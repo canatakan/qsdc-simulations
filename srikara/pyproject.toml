@@ -9,6 +9,7 @@ description = "CV QSDC Gaussian-states protocol simulation with analytic and Str
 readme = "README.md"
 requires-python = ">=3.9,<3.10"
 dependencies = [
+  "numpy",
   "strawberryfields",
 ]
 

@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import pi
 from typing import Protocol
-
+import numpy as np
 import strawberryfields as sf
 from strawberryfields import ops
 
 from .gaussian import (
     displacement_after_unsqueeze,
-    quadrature_means_to_alpha,
     sf_gate_args,
 )
 
@@ -23,16 +23,20 @@ class QSDCBackend(Protocol):
         """Backend display name."""
         ...
 
-    def control_amplitude(
-        self, alpha: complex, squeeze_r: float, theta: float
-    ) -> complex:
-        """Return Alice's amplitude after applying S(-s) to a control state."""
+    def begin_run(self, seed: int) -> None:
+        """Reset backend-level randomness for one protocol run."""
         ...
 
-    def returned_amplitude(
-        self, alpha: complex, squeeze_r: float, theta: float, beta: complex
-    ) -> complex:
-        """Return Bob's amplitude after Alice's D(beta) and Bob's S(-s)."""
+    def control_measurement(
+        self, alpha: complex, squeeze_r: float, theta: float, axis: str
+    ) -> float:
+        """Measure one control quadrature after Alice applies S(-s)."""
+        ...
+
+    def returned_measurement(
+        self, alpha: complex, squeeze_r: float, theta: float, beta: complex, axis: str
+    ) -> float:
+        """Measure one returned quadrature after Bob applies S(-s)."""
         ...
 
 
@@ -42,46 +46,64 @@ class AnalyticBackend:
 
     name: str = "analytic"
 
-    def control_amplitude(
-        self, alpha: complex, squeeze_r: float, theta: float
-    ) -> complex:
-        return alpha
+    def begin_run(self, seed: int) -> None:
+        pass
 
-    def returned_amplitude(
-        self, alpha: complex, squeeze_r: float, theta: float, beta: complex
-    ) -> complex:
-        return alpha + displacement_after_unsqueeze(beta, squeeze_r, theta)
+    def control_measurement(
+        self, alpha: complex, squeeze_r: float, theta: float, axis: str
+    ) -> float:
+        if axis == "q":
+            return alpha.real
+        if axis == "p":
+            return alpha.imag
+        raise ValueError(f"unknown quadrature axis {axis!r}")
+
+    def returned_measurement(
+        self, alpha: complex, squeeze_r: float, theta: float, beta: complex, axis: str
+    ) -> float:
+        returned_alpha = alpha + \
+            displacement_after_unsqueeze(beta, squeeze_r, theta)
+        if axis == "q":
+            return returned_alpha.real
+        if axis == "p":
+            return returned_alpha.imag
+        raise ValueError(f"unknown quadrature axis {axis!r}")
 
 
 @dataclass(frozen=True)
 class StrawberryFieldsBackend:
-    """One-mode Gaussian backend using Strawberry Fields native operations."""
+    """One-mode Gaussian backend using Strawberry Fields measurements."""
 
     name: str = "strawberryfields"
 
-    def control_amplitude(
-        self, alpha: complex, squeeze_r: float, theta: float
-    ) -> complex:
+    def begin_run(self, seed: int) -> None:
+        np.random.seed(seed)
+
+    def control_measurement(
+        self, alpha: complex, squeeze_r: float, theta: float, axis: str
+    ) -> float:
         prog = sf.Program(1)
         alpha_abs, alpha_phase = sf_gate_args(alpha)
+        phi = _homodyne_angle(axis)
 
         with prog.context as q:
             ops.Dgate(alpha_abs, alpha_phase) | q[0]
             # SF's sign convention is opposite to Eq. (5)-(7) in the paper.
             ops.Sgate(-squeeze_r, theta) | q[0]
             ops.Sgate(squeeze_r, theta) | q[0]
+            ops.MeasureHomodyne(phi) | q[0]
 
         eng = sf.Engine("gaussian")
         result = eng.run(prog)
-        x_mean, p_mean = result.state.means()
-        return quadrature_means_to_alpha(float(x_mean), float(p_mean))
+        return float(result.samples[0, 0]) / 2.0
 
-    def returned_amplitude(
-        self, alpha: complex, squeeze_r: float, theta: float, beta: complex
-    ) -> complex:
+    def returned_measurement(
+        self, alpha: complex, squeeze_r: float, theta: float, beta: complex, axis: str
+    ) -> float:
         prog = sf.Program(1)
         alpha_abs, alpha_phase = sf_gate_args(alpha)
         beta_abs, beta_phase = sf_gate_args(beta)
+        phi = _homodyne_angle(axis)
 
         with prog.context as q:
             ops.Dgate(alpha_abs, alpha_phase) | q[0]
@@ -90,11 +112,11 @@ class StrawberryFieldsBackend:
             if beta != 0:
                 ops.Dgate(beta_abs, beta_phase) | q[0]
             ops.Sgate(squeeze_r, theta) | q[0]
+            ops.MeasureHomodyne(phi) | q[0]
 
         eng = sf.Engine("gaussian")
         result = eng.run(prog)
-        x_mean, p_mean = result.state.means()
-        return quadrature_means_to_alpha(float(x_mean), float(p_mean))
+        return float(result.samples[0, 0]) / 2.0
 
 
 def make_backend(name: str) -> QSDCBackend:
@@ -103,3 +125,11 @@ def make_backend(name: str) -> QSDCBackend:
     if name in {"sf", "strawberryfields"}:
         return StrawberryFieldsBackend()
     raise ValueError(f"unknown backend {name!r}")
+
+
+def _homodyne_angle(axis: str) -> float:
+    if axis == "q":
+        return 0.0
+    if axis == "p":
+        return pi / 2.0
+    raise ValueError(f"unknown quadrature axis {axis!r}")

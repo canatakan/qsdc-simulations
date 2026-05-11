@@ -6,7 +6,8 @@ backends.
 The implementation includes:
 
 - analytic backend for formula-level checks
-- Strawberry Fields backend for Gaussian circuit execution
+- Strawberry Fields backend using Gaussian circuit execution with homodyne
+  measurements
 - detailed text-message transfer demo
 - method note in `method.pdf`
 
@@ -32,6 +33,10 @@ Transmit a text message through the verbose channel demo:
 ```bash
 qsdc-demo "hello" --backend sf
 ```
+
+The `analytic` backend is the exact formula reference. The `sf` backend uses
+Strawberry Fields measurement operations, so decoded symbols are sampled rather
+than read from exact state means.
 
 ## Tests
 

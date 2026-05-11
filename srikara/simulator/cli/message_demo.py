@@ -56,7 +56,7 @@ def main() -> None:
     decoded_bitstream = "".join(decoded_symbols)
     unpadded_bits = decoded_bitstream[:-padding] if padding else decoded_bitstream
     decoded_payload = bits_to_bytes(unpadded_bits)
-    decoded_message = decoded_payload.decode(args.encoding)
+    decoded_message = decoded_payload.decode(args.encoding, errors="replace")
 
     print_header("1. User message")
     print(f"Input text: {message!r}")
@@ -113,23 +113,26 @@ def main() -> None:
         )
 
     print_header("7. Bob checks returned decoys")
-    print("idx  expected alpha                  measured alpha                  status")
+    print("idx  axis  expected       measured       status")
     for decoy in result.decoys:
         status = "pass" if decoy.passed else "fail"
         print(
-            f"{decoy.index:>3}  {format_complex(decoy.expected_alpha):<30} "
-            f"{format_complex(decoy.measured_alpha):<30} {status}"
+            f"{decoy.index:>3}  {decoy.axis:>4}  "
+            f"{decoy.expected:>12.7f}  {decoy.measured:>12.7f}  {status}"
         )
     print(f"Decoy check result: {result.decoy_passed}")
 
     print_header("8. Bob decodes message modes")
-    print("idx  sent  decoded  Delta                          beta recovered")
+    print("idx  axis  sent  decoded  measured      Delta        factor       m recovered")
     for message_mode in result.messages:
         print(
-            f"{message_mode.index:>3}  {message_mode.sent_bits:>4}  "
+            f"{message_mode.index:>3}  {message_mode.axis:>4}  "
+            f"{message_mode.sent_bits:>4}  "
             f"{message_mode.decoded_bits:>7}  "
-            f"{format_complex(message_mode.observed_delta):<30} "
-            f"{format_complex(message_mode.recovered_beta)}"
+            f"{message_mode.measured:>11.7f}  "
+            f"{message_mode.observed_delta:>11.7f}  "
+            f"{message_mode.response_factor:>11.7f}  "
+            f"{message_mode.decoded_value:>11.7f}"
         )
 
     print_header("9. Reconstructed classical message")
