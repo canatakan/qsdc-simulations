@@ -1,10 +1,11 @@
 from simulator.backends import AnalyticBackend
-from simulator.protocol import ProtocolConfig, simulate_first_qsdc
+from simulator.core.config import ProtocolConfig
+from simulator.core.protocol import simulate_qsdc
 
 
-def test_first_qsdc_protocol_round_trips_messages():
+def test_qsdc_protocol_round_trips_messages():
     messages = ("000", "011", "101")
-    result = simulate_first_qsdc(
+    result = simulate_qsdc(
         messages,
         config=ProtocolConfig(n_states=12, seed=4),
         backend=AnalyticBackend(),

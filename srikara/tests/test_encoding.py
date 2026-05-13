@@ -1,6 +1,6 @@
 from random import Random
 
-from simulator.encoding import bits_for_real, sample_message_value
+from simulator.core.encoding import bits_for_real, sample_message_value
 
 
 def test_interval_round_trip_samples():

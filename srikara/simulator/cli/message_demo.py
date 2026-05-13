@@ -6,8 +6,9 @@ import argparse
 import textwrap
 
 from simulator.backends import make_backend
-from simulator.encoding import interval_for_bits
-from simulator.protocol import ProtocolConfig, simulate_first_qsdc
+from simulator.core.config import ProtocolConfig
+from simulator.core.encoding import interval_for_bits
+from simulator.core.protocol import simulate_qsdc
 
 
 def main() -> None:
@@ -19,13 +20,28 @@ def main() -> None:
     )
     parser.add_argument(
         "--backend",
-        choices=("analytic", "sf", "strawberryfields"),
+        choices=(
+            "analytic",
+            "sf",
+            "sf-sampled",
+        ),
         default="sf",
         help="simulation backend",
     )
     parser.add_argument("--seed", type=int, default=11)
     parser.add_argument("--encoding", default="utf-8")
-    parser.add_argument("--tolerance", type=float, default=1e-7)
+    parser.add_argument(
+        "--tolerance",
+        type=float,
+        default=None,
+        help="override control/decoy tolerance; defaults to the backend value",
+    )
+    parser.add_argument(
+        "--repetitions",
+        type=int,
+        default=1,
+        help="number of repeated homodyne samples to average for sf-sampled",
+    )
     args = parser.parse_args()
 
     message = args.message if args.message is not None else input("Message: ")
@@ -46,10 +62,10 @@ def main() -> None:
         seed=args.seed,
         tolerance=args.tolerance,
     )
-    result = simulate_first_qsdc(
+    result = simulate_qsdc(
         symbols,
         config=config,
-        backend=make_backend(args.backend),
+        backend=make_backend(args.backend, sampled_repetitions=args.repetitions),
     )
 
     decoded_symbols = tuple(message_mode.decoded_bits for message_mode in result.messages)
@@ -69,12 +85,15 @@ def main() -> None:
     print(f"Padding added for 3-bit QSDC symbols: {padding} zero bit(s)")
     print(f"Padded bitstream ({len(padded_bitstream)} bits):")
     print_wrapped(padded_bitstream)
-    print("3-bit symbols that will be sent by Alice:")
+    print("3-bit symbols selected for transmission:")
     print_symbol_rows(symbols)
 
     print_header("3. Quantum channel configuration")
     print(f"Backend: {result.backend_name}")
     print(f"Random seed: {args.seed}")
+    if result.backend_name == "sf-sampled":
+        print(f"Sample repetitions: {args.repetitions}")
+    print(f"Control/decoy tolerance: {result.check_tolerance:g}")
     print(f"Total optical modes n: {config.n_states}")
     print(f"Control modes n/2: {len(result.control_indices)}")
     print(f"Message modes n/4: {len(result.message_indices)}")
@@ -83,7 +102,7 @@ def main() -> None:
     print(f"Message coordinates: {result.message_indices}")
     print(f"Decoy coordinates: {result.decoy_indices}")
 
-    print_header("4. Bob prepares S(s_j)D(alpha_j)|0>")
+    print_header("4. State preparation S(s_j)D(alpha_j)|0>")
     print("idx  alpha_j                         r_j        theta_j")
     for state in result.prepared_states:
         print(
@@ -91,7 +110,7 @@ def main() -> None:
             f"{state.squeeze_r:>8.5f}  {state.theta:>9.5f}"
         )
 
-    print_header("5. Alice checks control modes")
+    print_header("5. Control-mode checks")
     print("idx  axis  expected       measured       status")
     for check in result.controls:
         status = "pass" if check.passed else "fail"
@@ -101,18 +120,18 @@ def main() -> None:
         )
     print(f"Control check result: {result.control_passed}")
 
-    print_header("6. Alice encodes message modes with D(beta_A)")
-    print("idx  bits  interval       m_A           beta_A")
+    print_header("6. Message-mode encoding with D(beta_m)")
+    print("idx  bits  interval       m             beta_m")
     for message_mode in result.messages:
         interval = interval_for_bits(message_mode.sent_bits)
         print(
             f"{message_mode.index:>3}  {message_mode.sent_bits:>4}  "
             f"{format_interval(interval.lower, interval.upper):<13} "
             f"{message_mode.message_value:>11.7f}  "
-            f"{format_complex(message_mode.alice_beta)}"
+            f"{format_complex(message_mode.message_beta)}"
         )
 
-    print_header("7. Bob checks returned decoys")
+    print_header("7. Returned decoy checks")
     print("idx  axis  expected       measured       status")
     for decoy in result.decoys:
         status = "pass" if decoy.passed else "fail"
@@ -122,7 +141,7 @@ def main() -> None:
         )
     print(f"Decoy check result: {result.decoy_passed}")
 
-    print_header("8. Bob decodes message modes")
+    print_header("8. Message-mode decoding")
     print("idx  axis  sent  decoded  measured      Delta        factor       m recovered")
     for message_mode in result.messages:
         print(

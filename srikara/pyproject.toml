@@ -20,6 +20,7 @@ dev = [
 
 [project.scripts]
 qsdc-demo = "simulator.cli.message_demo:main"
+qsdc-basic-demo = "simulator.cli.basic_demo:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["simulator"]

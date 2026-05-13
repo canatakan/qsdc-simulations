@@ -69,6 +69,6 @@ def sample_message_value(bits: str, rng: Random, tail_width: float = 1.0) -> flo
 
 
 def beta_for_message_value(message_value: float) -> complex:
-    """Return Alice's displacement beta = m(1 + i)."""
+    """Return the message displacement beta = m(1 + i)."""
 
     return complex(message_value, message_value)
