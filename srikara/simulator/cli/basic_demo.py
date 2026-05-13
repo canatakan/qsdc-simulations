@@ -32,7 +32,7 @@ def main() -> None:
     print("Formula:")
     print("beta = alpha cosh(r) + exp(i theta) alpha* sinh(r)")
     print("With r = 0: cosh(0) = 1 and sinh(0) = 0")
-    print(f"beta = {fmt(alpha)} * 1 + exp(0i) * {fmt(alpha.conjugate())} * 0")
+    print(f"beta = ({fmt(alpha)}) * 1 + exp(0i) * ({fmt(alpha.conjugate())}) * 0")
     print(f"beta = {fmt(prepared_beta)}")
     print(f"Prepared state: S(0)D(alpha)|0> = D({fmt(prepared_beta)})|0>")
 
@@ -55,7 +55,7 @@ def main() -> None:
     returned_alpha = alpha + delta
     print("Formula:")
     print("Delta = beta_A cosh(r) - exp(i theta) beta_A* sinh(r)")
-    print(f"Delta = {fmt(alice_beta)} * 1 - exp(0i) * {fmt(alice_beta.conjugate())} * 0")
+    print(f"Delta = ({fmt(alice_beta)}) * 1 - exp(0i) * ({fmt(alice_beta.conjugate())}) * 0")
     print(f"Delta = {fmt(delta)}")
     print(f"alpha_measured = alpha + Delta = {fmt(alpha)} + {fmt(delta)}")
     print(f"alpha_measured = {fmt(returned_alpha)}")
