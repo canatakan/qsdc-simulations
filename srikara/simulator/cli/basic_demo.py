@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from simulator.backends.analytic.calculations import (
     displacement_after_unsqueeze,
-    recover_message_displacement,
+    recover_alice_displacement,
     squeeze_displace_forward,
     squeeze_displace_inverse,
 )
@@ -17,17 +17,17 @@ def main() -> None:
     theta = 0.0
     bits = "110"
     message_value = 2.5
-    message_beta = beta_for_message_value(message_value)
+    alice_beta = beta_for_message_value(message_value)
 
     print_header("1. Fixed inputs")
     print(f"alpha = {fmt(alpha)}")
     print(f"r = {squeeze_r}")
     print(f"theta = {theta}")
     print(f"bits = {bits}")
-    print(f"m = {message_value}")
-    print(f"beta_m = m(1 + i) = {fmt(message_beta)}")
+    print(f"m_A = {message_value}")
+    print(f"beta_A = m_A(1 + i) = {fmt(alice_beta)}")
 
-    print_header("2. Prepare S(s)D(alpha)|0>")
+    print_header("2. Bob prepares S(s)D(alpha)|0>")
     prepared_beta = squeeze_displace_forward(alpha, squeeze_r, theta)
     print("Formula:")
     print("beta = alpha cosh(r) + exp(i theta) alpha* sinh(r)")
@@ -36,7 +36,7 @@ def main() -> None:
     print(f"beta = {fmt(prepared_beta)}")
     print(f"Prepared state: S(0)D(alpha)|0> = D({fmt(prepared_beta)})|0>")
 
-    print_header("3. Control check example")
+    print_header("3. Alice control check example")
     control_after_unsqueeze = squeeze_displace_inverse(prepared_beta, squeeze_r, theta)
     print("Formula:")
     print("alpha_recovered = beta cosh(r) - exp(i theta) beta* sinh(r)")
@@ -44,35 +44,35 @@ def main() -> None:
     print(f"q measurement should be Re(alpha) = {control_after_unsqueeze.real:g}")
     print(f"p measurement should be Im(alpha) = {control_after_unsqueeze.imag:g}")
 
-    print_header("4. Encode the message")
+    print_header("4. Alice encodes the message")
     print("Formula:")
-    print("beta_m = m + i m")
-    print(f"beta_m = {message_value:g} + i{message_value:g} = {fmt(message_beta)}")
+    print("beta_A = m_A + i m_A")
+    print(f"beta_A = {message_value:g} + i{message_value:g} = {fmt(alice_beta)}")
     print(f"{message_value:g} lies in interval (2, 3), so bits = {bits}")
 
-    print_header("5. Receive and unsqueeze")
-    delta = displacement_after_unsqueeze(message_beta, squeeze_r, theta)
+    print_header("5. Bob receives and unsqueezes")
+    delta = displacement_after_unsqueeze(alice_beta, squeeze_r, theta)
     returned_alpha = alpha + delta
     print("Formula:")
-    print("Delta = beta_m cosh(r) - exp(i theta) beta_m* sinh(r)")
-    print(f"Delta = {fmt(message_beta)} * 1 - exp(0i) * {fmt(message_beta.conjugate())} * 0")
+    print("Delta = beta_A cosh(r) - exp(i theta) beta_A* sinh(r)")
+    print(f"Delta = {fmt(alice_beta)} * 1 - exp(0i) * {fmt(alice_beta.conjugate())} * 0")
     print(f"Delta = {fmt(delta)}")
     print(f"alpha_measured = alpha + Delta = {fmt(alpha)} + {fmt(delta)}")
     print(f"alpha_measured = {fmt(returned_alpha)}")
 
-    print_header("6. Decode")
+    print_header("6. Bob decodes")
     observed_delta = returned_alpha - alpha
-    recovered_beta = recover_message_displacement(observed_delta, squeeze_r, theta)
+    recovered_beta = recover_alice_displacement(observed_delta, squeeze_r, theta)
     decoded_value = (recovered_beta.real + recovered_beta.imag) / 2.0
     decoded_bits = bits_for_real(decoded_value)
     print("Formula:")
     print("observed_delta = alpha_measured - alpha")
     print(f"observed_delta = {fmt(returned_alpha)} - {fmt(alpha)} = {fmt(observed_delta)}")
-    print("beta_m_recovered = observed_delta cosh(r) + exp(i theta) observed_delta* sinh(r)")
-    print(f"beta_m_recovered = {fmt(recovered_beta)}")
-    print("m_recovered = (Re(beta_m_recovered) + Im(beta_m_recovered)) / 2")
+    print("beta_A_recovered = observed_delta cosh(r) + exp(i theta) observed_delta* sinh(r)")
+    print(f"beta_A_recovered = {fmt(recovered_beta)}")
+    print("m_A_recovered = (Re(beta_A_recovered) + Im(beta_A_recovered)) / 2")
     print(
-        "m_recovered = "
+        "m_A_recovered = "
         f"({recovered_beta.real:g} + {recovered_beta.imag:g}) / 2 = {decoded_value:g}"
     )
     print(f"decoded bits = {decoded_bits}")

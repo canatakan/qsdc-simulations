@@ -2,7 +2,7 @@ from math import isclose
 
 from simulator.backends.analytic.calculations import (
     displacement_after_unsqueeze,
-    recover_message_displacement,
+    recover_alice_displacement,
     squeeze_displace_forward,
     squeeze_displace_inverse,
 )
@@ -24,12 +24,12 @@ def test_squeeze_displace_equations_are_inverses():
     assert_complex_close(recovered, alpha)
 
 
-def test_message_displacement_recovery_after_unsqueeze():
+def test_alice_displacement_recovery_after_unsqueeze():
     beta = -1.4 - 1.4j
     squeeze_r = 0.31
     theta = 1.7
 
     observed_delta = displacement_after_unsqueeze(beta, squeeze_r, theta)
-    recovered_beta = recover_message_displacement(observed_delta, squeeze_r, theta)
+    recovered_beta = recover_alice_displacement(observed_delta, squeeze_r, theta)
 
     assert_complex_close(recovered_beta, beta)

@@ -85,7 +85,7 @@ def main() -> None:
     print(f"Padding added for 3-bit QSDC symbols: {padding} zero bit(s)")
     print(f"Padded bitstream ({len(padded_bitstream)} bits):")
     print_wrapped(padded_bitstream)
-    print("3-bit symbols selected for transmission:")
+    print("3-bit symbols that will be sent by Alice:")
     print_symbol_rows(symbols)
 
     print_header("3. Quantum channel configuration")
@@ -102,7 +102,7 @@ def main() -> None:
     print(f"Message coordinates: {result.message_indices}")
     print(f"Decoy coordinates: {result.decoy_indices}")
 
-    print_header("4. State preparation S(s_j)D(alpha_j)|0>")
+    print_header("4. Bob prepares S(s_j)D(alpha_j)|0>")
     print("idx  alpha_j                         r_j        theta_j")
     for state in result.prepared_states:
         print(
@@ -110,7 +110,7 @@ def main() -> None:
             f"{state.squeeze_r:>8.5f}  {state.theta:>9.5f}"
         )
 
-    print_header("5. Control-mode checks")
+    print_header("5. Alice checks control modes")
     print("idx  axis  expected       measured       status")
     for check in result.controls:
         status = "pass" if check.passed else "fail"
@@ -120,18 +120,18 @@ def main() -> None:
         )
     print(f"Control check result: {result.control_passed}")
 
-    print_header("6. Message-mode encoding with D(beta_m)")
-    print("idx  bits  interval       m             beta_m")
+    print_header("6. Alice encodes message modes with D(beta_A)")
+    print("idx  bits  interval       m_A           beta_A")
     for message_mode in result.messages:
         interval = interval_for_bits(message_mode.sent_bits)
         print(
             f"{message_mode.index:>3}  {message_mode.sent_bits:>4}  "
             f"{format_interval(interval.lower, interval.upper):<13} "
             f"{message_mode.message_value:>11.7f}  "
-            f"{format_complex(message_mode.message_beta)}"
+            f"{format_complex(message_mode.alice_beta)}"
         )
 
-    print_header("7. Returned decoy checks")
+    print_header("7. Bob checks returned decoys")
     print("idx  axis  expected       measured       status")
     for decoy in result.decoys:
         status = "pass" if decoy.passed else "fail"
@@ -141,7 +141,7 @@ def main() -> None:
         )
     print(f"Decoy check result: {result.decoy_passed}")
 
-    print_header("8. Message-mode decoding")
+    print_header("8. Bob decodes message modes")
     print("idx  axis  sent  decoded  measured      Delta        factor       m recovered")
     for message_mode in result.messages:
         print(

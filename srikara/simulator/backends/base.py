@@ -19,13 +19,13 @@ class QSDCBackend(ABC):
     def control_measurement(
         self, alpha: complex, squeeze_r: float, theta: float, axis: str
     ) -> float:
-        """Measure one control quadrature after unsqueezing."""
+        """Measure one control quadrature after Alice applies S(-s)."""
 
     @abstractmethod
     def returned_measurement(
         self, alpha: complex, squeeze_r: float, theta: float, beta: complex, axis: str
     ) -> float:
-        """Measure one returned quadrature after unsqueezing."""
+        """Measure one returned quadrature after Bob applies S(-s)."""
 
     @abstractmethod
     def message_response_factor(

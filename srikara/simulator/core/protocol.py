@@ -1,5 +1,3 @@
-"""CV QSDC protocol from paper 11."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -12,8 +10,8 @@ from .encoding import beta_for_message_value, bits_for_real, sample_message_valu
 
 
 @dataclass(frozen=True)
-class PreparedState:
-    """Private state parameters for one time slot."""
+class BobPreparedState:
+    """Bob's private state parameters for one time slot."""
 
     index: int
     alpha: complex
@@ -44,7 +42,7 @@ class MessageDecode:
     index: int
     sent_bits: str
     message_value: float
-    message_beta: complex
+    alice_beta: complex
     axis: str
     measured: float
     observed_delta: float
@@ -60,7 +58,7 @@ class ProtocolResult:
     check_tolerance: float
     control_passed: bool
     decoy_passed: bool
-    prepared_states: tuple[PreparedState, ...]
+    prepared_states: tuple[BobPreparedState, ...]
     control_indices: tuple[int, ...]
     message_indices: tuple[int, ...]
     decoy_indices: tuple[int, ...]
@@ -78,7 +76,7 @@ def simulate_qsdc(
     config: ProtocolConfig | None = None,
     backend: QSDCBackend | None = None,
 ) -> ProtocolResult:
-    """Run the CV QSDC protocol."""
+    """Run the Alice-Bob CV QSDC protocol."""
 
     config = config or ProtocolConfig(n_states=4 * len(message_bits))
     active_backend: QSDCBackend = backend if backend is not None else AnalyticBackend()
@@ -86,7 +84,7 @@ def simulate_qsdc(
     active_backend.begin_run(resolved_config.seed)
 
     rng = Random(resolved_config.seed)
-    prepared_states = _prepare_states(resolved_config, rng)
+    prepared_states = _bob_prepare_states(resolved_config, rng)
 
     all_indices = list(range(resolved_config.n_states))
     rng.shuffle(all_indices)
@@ -139,10 +137,10 @@ def simulate_qsdc(
     )
 
 
-def _prepare_states(
+def _bob_prepare_states(
     config: ResolvedProtocolConfig, rng: Random
-) -> list[PreparedState]:
-    states: list[PreparedState] = []
+) -> list[BobPreparedState]:
+    states: list[BobPreparedState] = []
     for index in range(config.n_states):
         alpha = complex(
             rng.uniform(-config.alpha_bound, config.alpha_bound),
@@ -150,12 +148,12 @@ def _prepare_states(
         )
         squeeze_r = rng.uniform(config.squeeze_r_min, config.squeeze_r_max)
         theta = rng.uniform(0.0, 2.0 * pi)
-        states.append(PreparedState(index, alpha, squeeze_r, theta))
+        states.append(BobPreparedState(index, alpha, squeeze_r, theta))
     return states
 
 
 def _check_control(
-    state: PreparedState,
+    state: BobPreparedState,
     backend: QSDCBackend,
     config: ResolvedProtocolConfig,
     rng: Random,
@@ -175,7 +173,7 @@ def _check_control(
 
 
 def _check_decoy(
-    state: PreparedState,
+    state: BobPreparedState,
     backend: QSDCBackend,
     config: ResolvedProtocolConfig,
     rng: Random,
@@ -195,15 +193,15 @@ def _check_decoy(
 
 
 def _decode_message(
-    state: PreparedState,
+    state: BobPreparedState,
     message: tuple[str, float, complex],
     backend: QSDCBackend,
     rng: Random,
 ) -> MessageDecode:
-    bits, message_value, message_beta = message
+    bits, message_value, alice_beta = message
     axis = _message_axis(rng)
     measured = backend.returned_measurement(
-        state.alpha, state.squeeze_r, state.theta, beta=message_beta, axis=axis
+        state.alpha, state.squeeze_r, state.theta, beta=alice_beta, axis=axis
     )
     initial_component = state.alpha.real if axis == "q" else state.alpha.imag
     observed_delta = measured - initial_component
@@ -217,7 +215,7 @@ def _decode_message(
         index=state.index,
         sent_bits=bits,
         message_value=message_value,
-        message_beta=message_beta,
+        alice_beta=alice_beta,
         axis=axis,
         measured=measured,
         observed_delta=observed_delta,

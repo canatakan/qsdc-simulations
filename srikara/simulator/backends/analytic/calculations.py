@@ -39,27 +39,27 @@ def squeeze_displace_inverse(
 def displacement_after_unsqueeze(
     beta: complex, squeeze_r: float, theta: float
 ) -> complex:
-    """Compute message displacement after S(-s).
+    """Compute Alice's displacement as seen after Bob applies S(-s).
 
     Protocol situation:
-        The message operation applies D(beta_m).
-        The receiver later applies S†(s) = S(-s).
+        Alice applies D(beta_A) to a message state.
+        Bob later applies S†(s) = S(-s).
 
     Formula:
-        Delta = beta_m cosh(r) - exp(i theta) beta_m* sinh(r),
-          where beta_m is the message displacement: beta_m = m(1 + i)
+        Delta = beta_A cosh(r) - exp(i theta) beta_A* sinh(r),
+          where beta_A is Alice's displacement: beta_A = m_A(1 + i)
     """
 
     return squeeze_displace_inverse(beta, squeeze_r, theta)
 
 
-def recover_message_displacement(
+def recover_alice_displacement(
     delta: complex, squeeze_r: float, theta: float
 ) -> complex:
-    """Recover beta_m from the observed displacement shift.
+    """Recover Alice's beta_A from Bob's observed displacement shift.
 
     Formula:
-        beta_m = Delta cosh(r) + exp(i theta) Delta* sinh(r)
+        beta_A = Delta cosh(r) + exp(i theta) Delta* sinh(r)
     """
 
     return squeeze_displace_forward(delta, squeeze_r, theta)
