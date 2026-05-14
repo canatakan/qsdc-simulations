@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import inf
-from random import Random
+from .random_source import RandomSource
 
 
 @dataclass(frozen=True)
@@ -57,15 +57,17 @@ def bits_for_real(value: float) -> str:
     )
 
 
-def sample_message_value(bits: str, rng: Random, tail_width: float = 1.0) -> float:
+def sample_message_value(
+    bits: str, random_source: RandomSource, tail_width: float = 1.0
+) -> float:
     """Choose m from the interval for bits."""
 
     interval = interval_for_bits(bits)
     if interval.lower == -inf:
-        return rng.uniform(interval.upper - tail_width, interval.upper)
+        return random_source.uniform(interval.upper - tail_width, interval.upper)
     if interval.upper == inf:
-        return rng.uniform(interval.lower, interval.lower + tail_width)
-    return rng.uniform(interval.lower, interval.upper)
+        return random_source.uniform(interval.lower, interval.lower + tail_width)
+    return random_source.uniform(interval.lower, interval.upper)
 
 
 def beta_for_message_value(message_value: float) -> complex:

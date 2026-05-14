@@ -53,7 +53,7 @@ def main() -> None:
     padding = (-len(bitstream)) % 3
     padded_bitstream = bitstream + ("0" * padding)
     symbols = tuple(
-        padded_bitstream[index : index + 3]
+        padded_bitstream[index: index + 3]
         for index in range(0, len(padded_bitstream), 3)
     )
 
@@ -65,12 +65,15 @@ def main() -> None:
     result = simulate_qsdc(
         symbols,
         config=config,
-        backend=make_backend(args.backend, sampled_repetitions=args.repetitions),
+        backend=make_backend(
+            args.backend, sampled_repetitions=args.repetitions),
     )
 
-    decoded_symbols = tuple(message_mode.decoded_bits for message_mode in result.messages)
+    decoded_symbols = tuple(
+        message_mode.decoded_bits for message_mode in result.messages)
     decoded_bitstream = "".join(decoded_symbols)
-    unpadded_bits = decoded_bitstream[:-padding] if padding else decoded_bitstream
+    unpadded_bits = decoded_bitstream[:-
+                                      padding] if padding else decoded_bitstream
     decoded_payload = bits_to_bytes(unpadded_bits)
     decoded_message = decoded_payload.decode(args.encoding, errors="replace")
 
@@ -90,15 +93,25 @@ def main() -> None:
 
     print_header("3. Quantum channel configuration")
     print(f"Backend: {result.backend_name}")
+    print(f"Protocol random source: {result.random_source_name}")
     print(f"Random seed: {args.seed}")
+    print(f"Backend measurement seed: {args.seed}")
     if result.backend_name == "sf-sampled":
         print(f"Sample repetitions: {args.repetitions}")
     print(f"Control/decoy tolerance: {result.check_tolerance:g}")
+    
+    print()
+
     print(f"Total optical modes n: {config.n_states}")
     print(f"Control modes n/2: {len(result.control_indices)}")
     print(f"Message modes n/4: {len(result.message_indices)}")
     print(f"Decoy modes n/4: {len(result.decoy_indices)}")
+    print(f"Delayed modes n/2: {len(result.route.delayed_indices)}")
+    
+    print()
+    
     print(f"Control coordinates: {result.control_indices}")
+    print(f"Delayed coordinates: {result.route.delayed_indices}")
     print(f"Message coordinates: {result.message_indices}")
     print(f"Decoy coordinates: {result.decoy_indices}")
 
@@ -109,8 +122,20 @@ def main() -> None:
             f"{state.index:>3}  {format_complex(state.alpha):<30} "
             f"{state.squeeze_r:>8.5f}  {state.theta:>9.5f}"
         )
+    
+    print()
+    print(
+        "Announcement via classical channel (Alice -> Bob): "
+        f"{result.transcript.control_coordinates.label}"
+    )
 
     print_header("5. Alice checks control modes")
+    print(
+        "Announcement via classical channel (Bob -> Alice): "
+        f"{result.transcript.control_parameter_coordinates.label}"
+    )
+    print()
+
     print("idx  axis  expected       measured       status")
     for check in result.controls:
         status = "pass" if check.passed else "fail"
@@ -132,6 +157,12 @@ def main() -> None:
         )
 
     print_header("7. Bob checks returned decoys")
+    print(
+        "Announcement via classical channel (Alice -> Bob): "
+        f"{result.transcript.decoy_coordinates.label}"
+    )
+    print()
+
     print("idx  axis  expected       measured       status")
     for decoy in result.decoys:
         status = "pass" if decoy.passed else "fail"
@@ -172,7 +203,7 @@ def bytes_to_bits(payload: bytes) -> str:
 def bits_to_bytes(bits: str) -> bytes:
     if len(bits) % 8 != 0:
         raise ValueError("decoded bitstream length is not byte-aligned")
-    return bytes(int(bits[index : index + 8], 2) for index in range(0, len(bits), 8))
+    return bytes(int(bits[index: index + 8], 2) for index in range(0, len(bits), 8))
 
 
 def print_header(title: str) -> None:
@@ -189,7 +220,7 @@ def print_wrapped(bits: str, width: int = 72) -> None:
 
 def print_symbol_rows(symbols: tuple[str, ...], per_row: int = 16) -> None:
     for index in range(0, len(symbols), per_row):
-        row = symbols[index : index + per_row]
+        row = symbols[index: index + per_row]
         print(f"{index:>3}-{index + len(row) - 1:<3}: {' '.join(row)}")
 
 

@@ -9,9 +9,19 @@ from simulator.backends.analytic.calculations import (
     squeeze_displace_inverse,
 )
 from simulator.core.encoding import beta_for_message_value, bits_for_real
+from simulator.core.flow import ModeRoute, build_transcript
+from simulator.core.random_source import IdealQRNG
 
 
 def main() -> None:
+    qrng = IdealQRNG(seed=3)
+    route = ModeRoute(
+        control_indices=(0, 1),
+        delayed_indices=(2, 3),
+        message_indices=(2,),
+        decoy_indices=(3,),
+    )
+    transcript = build_transcript(route, qrng)
     alpha = 2.0 + 3.0j
     squeeze_r = 0.0
     theta = 0.0
@@ -20,6 +30,12 @@ def main() -> None:
     alice_beta = beta_for_message_value(message_value)
 
     print_header("1. Fixed inputs")
+    print(f"protocol random source = {qrng.name}")
+    print("total modes n = 4")
+    print(f"control coordinates = {route.control_indices}")
+    print(f"delayed coordinates = {route.delayed_indices}")
+    print(f"message coordinates = {route.message_indices}")
+    print(f"decoy coordinates = {route.decoy_indices}")
     print(f"alpha = {fmt(alpha)}")
     print(f"r = {squeeze_r}")
     print(f"theta = {theta}")
@@ -35,8 +51,16 @@ def main() -> None:
     print(f"beta = ({fmt(alpha)}) * 1 + exp(0i) * ({fmt(alpha.conjugate())}) * 0")
     print(f"beta = {fmt(prepared_beta)}")
     print(f"Prepared state: S(0)D(alpha)|0> = D({fmt(prepared_beta)})|0>")
+    print(
+        "Announcement via classical channel (Alice -> Bob): "
+        f"{transcript.control_coordinates.label}"
+    )
 
     print_header("3. Alice control check example")
+    print(
+        "Announcement via classical channel (Bob -> Alice): "
+        f"{transcript.control_parameter_coordinates.label}"
+    )
     control_after_unsqueeze = squeeze_displace_inverse(prepared_beta, squeeze_r, theta)
     print("Formula:")
     print("alpha_recovered = beta cosh(r) - exp(i theta) beta* sinh(r)")
@@ -44,23 +68,35 @@ def main() -> None:
     print(f"q measurement should be Re(alpha) = {control_after_unsqueeze.real:g}")
     print(f"p measurement should be Im(alpha) = {control_after_unsqueeze.imag:g}")
 
-    print_header("4. Alice encodes the message")
+    print_header("4. Delay and Alice encodes")
+    print(f"Delay buffer holds coordinates: {route.delayed_indices}")
+    print(f"Released message coordinate: {route.message_indices[0]}")
     print("Formula:")
     print("beta_A = m_A + i m_A")
     print(f"beta_A = {message_value:g} + i{message_value:g} = {fmt(alice_beta)}")
     print(f"{message_value:g} lies in interval (2, 3), so bits = {bits}")
 
-    print_header("5. Bob receives and unsqueezes")
+    print_header("5. Decoy announcement")
+    print(
+        "Announcement via classical channel (Alice -> Bob): "
+        f"{transcript.decoy_coordinates.label}"
+    )
+    print(f"Released decoy coordinate: {route.decoy_indices[0]}")
+
+    print_header("6. Bob receives and unsqueezes")
     delta = displacement_after_unsqueeze(alice_beta, squeeze_r, theta)
     returned_alpha = alpha + delta
     print("Formula:")
     print("Delta = beta_A cosh(r) - exp(i theta) beta_A* sinh(r)")
-    print(f"Delta = ({fmt(alice_beta)}) * 1 - exp(0i) * ({fmt(alice_beta.conjugate())}) * 0")
+    print(
+        f"Delta = ({fmt(alice_beta)}) * 1 - exp(0i) * "
+        f"({fmt(alice_beta.conjugate())}) * 0"
+    )
     print(f"Delta = {fmt(delta)}")
     print(f"alpha_measured = alpha + Delta = {fmt(alpha)} + {fmt(delta)}")
     print(f"alpha_measured = {fmt(returned_alpha)}")
 
-    print_header("6. Bob decodes")
+    print_header("7. Bob decodes")
     observed_delta = returned_alpha - alpha
     recovered_beta = recover_alice_displacement(observed_delta, squeeze_r, theta)
     decoded_value = (recovered_beta.real + recovered_beta.imag) / 2.0

@@ -10,6 +10,8 @@ The implementation includes:
   means
 - Strawberry Fields sampled backend using Gaussian circuit execution with
   homodyne measurements
+- protocol QRNG/random-source abstraction for reproducible routing choices
+- optical-switch, delay-buffer, and public-announcement flow records
 - detailed text-message transfer demo
 - method note in `method.pdf`
 
@@ -80,7 +82,9 @@ simulator/
   core/
     config.py      # protocol settings, validation, and backend tolerances
     encoding.py    # 3-bit interval encoding
+    flow.py        # optical switching, delay, and announcement records
     protocol.py    # CV QSDC protocol orchestration
+    random_source.py
   cli/             # qsdc-demo command implementation
 tests/
 method.pdf
