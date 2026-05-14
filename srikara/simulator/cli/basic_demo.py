@@ -10,11 +10,11 @@ from simulator.backends.analytic.calculations import (
 )
 from simulator.core.encoding import beta_for_message_value, bits_for_real
 from simulator.core.flow import ModeRoute, build_transcript
-from simulator.core.random_source import IdealQRNG
+from simulator.core.random_source import ClassicalRandomSource
 
 
 def main() -> None:
-    qrng = IdealQRNG(seed=3)
+    qrng = ClassicalRandomSource(seed=3)
     route = ModeRoute(
         control_indices=(0, 1),
         delayed_indices=(2, 3),

@@ -7,7 +7,7 @@ from simulator.backends import AnalyticBackend, QSDCBackend
 from .config import ProtocolConfig, ResolvedProtocolConfig, resolve_config
 from .encoding import beta_for_message_value, bits_for_real, sample_message_value
 from .flow import ModeRoute, OpticalSwitch, ProtocolTranscript, build_transcript
-from .random_source import IdealQRNG, RandomSource
+from .random_source import ClassicalRandomSource, RandomSource
 
 
 @dataclass(frozen=True)
@@ -84,7 +84,7 @@ def simulate_qsdc(
     config = config or ProtocolConfig(n_states=4 * len(message_bits))
     active_backend: QSDCBackend = backend if backend is not None else AnalyticBackend()
     resolved_config = resolve_config(config, active_backend, len(message_bits))
-    protocol_random = random_source or IdealQRNG(resolved_config.seed)
+    protocol_random = random_source or ClassicalRandomSource(resolved_config.seed)
 
     # Backend seeding is only for backend-owned sampling, such as SF homodyne draws.
     active_backend.begin_run(resolved_config.seed)

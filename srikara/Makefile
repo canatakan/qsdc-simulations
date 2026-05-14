@@ -20,7 +20,11 @@ demo/sf:
 	qsdc-demo 'hello' --backend sf
 
 demo/sf-sampled:
-	qsdc-demo 'hello' --backend sf-sampled --repetitions 100
+	qsdc-demo 'hello' \
+	--backend sf-sampled \
+	--repetitions 10 \
+	--random-source sf-bs-qrng \
+	--seed 30
 
 clean:
 	find . -type d -name "__pycache__" -prune -exec rm -rf {} +

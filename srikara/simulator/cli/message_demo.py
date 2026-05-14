@@ -9,6 +9,7 @@ from simulator.backends import make_backend
 from simulator.core.config import ProtocolConfig
 from simulator.core.encoding import interval_for_bits
 from simulator.core.protocol import simulate_qsdc
+from simulator.core.random_source import ClassicalRandomSource, SFBeamSplitterQRNG
 
 
 def main() -> None:
@@ -42,6 +43,12 @@ def main() -> None:
         default=1,
         help="number of repeated homodyne samples to average for sf-sampled",
     )
+    parser.add_argument(
+        "--random-source",
+        choices=("classical", "sf-bs-qrng"),
+        default="classical",
+        help="protocol random source for routing, basis choices, and values",
+    )
     args = parser.parse_args()
 
     message = args.message if args.message is not None else input("Message: ")
@@ -67,6 +74,7 @@ def main() -> None:
         config=config,
         backend=make_backend(
             args.backend, sampled_repetitions=args.repetitions),
+        random_source=make_random_source(args.random_source, args.seed),
     )
 
     decoded_symbols = tuple(
@@ -233,6 +241,14 @@ def format_interval(lower: float, upper: float) -> str:
     left = "-inf" if lower == float("-inf") else f"{lower:g}"
     right = "inf" if upper == float("inf") else f"{upper:g}"
     return f"({left}, {right})"
+
+
+def make_random_source(name: str, seed: int):
+    if name == "classical":
+        return ClassicalRandomSource(seed)
+    if name == "sf-bs-qrng":
+        return SFBeamSplitterQRNG(seed=seed)
+    raise ValueError(f"unknown random source {name!r}")
 
 
 if __name__ == "__main__":

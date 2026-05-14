@@ -10,7 +10,8 @@ The implementation includes:
   means
 - Strawberry Fields sampled backend using Gaussian circuit execution with
   homodyne measurements
-- protocol QRNG/random-source abstraction for reproducible routing choices
+- protocol random-source abstraction with classical and SF beam-splitter QRNG
+  simulations
 - optical-switch, delay-buffer, and public-announcement flow records
 - detailed text-message transfer demo
 - method note in `method.pdf`
@@ -48,6 +49,12 @@ Average repeated homodyne samples in the sampled backend:
 
 ```bash
 qsdc-demo "hello" --backend sf-sampled --repetitions 100
+```
+
+Use the Strawberry Fields beam-splitter QRNG simulation for protocol choices:
+
+```bash
+qsdc-demo "hello" --backend sf --random-source sf-bs-qrng
 ```
 
 Print a hand-checkable one-symbol calculation:
