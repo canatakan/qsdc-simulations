@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from simulator.core.config import (
+from srikara.simulator.core.config import (
     DEFAULT_SAMPLED_REPETITIONS,
     DEFAULT_SAMPLED_TOLERANCE_SIGMAS,
     validate_sampled_repetitions,

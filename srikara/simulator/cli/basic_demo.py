@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from simulator.backends.analytic.calculations import (
+from srikara.simulator.backends.analytic.calculations import (
     displacement_after_unsqueeze,
     recover_alice_displacement,
     squeeze_displace_forward,
     squeeze_displace_inverse,
 )
-from simulator.core.encoding import beta_for_message_value, bits_for_real
-from simulator.core.flow import ModeRoute, build_transcript
-from simulator.core.random_source import ClassicalRandomSource
+from srikara.simulator.core.encoding import beta_for_message_value, bits_for_real
+from srikara.simulator.core.flow import ModeRoute, build_transcript
+from utils import ClassicalRandomSource
 
 
 def main() -> None:

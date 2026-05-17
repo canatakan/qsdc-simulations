@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from simulator.core.config import DEFAULT_EXACT_TOLERANCE
-from simulator.core.encoding import beta_for_message_value
+from srikara.simulator.core.config import DEFAULT_EXACT_TOLERANCE
+from srikara.simulator.core.encoding import beta_for_message_value
 
 from ..base import QSDCBackend
 from .calculations import displacement_after_unsqueeze

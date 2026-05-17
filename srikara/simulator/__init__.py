@@ -1,4 +1,4 @@
-"""Modular simulator for the CV QSDC protocol."""
+"""Modular srikara.simulator for the CV QSDC protocol."""
 
 from .core.config import ProtocolConfig
 from .core.protocol import ProtocolResult, simulate_qsdc

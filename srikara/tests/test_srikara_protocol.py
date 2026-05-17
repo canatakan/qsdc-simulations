@@ -1,6 +1,6 @@
-from simulator.backends import AnalyticBackend
-from simulator.core.config import ProtocolConfig
-from simulator.core.protocol import simulate_qsdc
+from srikara.simulator.backends import AnalyticBackend
+from srikara.simulator.core.config import ProtocolConfig
+from srikara.simulator.core.protocol import simulate_qsdc
 
 
 def test_qsdc_protocol_round_trips_messages():

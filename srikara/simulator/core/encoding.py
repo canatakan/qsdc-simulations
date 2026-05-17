@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import inf
-from .random_source import RandomSource
+
+from utils import RandomSource
 
 
 @dataclass(frozen=True)

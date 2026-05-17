@@ -1,6 +1,6 @@
 from math import isclose
 
-from simulator.backends.analytic.calculations import (
+from srikara.simulator.backends.analytic.calculations import (
     displacement_after_unsqueeze,
     recover_alice_displacement,
     squeeze_displace_forward,

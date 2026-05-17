@@ -5,11 +5,12 @@ from __future__ import annotations
 import argparse
 import textwrap
 
-from simulator.backends import make_backend
-from simulator.core.config import ProtocolConfig
-from simulator.core.encoding import interval_for_bits
-from simulator.core.protocol import simulate_qsdc
-from simulator.core.random_source import ClassicalRandomSource, SFBeamSplitterQRNG
+from srikara.simulator.backends import make_backend
+from srikara.simulator.core.config import ProtocolConfig
+from srikara.simulator.core.encoding import interval_for_bits
+from srikara.simulator.core.protocol import simulate_qsdc
+from utils import ClassicalRandomSource
+from utils import SFBeamSplitterQRNG
 
 
 def main() -> None:

@@ -9,8 +9,8 @@ import numpy as np
 import strawberryfields as sf
 from strawberryfields import ops
 
-from simulator.core.config import validate_sampled_repetitions
-from simulator.core.encoding import beta_for_message_value
+from srikara.simulator.core.config import validate_sampled_repetitions
+from srikara.simulator.core.encoding import beta_for_message_value
 
 
 def homodyne_angle(axis: str) -> float:

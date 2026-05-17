@@ -1,4 +1,4 @@
-"""Backend contract for the CV QSDC simulator."""
+"""Backend contract for the CV QSDC srikara.simulator."""
 
 from __future__ import annotations
 

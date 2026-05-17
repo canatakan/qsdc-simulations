@@ -1,5 +1,5 @@
-from simulator.core.encoding import bits_for_real, sample_message_value
-from simulator.core.random_source import ClassicalRandomSource
+from srikara.simulator.core.encoding import bits_for_real, sample_message_value
+from utils import ClassicalRandomSource
 
 
 def test_interval_round_trip_samples():

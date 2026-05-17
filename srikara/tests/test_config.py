@@ -1,7 +1,7 @@
 import pytest
 
-from simulator.backends import AnalyticBackend, SFSampledBackend
-from simulator.core.config import (
+from srikara.simulator.backends import AnalyticBackend, SFSampledBackend
+from srikara.simulator.core.config import (
     ProtocolConfig,
     resolve_config,
     validate_config,

@@ -3,11 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from math import pi
 
-from simulator.backends import AnalyticBackend, QSDCBackend
+from srikara.simulator.backends import AnalyticBackend, QSDCBackend
 from .config import ProtocolConfig, ResolvedProtocolConfig, resolve_config
 from .encoding import beta_for_message_value, bits_for_real, sample_message_value
 from .flow import ModeRoute, OpticalSwitch, ProtocolTranscript, build_transcript
-from .random_source import ClassicalRandomSource, RandomSource
+from utils import ClassicalRandomSource, RandomSource
 
 
 @dataclass(frozen=True)
