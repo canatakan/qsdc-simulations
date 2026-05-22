@@ -5,7 +5,7 @@ from __future__ import annotations
 from random import Random
 from typing import Sequence, TypeVar
 
-from .base import RandomSource
+from utils.random.base import RandomSource
 
 T = TypeVar("T")
 

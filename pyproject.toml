@@ -32,3 +32,6 @@ packages = [
 testpaths = [
   "srikara/tests",
 ]
+addopts = [
+  "--import-mode=importlib",
+]

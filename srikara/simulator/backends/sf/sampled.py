@@ -11,8 +11,8 @@ from srikara.simulator.core.config import (
     DEFAULT_SAMPLED_TOLERANCE_SIGMAS,
     validate_sampled_repetitions,
 )
-from ..base import QSDCBackend
-from .calculations import (
+from srikara.simulator.backends.base import QSDCBackend
+from srikara.simulator.backends.sf.calculations import (
     build_control_program,
     build_returned_program,
     homodyne_component_std,

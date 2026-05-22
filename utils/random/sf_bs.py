@@ -9,7 +9,7 @@ import numpy as np
 import strawberryfields as sf
 from strawberryfields import ops
 
-from .base import RandomSource
+from utils.random.base import RandomSource
 
 T = TypeVar("T")
 

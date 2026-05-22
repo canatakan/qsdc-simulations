@@ -15,7 +15,7 @@ make install
 
 ## Simulators
 
-- `srikara/`: CV QSDC Gaussian-states simulator with analytic and Strawberry Fields backends.
+- `srikara`: CV QSDC Gaussian-states simulator with analytic and Strawberry Fields backends.
 
   > Reference: S. Srikara, K. Thapliyal, and A. Pathak, Continuous variable direct secure quantum communication using gaussian states, Quantum Inf. Process. 19, 1 (2020).
 
@@ -26,7 +26,3 @@ make test
 make srikara/demo/sf
 make srikara/demo/sf-sampled
 ```
-
-The root `pyproject.toml`, `requirements.txt`, and `Makefile` configure the
-active project. Individual simulator directories keep paper-specific code and
-documentation only.

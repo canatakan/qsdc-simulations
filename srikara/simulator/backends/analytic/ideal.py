@@ -7,8 +7,10 @@ from dataclasses import dataclass
 from srikara.simulator.core.config import DEFAULT_EXACT_TOLERANCE
 from srikara.simulator.core.encoding import beta_for_message_value
 
-from ..base import QSDCBackend
-from .calculations import displacement_after_unsqueeze
+from srikara.simulator.backends.base import QSDCBackend
+from srikara.simulator.backends.analytic.calculations import (
+    displacement_after_unsqueeze,
+)
 
 
 @dataclass(frozen=True)
