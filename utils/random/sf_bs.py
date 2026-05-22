@@ -1,64 +1,21 @@
-"""Random sources used by the protocol simulation."""
+"""Strawberry Fields beam-splitter QRNG."""
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from collections import deque
-from random import Random
 from typing import Sequence, TypeVar
 
 import numpy as np
 import strawberryfields as sf
 from strawberryfields import ops
 
+from utils.random.base import RandomSource
+
 T = TypeVar("T")
 
 
-class RandomSource(ABC):
-    """Minimal random-source interface used by protocol decisions."""
-
-    name: str
-
-    @abstractmethod
-    def uniform(self, lower: float, upper: float) -> float:
-        """Return a random float in [lower, upper]."""
-
-    @abstractmethod
-    def choice(self, values: Sequence[T]) -> T:
-        """Return one random value from a non-empty sequence."""
-
-    @abstractmethod
-    def shuffled(self, values: Sequence[T]) -> list[T]:
-        """Return a shuffled copy of a sequence."""
-
-
-class ClassicalRandomSource(RandomSource):
-    """Seeded PRNG used for reproducible simulator runs."""
-
-    name = "classical"
-
-    def __init__(self, seed: int):
-        self._rng = Random(seed)
-
-    def uniform(self, lower: float, upper: float) -> float:
-        return self._rng.uniform(lower, upper)
-
-    def choice(self, values: Sequence[T]) -> T:
-        return self._rng.choice(values)
-
-    def shuffled(self, values: Sequence[T]) -> list[T]:
-        shuffled_values = list(values)
-        self._rng.shuffle(shuffled_values)
-        return shuffled_values
-
-
 class SFBeamSplitterQRNG(RandomSource):
-    """Simulated beam-splitter QRNG using Strawberry Fields.
-
-    A single photon enters one port of a 50:50 beam splitter while vacuum enters
-    the other. Fock measurement of the output mode containing the photon gives a
-    raw bit.
-    """
+    """Simulated beam-splitter QRNG using Strawberry Fields."""
 
     name = "sf-bs-qrng"
 
@@ -90,16 +47,6 @@ class SFBeamSplitterQRNG(RandomSource):
             raise ValueError("cannot choose from an empty sequence")
         return values[self._randbelow(len(values))]
 
-    def shuffled(self, values: Sequence[T]) -> list[T]:
-        shuffled_values = list(values)
-        for index in range(len(shuffled_values) - 1, 0, -1):
-            swap_index = self._randbelow(index + 1)
-            shuffled_values[index], shuffled_values[swap_index] = (
-                shuffled_values[swap_index],
-                shuffled_values[index],
-            )
-        return shuffled_values
-
     def raw_bit(self) -> int:
         if not self._bits:
             self._refill_bits()
@@ -115,7 +62,6 @@ class SFBeamSplitterQRNG(RandomSource):
         return value
 
     def random_unit_float(self) -> float:
-        # Generate a 53-bit random integer and scale it into the interval [0, 1).
         return self.random_bits_as_int(53) / (1 << 53)
 
     def _program(self) -> sf.Program:

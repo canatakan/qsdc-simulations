@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from simulator.core.config import DEFAULT_EXACT_TOLERANCE
-from ..base import QSDCBackend
-from .calculations import (
+from srikara.simulator.core.config import DEFAULT_EXACT_TOLERANCE
+from srikara.simulator.backends.base import QSDCBackend
+from srikara.simulator.backends.sf.calculations import (
     build_control_program,
     build_returned_program,
     mean_component,

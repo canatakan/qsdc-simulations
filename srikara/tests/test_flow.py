@@ -1,5 +1,5 @@
-from simulator.core.flow import ModeRoute, OpticalSwitch, build_transcript
-from simulator.core.random_source import ClassicalRandomSource
+from srikara.simulator.core.flow import ModeRoute, OpticalSwitch, build_transcript
+from utils import ClassicalRandomSource
 
 
 def test_optical_switch_partitions_modes():

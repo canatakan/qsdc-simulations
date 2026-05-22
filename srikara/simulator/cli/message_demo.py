@@ -5,11 +5,16 @@ from __future__ import annotations
 import argparse
 import textwrap
 
-from simulator.backends import make_backend
-from simulator.core.config import ProtocolConfig
-from simulator.core.encoding import interval_for_bits
-from simulator.core.protocol import simulate_qsdc
-from simulator.core.random_source import ClassicalRandomSource, SFBeamSplitterQRNG
+from srikara.simulator.backends import make_backend
+from srikara.simulator.core.config import ProtocolConfig
+from srikara.simulator.core.encoding import interval_for_bits
+from srikara.simulator.core.protocol import simulate_qsdc
+from utils import (
+    bits_to_bytes,
+    bytes_to_bits,
+    ClassicalRandomSource,
+    SFBeamSplitterQRNG,
+)
 
 
 def main() -> None:
@@ -202,16 +207,6 @@ def main() -> None:
     print(f"Recovered payload bytes: {decoded_payload.hex(' ')}")
     print(f"Recovered text: {decoded_message!r}")
     print(f"Protocol accepted: {result.accepted}")
-
-
-def bytes_to_bits(payload: bytes) -> str:
-    return "".join(f"{byte:08b}" for byte in payload)
-
-
-def bits_to_bytes(bits: str) -> bytes:
-    if len(bits) % 8 != 0:
-        raise ValueError("decoded bitstream length is not byte-aligned")
-    return bytes(int(bits[index: index + 8], 2) for index in range(0, len(bits), 8))
 
 
 def print_header(title: str) -> None:

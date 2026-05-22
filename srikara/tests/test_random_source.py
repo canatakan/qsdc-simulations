@@ -1,10 +1,8 @@
 import numpy as np
 import pytest
 
-from simulator.core.random_source import (
-    ClassicalRandomSource,
-    SFBeamSplitterQRNG,
-)
+from utils import ClassicalRandomSource
+from utils import SFBeamSplitterQRNG
 
 
 def assert_numpy_state_equal(left, right):

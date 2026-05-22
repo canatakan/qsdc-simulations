@@ -21,14 +21,13 @@ The implementation includes:
 From the `qsdc-simulations` repository root:
 
 ```bash
-cd srikara
-python3.9 -m venv .venv
+python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install ".[dev]"
+make install
 ```
 
-This installs the package, dependencies, test dependency, and the `qsdc-demo`
+This installs the package, dependencies, test dependency, and the `srikara-demo`
 console command.
 
 ## Quick Start
@@ -36,31 +35,31 @@ console command.
 Transmit a text message through the verbose channel demo:
 
 ```bash
-qsdc-demo "hello" --backend sf
+srikara-demo "hello" --backend sf
 ```
 
 Use `sf-sampled` to run actual sampled homodyne measurements:
 
 ```bash
-qsdc-demo "hello" --backend sf-sampled
+srikara-demo "hello" --backend sf-sampled
 ```
 
 Average repeated homodyne samples in the sampled backend:
 
 ```bash
-qsdc-demo "hello" --backend sf-sampled --repetitions 100
+srikara-demo "hello" --backend sf-sampled --repetitions 100
 ```
 
 Use the Strawberry Fields beam-splitter QRNG simulation for protocol choices:
 
 ```bash
-qsdc-demo "hello" --backend sf --random-source sf-bs-qrng
+srikara-demo "hello" --backend sf --random-source sf-bs-qrng
 ```
 
 Print a hand-checkable one-symbol calculation:
 
 ```bash
-qsdc-basic-demo
+srikara-basic-demo
 ```
 
 The `analytic` backend is the exact formula reference. The `sf` backend uses
@@ -76,13 +75,13 @@ sampled tolerance scales by `1 / sqrt(N)`.
 ## Tests
 
 ```bash
-python -m pytest tests
+make srikara/test
 ```
 
 ## Layout
 
 ```text
-simulator/
+srikara/simulator/
   backends/
     analytic/      # analytic backend and calculations
     sf/            # SF ideal/sampled backends and calculations
@@ -91,9 +90,9 @@ simulator/
     encoding.py    # 3-bit interval encoding
     flow.py        # optical switching, delay, and announcement records
     protocol.py    # CV QSDC protocol orchestration
-    random_source.py
-  cli/             # qsdc-demo command implementation
+  cli/             # srikara-demo command implementation
 tests/
 method.pdf
-pyproject.toml
+../pyproject.toml
+../requirements.txt
 ```

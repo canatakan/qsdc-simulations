@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "qsdc-simulations"
+version = "0.1.0"
+description = "Continuous-variable QSDC protocol simulators."
+readme = "README.md"
+requires-python = ">=3.9,<3.10"
+dependencies = [
+  "numpy",
+  "strawberryfields",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+]
+
+[project.scripts]
+srikara-demo = "srikara.simulator.cli.message_demo:main"
+srikara-basic-demo = "srikara.simulator.cli.basic_demo:main"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+  "srikara",
+  "utils",
+]
+
+[tool.pytest.ini_options]
+testpaths = [
+  "srikara/tests",
+]
+addopts = [
+  "--import-mode=importlib",
+]

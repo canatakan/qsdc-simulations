@@ -5,22 +5,26 @@ env/activate:
 	source .venv/bin/activate
 
 install:
+	python -m pip install -r requirements.txt
 	python -m pip install -e ".[dev]"
 
 test:
-	pytest
+	python -m pytest
 
-demo/basic:
-	qsdc-basic-demo
+srikara/test:
+	python -m pytest srikara/tests
 
-demo/analytic:
-	qsdc-demo 'hello' --backend analytic
+srikara/demo/basic:
+	srikara-basic-demo
 
-demo/sf:
-	qsdc-demo 'hello' --backend sf
+srikara/demo/analytic:
+	srikara-demo 'hello' --backend analytic
 
-demo/sf-sampled:
-	qsdc-demo 'hello' \
+srikara/demo/sf:
+	srikara-demo 'hello' --backend sf
+
+srikara/demo/sf-sampled:
+	srikara-demo 'hello' \
 	--backend sf-sampled \
 	--repetitions 10 \
 	--random-source sf-bs-qrng \

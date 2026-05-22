@@ -1,11 +1,12 @@
-"""Backend implementations for the CV QSDC simulator."""
+"""Backend implementations for the CV QSDC srikara.simulator."""
 
 from __future__ import annotations
 
-from .analytic import AnalyticBackend
-from .base import QSDCBackend
-from .sf import SFBackend, SFSampledBackend
-from simulator.core.config import DEFAULT_SAMPLED_REPETITIONS
+from srikara.simulator.backends.analytic.ideal import AnalyticBackend
+from srikara.simulator.backends.base import QSDCBackend
+from srikara.simulator.backends.sf.ideal import SFBackend
+from srikara.simulator.backends.sf.sampled import SFSampledBackend
+from srikara.simulator.core.config import DEFAULT_SAMPLED_REPETITIONS
 
 
 def make_backend(
