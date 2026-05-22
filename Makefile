@@ -26,7 +26,6 @@ srikara/demo/sf:
 srikara/demo/sf-sampled:
 	srikara-demo 'hello' \
 	--backend sf-sampled \
-	--repetitions 10 \
 	--random-source sf-bs-qrng \
 	--seed 30
 

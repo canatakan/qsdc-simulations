@@ -6,18 +6,15 @@ from srikara.simulator.backends.analytic.ideal import AnalyticBackend
 from srikara.simulator.backends.base import QSDCBackend
 from srikara.simulator.backends.sf.ideal import SFBackend
 from srikara.simulator.backends.sf.sampled import SFSampledBackend
-from srikara.simulator.core.config import DEFAULT_SAMPLED_REPETITIONS
 
 
-def make_backend(
-    name: str, sampled_repetitions: int = DEFAULT_SAMPLED_REPETITIONS
-) -> QSDCBackend:
+def make_backend(name: str) -> QSDCBackend:
     if name == "analytic":
         return AnalyticBackend()
     if name == "sf":
         return SFBackend()
     if name == "sf-sampled":
-        return SFSampledBackend(repetitions=sampled_repetitions)
+        return SFSampledBackend()
     raise ValueError(f"unknown backend {name!r}")
 
 

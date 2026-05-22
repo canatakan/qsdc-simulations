@@ -11,7 +11,6 @@ DEFAULT_SQUEEZE_R_MIN = 0.05
 DEFAULT_SQUEEZE_R_MAX = 0.8
 DEFAULT_SEED = 11
 DEFAULT_EXACT_TOLERANCE = 1e-7
-DEFAULT_SAMPLED_REPETITIONS = 1
 DEFAULT_SAMPLED_TOLERANCE_SIGMAS = 4.0
 
 
@@ -69,8 +68,3 @@ def validate_config(config: ProtocolConfig, message_count: int) -> None:
         raise ValueError("invalid squeezing range")
     if config.tolerance is not None and config.tolerance < 0:
         raise ValueError("tolerance must be non-negative")
-
-
-def validate_sampled_repetitions(repetitions: int) -> None:
-    if repetitions < 1:
-        raise ValueError("sampled backend repetitions must be at least 1")

@@ -44,12 +44,6 @@ Use `sf-sampled` to run actual sampled homodyne measurements:
 srikara-demo "hello" --backend sf-sampled
 ```
 
-Average repeated homodyne samples in the sampled backend:
-
-```bash
-srikara-demo "hello" --backend sf-sampled --repetitions 100
-```
-
 Use the Strawberry Fields beam-splitter QRNG simulation for protocol choices:
 
 ```bash
@@ -69,8 +63,7 @@ measurement samples, so decoded symbols can differ from the sent symbols.
 
 If `--tolerance` is omitted, the backend chooses the control/decoy tolerance:
 `analytic` and `sf` use `1e-7`, while `sf-sampled` uses a 4-sigma homodyne
-threshold derived from Strawberry Fields' `hbar`. With `--repetitions N`, the
-sampled tolerance scales by `1 / sqrt(N)`.
+threshold derived from Strawberry Fields' `hbar`.
 
 ## Tests
 

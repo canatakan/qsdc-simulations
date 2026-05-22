@@ -43,12 +43,6 @@ def main() -> None:
         help="override control/decoy tolerance; defaults to the backend value",
     )
     parser.add_argument(
-        "--repetitions",
-        type=int,
-        default=1,
-        help="number of repeated homodyne samples to average for sf-sampled",
-    )
-    parser.add_argument(
         "--random-source",
         choices=("classical", "sf-bs-qrng"),
         default="classical",
@@ -77,8 +71,7 @@ def main() -> None:
     result = simulate_qsdc(
         symbols,
         config=config,
-        backend=make_backend(
-            args.backend, sampled_repetitions=args.repetitions),
+        backend=make_backend(args.backend),
         random_source=make_random_source(args.random_source, args.seed),
     )
 
@@ -109,8 +102,6 @@ def main() -> None:
     print(f"Protocol random source: {result.random_source_name}")
     print(f"Random seed: {args.seed}")
     print(f"Backend measurement seed: {args.seed}")
-    if result.backend_name == "sf-sampled":
-        print(f"Sample repetitions: {args.repetitions}")
     print(f"Control/decoy tolerance: {result.check_tolerance:g}")
     
     print()

@@ -5,11 +5,9 @@ from __future__ import annotations
 from cmath import phase
 from math import pi, sqrt
 
-import numpy as np
 import strawberryfields as sf
 from strawberryfields import ops
 
-from srikara.simulator.core.config import validate_sampled_repetitions
 from srikara.simulator.core.encoding import beta_for_message_value
 
 
@@ -69,12 +67,6 @@ def mean_component(prog: sf.Program, axis: str) -> float:
     result = sf.Engine("gaussian").run(prog)
     x_mean, p_mean = result.state.means()
     return component_from_means(float(x_mean), float(p_mean), axis)
-
-
-def homodyne_mean(build_program, args: tuple, axis: str, repetitions: int) -> float:
-    validate_sampled_repetitions(repetitions)
-    samples = [homodyne_sample(build_program(*args), axis) for _ in range(repetitions)]
-    return float(np.mean(samples))
 
 
 def homodyne_sample(prog: sf.Program, axis: str) -> float:

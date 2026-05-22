@@ -5,7 +5,6 @@ from srikara.simulator.core.config import (
     ProtocolConfig,
     resolve_config,
     validate_config,
-    validate_sampled_repetitions,
 )
 
 
@@ -22,7 +21,7 @@ def test_resolve_config_uses_backend_default_tolerance():
 def test_resolve_config_keeps_explicit_tolerance():
     resolved = resolve_config(
         ProtocolConfig(n_states=4, tolerance=0.25),
-        SFSampledBackend(repetitions=4),
+        SFSampledBackend(),
         message_count=1,
     )
 
@@ -44,10 +43,3 @@ def test_config_validation_rejects_invalid_protocol_shape():
 
     with pytest.raises(ValueError, match="tolerance"):
         validate_config(ProtocolConfig(n_states=4, tolerance=-1.0), message_count=1)
-
-
-def test_sampled_repetition_validation():
-    validate_sampled_repetitions(1)
-
-    with pytest.raises(ValueError, match="at least 1"):
-        validate_sampled_repetitions(0)
