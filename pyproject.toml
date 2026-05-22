@@ -19,8 +19,8 @@ dev = [
 ]
 
 [project.scripts]
-srikara-demo = "srikara.simulator.cli.message_demo:main"
-srikara-basic-demo = "srikara.simulator.cli.basic_demo:main"
+srikara-demo = "srikara.demo.message_demo:main"
+srikara-basic-demo = "srikara.demo.basic_demo:main"
 
 [tool.hatch.build.targets.wheel]
 packages = [

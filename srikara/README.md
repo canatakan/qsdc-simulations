@@ -74,18 +74,20 @@ make srikara/test
 ## Layout
 
 ```text
-srikara/simulator/
-  backends/
-    analytic/      # analytic backend and calculations
-    sf/            # SF ideal/sampled backends and calculations
-  core/
-    config.py      # protocol settings, validation, and backend tolerances
-    encoding.py    # 3-bit interval encoding
-    flow.py        # optical switching, delay, and announcement records
-    protocol.py    # CV QSDC protocol orchestration
-  cli/             # srikara-demo command implementation
-tests/
-method.pdf
+srikara/
+  benchmark/       # benchmark runners and report generation
+  demo/            # srikara-demo command implementations
+  simulator/
+    backends/
+      analytic/    # analytic backend and calculations
+      sf/          # SF ideal/sampled backends and calculations
+    core/
+      config.py    # protocol settings, validation, and backend tolerances
+      encoding.py  # 3-bit interval encoding
+      flow.py      # optical switching, delay, and announcement records
+      protocol.py  # CV QSDC protocol orchestration
+  tests/
+  method.pdf
 ../pyproject.toml
 ../requirements.txt
 ```
