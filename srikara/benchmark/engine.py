@@ -1,0 +1,242 @@
+"""Benchmark execution engine."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from itertools import product
+from pathlib import Path
+from time import time, time_ns
+from typing import Any
+
+from srikara.benchmark.config import BenchmarkConfig
+from srikara.benchmark.metrics import (
+    aggregate_trial_metrics,
+    summarize_checks,
+    summarize_messages,
+)
+from srikara.benchmark.output import write_benchmark_artifacts
+from srikara.benchmark.seeds import derive_seed
+from srikara.simulator.backends import make_backend
+from srikara.simulator.core.config import ProtocolConfig
+from srikara.simulator.core.distributions import SqueezeRDistribution
+from srikara.simulator.core.protocol import simulate_qsdc
+from utils import (
+    ClassicalRandomSource,
+    chunk_bits,
+    make_random_source,
+    weighted_random_bits,
+)
+
+
+@dataclass(frozen=True)
+class BenchmarkCombo:
+    combo_index: int
+    one_probability: float
+    tolerance: float
+    r_distribution: SqueezeRDistribution
+
+
+@dataclass(frozen=True)
+class BenchmarkReport:
+    output_dir: str
+    effective_config: dict[str, object]
+    summary: dict[str, object]
+    trials: list[dict[str, object]]
+    combos: list[dict[str, object]]
+
+
+def run_benchmark(
+    config: BenchmarkConfig,
+    output_dir: str | None = None,
+    write_artifacts: bool = True,
+) -> BenchmarkReport:
+    effective_config = config.with_output_dir(output_dir or config.output_dir)
+    base_output_dir = effective_config.output_dir or str(
+        Path("srikara") / "benchmark" / "results" / effective_config.name
+    )
+    effective_config = effective_config.with_output_dir(base_output_dir)
+    benchmark_run_id = _benchmark_run_id()
+    benchmark_run_dir = str(Path(base_output_dir) / benchmark_run_id)
+
+    started_at = time()
+    combos = _expand_combos(effective_config)
+    trial_rows: list[dict[str, object]] = []
+    combo_rows: list[dict[str, object]] = []
+
+    for combo in combos:
+        combo_trials = []
+        for trial_index in range(effective_config.trials_per_combo):
+            trial_row = _run_trial(
+                effective_config,
+                combo,
+                trial_index,
+            )
+            trial_rows.append(trial_row)
+            combo_trials.append(trial_row)
+        combo_rows.append(_aggregate_combo(effective_config, combo, combo_trials))
+
+    accepted_count = sum(1 for trial in trial_rows if trial["accepted"])
+    summary = {
+        "name": effective_config.name,
+        "benchmark_run_id": benchmark_run_id,
+        "benchmark_run_unix_ns": int(benchmark_run_id.removeprefix("run_")),
+        "base_output_dir": base_output_dir,
+        "output_dir": benchmark_run_dir,
+        "effective_config": effective_config.to_dict(),
+        "derived_counts": {
+            "payload_bit_count": effective_config.payload_bit_count,
+            "padding_bit_count": effective_config.padding_bit_count,
+            "transmitted_message_bit_count": (
+                effective_config.transmitted_message_bit_count
+            ),
+            "message_symbol_count": effective_config.message_symbol_count,
+            "message_mode_count": effective_config.message_symbol_count,
+            "n_states": effective_config.n_states,
+        },
+        "combo_count": len(combo_rows),
+        "trial_count": len(trial_rows),
+        "accepted_count": accepted_count,
+        "accepted_rate": accepted_count / len(trial_rows) if trial_rows else 0.0,
+        "elapsed_seconds": time() - started_at,
+        "artifacts": {
+            "benchmark": "benchmark.json",
+            "config": "config.json",
+            "trials": "trials.jsonl",
+            "combos_json": "combos.json",
+            "combos_csv": "combos.csv",
+        },
+    }
+    report = BenchmarkReport(
+        output_dir=benchmark_run_dir,
+        effective_config=effective_config.to_dict(),
+        summary=summary,
+        trials=trial_rows,
+        combos=combo_rows,
+    )
+    if write_artifacts:
+        write_benchmark_artifacts(report)
+    return report
+
+
+def _benchmark_run_id() -> str:
+    return f"run_{time_ns()}"
+
+
+def _expand_combos(config: BenchmarkConfig) -> list[BenchmarkCombo]:
+    combos: list[BenchmarkCombo] = []
+    for combo_index, (one_probability, tolerance, r_distribution) in enumerate(
+        product(
+            config.one_probabilities,
+            config.tolerance_values(),
+            config.r_distributions,
+        )
+    ):
+        combos.append(
+            BenchmarkCombo(
+                combo_index=combo_index,
+                one_probability=one_probability,
+                tolerance=tolerance,
+                r_distribution=r_distribution,
+            )
+        )
+    return combos
+
+
+def _run_trial(
+    config: BenchmarkConfig,
+    combo: BenchmarkCombo,
+    trial_index: int,
+) -> dict[str, object]:
+    trial_seed = derive_seed(config.base_seed, combo.combo_index, trial_index)
+    message_seed = derive_seed(trial_seed, "message")
+    simulation_seed = derive_seed(trial_seed, "simulation")
+    bits = weighted_random_bits(
+        bit_count=config.payload_bit_count,
+        one_probability=combo.one_probability,
+        random_source=ClassicalRandomSource(message_seed),
+    )
+    symbols = chunk_bits(bits, 3)
+    result = simulate_qsdc(
+        symbols,
+        config=ProtocolConfig(
+            n_states=config.n_states,
+            alpha_distribution=config.alpha_distribution,
+            squeeze_r_distribution=combo.r_distribution,
+            theta_distribution=config.theta_distribution,
+            tolerance=combo.tolerance,
+            seed=simulation_seed,
+        ),
+        backend=make_backend(config.backend),
+        random_source=make_random_source(config.random_source, simulation_seed),
+    )
+    message_metrics = summarize_messages(
+        result.messages,
+        payload_bit_count=config.payload_bit_count,
+    )
+    control_metrics = summarize_checks(result.controls)
+    decoy_metrics = summarize_checks(result.decoys)
+    return {
+        "combo_index": combo.combo_index,
+        "trial_index": trial_index,
+        "trial_seed": trial_seed,
+        "message_seed": message_seed,
+        "simulation_seed": simulation_seed,
+        "backend": result.backend_name,
+        "random_source": result.random_source_name,
+        "one_probability": combo.one_probability,
+        "tolerance": combo.tolerance,
+        "r_distribution": combo.r_distribution.summary(),
+        "r_distribution_config": combo.r_distribution.to_dict(),
+        "alpha_distribution": config.alpha_distribution.summary(),
+        "theta_distribution": config.theta_distribution.summary(),
+        "payload_bit_count": config.payload_bit_count,
+        "padding_bit_count": config.padding_bit_count,
+        "transmitted_message_bit_count": config.transmitted_message_bit_count,
+        "message_mode_count": config.message_symbol_count,
+        "n_states": config.n_states,
+        "control_passed": result.control_passed,
+        "decoy_passed": result.decoy_passed,
+        "accepted": result.accepted,
+        **message_metrics,
+        "control_check_count": control_metrics["check_count"],
+        "control_failed_check_count": control_metrics["failed_check_count"],
+        "control_mean_abs_deviation": control_metrics["mean_abs_deviation"],
+        "control_max_abs_deviation": control_metrics["max_abs_deviation"],
+        "decoy_check_count": decoy_metrics["check_count"],
+        "decoy_failed_check_count": decoy_metrics["failed_check_count"],
+        "decoy_mean_abs_deviation": decoy_metrics["mean_abs_deviation"],
+        "decoy_max_abs_deviation": decoy_metrics["max_abs_deviation"],
+    }
+
+
+def _aggregate_combo(
+    config: BenchmarkConfig,
+    combo: BenchmarkCombo,
+    trials: list[dict[str, object]],
+) -> dict[str, Any]:
+    accepted_count = sum(1 for trial in trials if trial["accepted"])
+    control_pass_count = sum(1 for trial in trials if trial["control_passed"])
+    decoy_pass_count = sum(1 for trial in trials if trial["decoy_passed"])
+    all_metrics = aggregate_trial_metrics(trials)
+    accepted_metrics = aggregate_trial_metrics(trials, accepted=True)
+    rejected_metrics = aggregate_trial_metrics(trials, accepted=False)
+    trial_count = len(trials)
+    return {
+        "combo_index": combo.combo_index,
+        "one_probability": combo.one_probability,
+        "tolerance": combo.tolerance,
+        "r_distribution": combo.r_distribution.summary(),
+        "r_distribution_config": combo.r_distribution.to_dict(),
+        "alpha_distribution": config.alpha_distribution.summary(),
+        "alpha_distribution_config": config.alpha_distribution.to_dict(),
+        "theta_distribution": config.theta_distribution.summary(),
+        "theta_distribution_config": config.theta_distribution.to_dict(),
+        "trial_count": trial_count,
+        "accepted_count": accepted_count,
+        "accepted_rate": accepted_count / trial_count if trial_count else 0.0,
+        "control_pass_rate": control_pass_count / trial_count if trial_count else 0.0,
+        "decoy_pass_rate": decoy_pass_count / trial_count if trial_count else 0.0,
+        "all": all_metrics,
+        "accepted": accepted_metrics,
+        "rejected": rejected_metrics,
+    }

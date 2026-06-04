@@ -21,6 +21,7 @@ dev = [
 [project.scripts]
 srikara-demo = "srikara.demo.message_demo:main"
 srikara-basic-demo = "srikara.demo.basic_demo:main"
+srikara-benchmark = "srikara.benchmark.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = [
