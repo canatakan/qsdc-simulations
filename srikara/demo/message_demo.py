@@ -12,8 +12,7 @@ from srikara.simulator.core.protocol import simulate_qsdc
 from utils import (
     bits_to_bytes,
     bytes_to_bits,
-    ClassicalRandomSource,
-    SFBeamSplitterQRNG,
+    make_random_source,
 )
 
 
@@ -76,10 +75,12 @@ def main() -> None:
     )
 
     decoded_symbols = tuple(
-        message_mode.decoded_bits for message_mode in result.messages)
+        message_mode.decoded_bits for message_mode in result.messages
+    )
     decoded_bitstream = "".join(decoded_symbols)
-    unpadded_bits = decoded_bitstream[:-
-                                      padding] if padding else decoded_bitstream
+    unpadded_bits = (
+        decoded_bitstream[:-padding] if padding else decoded_bitstream
+    )
     decoded_payload = bits_to_bytes(unpadded_bits)
     decoded_message = decoded_payload.decode(args.encoding, errors="replace")
 
@@ -103,7 +104,7 @@ def main() -> None:
     print(f"Random seed: {args.seed}")
     print(f"Backend measurement seed: {args.seed}")
     print(f"Control/decoy tolerance: {result.check_tolerance:g}")
-    
+
     print()
 
     print(f"Total optical modes n: {config.n_states}")
@@ -111,9 +112,9 @@ def main() -> None:
     print(f"Message modes n/4: {len(result.message_indices)}")
     print(f"Decoy modes n/4: {len(result.decoy_indices)}")
     print(f"Delayed modes n/2: {len(result.route.delayed_indices)}")
-    
+
     print()
-    
+
     print(f"Control coordinates: {result.control_indices}")
     print(f"Delayed coordinates: {result.route.delayed_indices}")
     print(f"Message coordinates: {result.message_indices}")
@@ -126,7 +127,7 @@ def main() -> None:
             f"{state.index:>3}  {format_complex(state.alpha):<30} "
             f"{state.squeeze_r:>8.5f}  {state.theta:>9.5f}"
         )
-    
+
     print()
     print(
         "Announcement via classical channel (Alice -> Bob): "
@@ -177,7 +178,10 @@ def main() -> None:
     print(f"Decoy check result: {result.decoy_passed}")
 
     print_header("8. Bob decodes message modes")
-    print("idx  axis  sent  decoded  measured      Delta        factor       m recovered")
+    print(
+        "idx  axis  sent  decoded  measured      Delta        factor       "
+        "m recovered"
+    )
     for message_mode in result.messages:
         print(
             f"{message_mode.index:>3}  {message_mode.axis:>4}  "
@@ -227,14 +231,6 @@ def format_interval(lower: float, upper: float) -> str:
     left = "-inf" if lower == float("-inf") else f"{lower:g}"
     right = "inf" if upper == float("inf") else f"{upper:g}"
     return f"({left}, {right})"
-
-
-def make_random_source(name: str, seed: int):
-    if name == "classical":
-        return ClassicalRandomSource(seed)
-    if name == "sf-bs-qrng":
-        return SFBeamSplitterQRNG(seed=seed)
-    raise ValueError(f"unknown random source {name!r}")
 
 
 if __name__ == "__main__":
