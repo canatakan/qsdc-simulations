@@ -103,8 +103,14 @@ def main() -> None:
     decoded_bits = bits_for_real(decoded_value)
     print("Formula:")
     print("observed_delta = alpha_measured - alpha")
-    print(f"observed_delta = {fmt(returned_alpha)} - {fmt(alpha)} = {fmt(observed_delta)}")
-    print("beta_A_recovered = observed_delta cosh(r) + exp(i theta) observed_delta* sinh(r)")
+    print(
+        f"observed_delta = {fmt(returned_alpha)} - {fmt(alpha)} = "
+        f"{fmt(observed_delta)}"
+    )
+    print(
+        "beta_A_recovered = observed_delta cosh(r) "
+        "+ exp(i theta) observed_delta* sinh(r)"
+    )
     print(f"beta_A_recovered = {fmt(recovered_beta)}")
     print("m_A_recovered = (Re(beta_A_recovered) + Im(beta_A_recovered)) / 2")
     print(

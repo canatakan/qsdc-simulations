@@ -65,7 +65,10 @@ class DelayBuffer:
         return self.indices
 
 
-def build_transcript(route: ModeRoute, random_source: RandomSource) -> ProtocolTranscript:
+def build_transcript(
+    route: ModeRoute,
+    random_source: RandomSource,
+) -> ProtocolTranscript:
     return ProtocolTranscript(
         random_source=random_source.name,
         control_coordinates=PublicAnnouncement(
