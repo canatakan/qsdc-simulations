@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from srikara.simulator.core.distributions import (
+    AlphaDistribution,
+    SqueezeRDistribution,
+    ThetaDistribution,
+    UniformSqueezeR,
+    UniformSquareAlpha,
+    UniformTheta,
+)
 
 
 DEFAULT_N_STATES = 8
@@ -19,9 +28,16 @@ class ProtocolConfig:
     """User-facing simulation settings."""
 
     n_states: int = DEFAULT_N_STATES
-    alpha_bound: float = DEFAULT_ALPHA_BOUND
-    squeeze_r_min: float = DEFAULT_SQUEEZE_R_MIN
-    squeeze_r_max: float = DEFAULT_SQUEEZE_R_MAX
+    alpha_distribution: AlphaDistribution = field(
+        default_factory=lambda: UniformSquareAlpha(DEFAULT_ALPHA_BOUND)
+    )
+    squeeze_r_distribution: SqueezeRDistribution = field(
+        default_factory=lambda: UniformSqueezeR(
+            DEFAULT_SQUEEZE_R_MIN,
+            DEFAULT_SQUEEZE_R_MAX,
+        )
+    )
+    theta_distribution: ThetaDistribution = field(default_factory=UniformTheta)
     tolerance: float | None = None
     seed: int = DEFAULT_SEED
 
@@ -31,9 +47,9 @@ class ResolvedProtocolConfig:
     """Simulation settings after backend defaults are applied."""
 
     n_states: int
-    alpha_bound: float
-    squeeze_r_min: float
-    squeeze_r_max: float
+    alpha_distribution: AlphaDistribution
+    squeeze_r_distribution: SqueezeRDistribution
+    theta_distribution: ThetaDistribution
     tolerance: float
     seed: int
 
@@ -47,9 +63,9 @@ def resolve_config(
     )
     return ResolvedProtocolConfig(
         n_states=config.n_states,
-        alpha_bound=config.alpha_bound,
-        squeeze_r_min=config.squeeze_r_min,
-        squeeze_r_max=config.squeeze_r_max,
+        alpha_distribution=config.alpha_distribution,
+        squeeze_r_distribution=config.squeeze_r_distribution,
+        theta_distribution=config.theta_distribution,
         tolerance=tolerance,
         seed=config.seed,
     )
@@ -64,7 +80,5 @@ def validate_config(config: ProtocolConfig, message_count: int) -> None:
             f"expected {expected_messages} 3-bit symbols for n={config.n_states}, "
             f"got {message_count}"
         )
-    if config.squeeze_r_min < 0 or config.squeeze_r_max < config.squeeze_r_min:
-        raise ValueError("invalid squeezing range")
     if config.tolerance is not None and config.tolerance < 0:
         raise ValueError("tolerance must be non-negative")

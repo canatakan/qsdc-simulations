@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import pi
-
 from srikara.simulator.backends import AnalyticBackend, QSDCBackend
 from srikara.simulator.core.config import (
     ProtocolConfig,
@@ -161,13 +159,9 @@ def _bob_prepare_states(
 ) -> list[BobPreparedState]:
     states: list[BobPreparedState] = []
     for index in range(config.n_states):
-        alpha = complex(
-            random_source.uniform(-config.alpha_bound, config.alpha_bound),
-            random_source.uniform(-config.alpha_bound, config.alpha_bound),
-        )
-        squeeze_r = random_source.uniform(
-            config.squeeze_r_min, config.squeeze_r_max)
-        theta = random_source.uniform(0.0, 2.0 * pi)
+        alpha = config.alpha_distribution.sample(random_source)
+        squeeze_r = config.squeeze_r_distribution.sample(random_source)
+        theta = config.theta_distribution.sample(random_source)
         states.append(BobPreparedState(index, alpha, squeeze_r, theta))
     return states
 
