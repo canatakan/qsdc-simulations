@@ -21,20 +21,17 @@ dev = [
 ]
 
 [project.scripts]
-srikara-demo = "srikara.demo.message_demo:main"
-srikara-basic-demo = "srikara.demo.basic_demo:main"
-srikara-benchmark = "srikara.benchmark.cli:main"
-srikara-benchmark-plot = "srikara.benchmark.plot:main"
+srikara-benchmark = "qsdc.protocols.srikara.benchmark.cli:main"
+srikara-benchmark-plot = "qsdc.protocols.srikara.benchmark.artifacts.plots:main"
 
 [tool.hatch.build.targets.wheel]
 packages = [
-  "srikara",
-  "utils",
+  "src/qsdc",
 ]
 
 [tool.pytest.ini_options]
 testpaths = [
-  "srikara/tests",
+  "tests",
 ]
 addopts = [
   "--import-mode=importlib",

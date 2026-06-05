@@ -2,6 +2,10 @@
 
 Independent QSDC protocol simulators organized by the paper reference.
 
+Importable code lives under `src/qsdc`, tests live under `tests`, checked-in
+benchmark presets live with their benchmark package, and paper notes live under
+`docs`.
+
 ## Setup
 
 From this repository root:

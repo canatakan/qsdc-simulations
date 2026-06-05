@@ -12,19 +12,19 @@ test:
 	python -m pytest
 
 srikara/test:
-	python -m pytest srikara/tests
+	python -m pytest tests/protocols/srikara
 
 srikara/demo/basic:
-	srikara-basic-demo
+	python demos/srikara/basic.py
 
 srikara/demo/analytic:
-	srikara-demo 'hello' --backend analytic
+	python demos/srikara/message.py 'hello' --backend analytic
 
 srikara/demo/sf:
-	srikara-demo 'hello' --backend sf
+	python demos/srikara/message.py 'hello' --backend sf
 
 srikara/demo/sf-sampled:
-	srikara-demo 'hello' \
+	python demos/srikara/message.py 'hello' \
 	--backend sf-sampled \
 	--random-source sf-bs-qrng \
 	--seed 30
