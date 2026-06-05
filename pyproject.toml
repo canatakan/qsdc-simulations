@@ -11,6 +11,7 @@ requires-python = ">=3.9,<3.10"
 dependencies = [
   "matplotlib",
   "numpy",
+  "openpyxl",
   "strawberryfields",
 ]
 

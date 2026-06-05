@@ -314,7 +314,7 @@ directory:
 benchmark.json
 config.json
 combos.json
-combos.csv
+benchmark.xlsx
 trials.jsonl
 plots/
 ```
@@ -335,11 +335,17 @@ accepted
 rejected
 ```
 
-`combos.csv` is the same combo-level view flattened for spreadsheets and quick
-plotting. It includes the resolved `check_tolerance_sigmas`, total
-control/decoy check counts, failed check counts, failed check rates, and
-mean/max failed checks per trial so rejection severity is visible without
-opening `trials.jsonl`.
+`benchmark.xlsx` is the human-readable Excel workbook. It groups the benchmark
+views into separate sheets:
+
+```text
+Run              run metadata and derived protocol counts
+Overview         acceptance and protocol pass rates per combo
+Errors           bit, symbol, numeric, and accepted/rejected error metrics
+Checks           control/decoy check counts and failed-check severity
+Tolerance        configured sigma tolerance, noise sigma, and derived thresholds
+Trial Tolerance  per-trial required control/decoy/acceptance tolerances
+```
 
 `trials.jsonl` contains one JSON object per protocol trial.
 

@@ -112,7 +112,7 @@ def run_benchmark(
             "config": "config.json",
             "trials": "trials.jsonl",
             "combos_json": "combos.json",
-            "combos_csv": "combos.csv",
+            "workbook": "benchmark.xlsx",
             "plots": [],
         },
     }

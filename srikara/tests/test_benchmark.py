@@ -1,6 +1,8 @@
 from io import StringIO
 from pathlib import Path
 
+from openpyxl import load_workbook
+
 from srikara.benchmark import load_benchmark_config, run_benchmark
 from srikara.benchmark.config import parse_benchmark_config
 from srikara.benchmark.metrics import aggregate_trial_metrics
@@ -145,13 +147,27 @@ def test_benchmark_runs_with_analytic_backend(tmp_path):
     assert all("all_bit_error_rate" not in combo for combo in report.combos)
     assert Path(report.output_dir).parent == tmp_path / "test"
     assert (Path(report.output_dir) / "trials.jsonl").exists()
-    csv_header = (Path(report.output_dir) / "combos.csv").read_text().splitlines()[0]
-    assert "check_tolerance_sigmas" in csv_header
-    assert "measurement_noise_sigma" in csv_header
-    assert "control_failed_check_count" in csv_header
-    assert "control_max_failed_check_count_per_trial" in csv_header
-    assert "decoy_failed_check_count" in csv_header
-    assert "decoy_max_failed_check_count_per_trial" in csv_header
+    assert not (Path(report.output_dir) / "combos.csv").exists()
+    workbook_path = Path(report.output_dir) / "benchmark.xlsx"
+    assert workbook_path.exists()
+    workbook = load_workbook(workbook_path, read_only=True)
+    assert workbook.sheetnames == [
+        "Run",
+        "Overview",
+        "Errors",
+        "Checks",
+        "Tolerance",
+        "Trial Tolerance",
+    ]
+    assert workbook["Tolerance"]["D1"].value == "check_tolerance_sigmas"
+    assert workbook["Tolerance"]["E1"].value == "measurement_noise_sigma"
+    assert (
+        workbook["Tolerance"]["J1"].value
+        == "required_acceptance_tolerance_sigmas_max"
+    )
+    assert workbook["Checks"]["E1"].value == "control_failed_check_count"
+    assert workbook["Checks"]["M1"].value == "decoy_max_failed_check_count_per_trial"
+    assert report.summary["artifacts"]["workbook"] == "benchmark.xlsx"
     assert report.summary["artifacts"]["plots"] == [
         "plots/bit_error_by_r.png",
         "plots/symbol_error_by_r.png",
