@@ -36,10 +36,13 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=11)
     parser.add_argument("--encoding", default="utf-8")
     parser.add_argument(
-        "--tolerance",
+        "--tolerance-sigmas",
         type=float,
         default=None,
-        help="override control/decoy tolerance; defaults to the backend value",
+        help=(
+            "override control/decoy measurement-noise-sigma tolerance; defaults "
+            "to the backend value"
+        ),
     )
     parser.add_argument(
         "--random-source",
@@ -65,7 +68,7 @@ def main() -> None:
     config = ProtocolConfig(
         n_states=4 * len(symbols),
         seed=args.seed,
-        tolerance=args.tolerance,
+        tolerance_sigmas=args.tolerance_sigmas,
     )
     result = simulate_qsdc(
         symbols,
@@ -103,7 +106,11 @@ def main() -> None:
     print(f"Protocol random source: {result.random_source_name}")
     print(f"Random seed: {args.seed}")
     print(f"Backend measurement seed: {args.seed}")
-    print(f"Control/decoy tolerance: {result.check_tolerance:g}")
+    print(
+        "Control/decoy tolerance "
+        f"(measurement noise sigmas): {result.check_tolerance_sigmas:g}"
+    )
+    print(f"Measurement noise sigma: {result.measurement_noise_sigma:g}")
 
     print()
 
@@ -141,12 +148,16 @@ def main() -> None:
     )
     print()
 
-    print("idx  axis  expected       measured       status")
+    print("idx  axis  expected       measured       dev/sigma     status")
     for check in result.controls:
         status = "pass" if check.passed else "fail"
+        sigma_deviation = (
+            abs(check.measured - check.expected) / result.measurement_noise_sigma
+        )
         print(
             f"{check.index:>3}  {check.axis:>4}  "
-            f"{check.expected:>12.7f}  {check.measured:>12.7f}  {status}"
+            f"{check.expected:>12.7f}  {check.measured:>12.7f}  "
+            f"{sigma_deviation:>9.4f}  {status}"
         )
     print(f"Control check result: {result.control_passed}")
 
@@ -168,12 +179,16 @@ def main() -> None:
     )
     print()
 
-    print("idx  axis  expected       measured       status")
+    print("idx  axis  expected       measured       dev/sigma     status")
     for decoy in result.decoys:
         status = "pass" if decoy.passed else "fail"
+        sigma_deviation = (
+            abs(decoy.measured - decoy.expected) / result.measurement_noise_sigma
+        )
         print(
             f"{decoy.index:>3}  {decoy.axis:>4}  "
-            f"{decoy.expected:>12.7f}  {decoy.measured:>12.7f}  {status}"
+            f"{decoy.expected:>12.7f}  {decoy.measured:>12.7f}  "
+            f"{sigma_deviation:>9.4f}  {status}"
         )
     print(f"Decoy check result: {result.decoy_passed}")
 

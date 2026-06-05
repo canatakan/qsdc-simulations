@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from srikara.simulator.core.config import DEFAULT_EXACT_TOLERANCE
+from srikara.simulator.core.config import (
+    DEFAULT_EXACT_MEASUREMENT_NOISE_SIGMA,
+    DEFAULT_EXACT_TOLERANCE_SIGMAS,
+)
 from srikara.simulator.core.encoding import beta_for_message_value
 
 from srikara.simulator.backends.base import QSDCBackend
@@ -18,7 +21,8 @@ class AnalyticBackend(QSDCBackend):
     """Formula-only backend following the paper's ideal algebra."""
 
     name: str = "analytic"
-    default_tolerance: float = DEFAULT_EXACT_TOLERANCE
+    default_tolerance_sigmas: float = DEFAULT_EXACT_TOLERANCE_SIGMAS
+    measurement_noise_sigma: float = DEFAULT_EXACT_MEASUREMENT_NOISE_SIGMA
 
     def begin_run(self, seed: int) -> None:
         pass

@@ -9,7 +9,8 @@ class QSDCBackend(ABC):
     """Minimal backend contract needed by the QSDC protocol."""
 
     name: str
-    default_tolerance: float
+    default_tolerance_sigmas: float
+    measurement_noise_sigma: float
 
     @abstractmethod
     def begin_run(self, seed: int) -> None:

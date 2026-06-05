@@ -9,6 +9,7 @@ description = "Continuous-variable QSDC protocol simulators."
 readme = "README.md"
 requires-python = ">=3.9,<3.10"
 dependencies = [
+  "matplotlib",
   "numpy",
   "strawberryfields",
 ]
@@ -22,6 +23,7 @@ dev = [
 srikara-demo = "srikara.demo.message_demo:main"
 srikara-basic-demo = "srikara.demo.basic_demo:main"
 srikara-benchmark = "srikara.benchmark.cli:main"
+srikara-benchmark-plot = "srikara.benchmark.plot:main"
 
 [tool.hatch.build.targets.wheel]
 packages = [

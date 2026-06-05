@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from math import ceil
 from statistics import mean
 from typing import Iterable, Sequence
 
@@ -59,7 +60,6 @@ def summarize_messages(
         ),
         "mean_abs_value_error": _mean_or_zero(absolute_errors),
         "max_abs_value_error": max(absolute_errors, default=0.0),
-        "interval_miss_count": sum(1 for distance in miss_distances if distance > 0),
         "mean_interval_miss_distance": _mean_or_zero(miss_distances),
         "max_interval_miss_distance": max(miss_distances, default=0.0),
         "mean_interval_margin": _mean_or_zero(margins),
@@ -103,7 +103,7 @@ def summarize_checks(
 def aggregate_trial_metrics(
     trials: Sequence[dict[str, object]],
     accepted: bool | None = None,
-) -> dict[str, float | int | None]:
+) -> dict[str, object]:
     selected = [
         trial
         for trial in trials
@@ -117,6 +117,13 @@ def aggregate_trial_metrics(
             "mean_abs_value_error": None,
             "mean_interval_miss_distance": None,
             "mean_interval_margin": None,
+            "required_acceptance_tolerance_sigmas": {
+                "min": None,
+                "mean": None,
+                "median": None,
+                "p95": None,
+                "max": None,
+            },
         }
 
     bit_errors = sum(int(trial["message_bit_error_count"]) for trial in selected)
@@ -136,6 +143,10 @@ def aggregate_trial_metrics(
             "mean_interval_miss_distance",
         ),
         "mean_interval_margin": _mean_trial_field(selected, "mean_interval_margin"),
+        "required_acceptance_tolerance_sigmas": _threshold_summary(
+            float(trial["required_acceptance_tolerance_sigmas"])
+            for trial in selected
+        ),
     }
 
 
@@ -146,3 +157,28 @@ def _mean_trial_field(trials: Sequence[dict[str, object]], field: str) -> float:
 def _mean_or_zero(values: Iterable[float]) -> float:
     values = tuple(values)
     return mean(values) if values else 0.0
+
+
+def _threshold_summary(values: Iterable[float]) -> dict[str, float | None]:
+    sorted_values = sorted(values)
+    if not sorted_values:
+        return {
+            "min": None,
+            "mean": None,
+            "median": None,
+            "p95": None,
+            "max": None,
+        }
+    middle = len(sorted_values) // 2
+    if len(sorted_values) % 2:
+        median = sorted_values[middle]
+    else:
+        median = (sorted_values[middle - 1] + sorted_values[middle]) / 2
+    p95_index = max(ceil(0.95 * len(sorted_values)) - 1, 0)
+    return {
+        "min": sorted_values[0],
+        "mean": mean(sorted_values),
+        "median": median,
+        "p95": sorted_values[p95_index],
+        "max": sorted_values[-1],
+    }

@@ -9,24 +9,24 @@ from srikara.simulator.core.config import (
 from srikara.simulator.core.distributions import FixedSqueezeR, UniformSqueezeR
 
 
-def test_resolve_config_uses_backend_default_tolerance():
+def test_resolve_config_uses_backend_default_tolerance_sigmas():
     resolved = resolve_config(
-        ProtocolConfig(n_states=4, tolerance=None),
+        ProtocolConfig(n_states=4, tolerance_sigmas=None),
         AnalyticBackend(),
         message_count=1,
     )
 
-    assert resolved.tolerance == AnalyticBackend.default_tolerance
+    assert resolved.tolerance_sigmas == AnalyticBackend.default_tolerance_sigmas
 
 
-def test_resolve_config_keeps_explicit_tolerance():
+def test_resolve_config_keeps_explicit_tolerance_sigmas():
     resolved = resolve_config(
-        ProtocolConfig(n_states=4, tolerance=0.25),
+        ProtocolConfig(n_states=4, tolerance_sigmas=0.25),
         AnalyticBackend(),
         message_count=1,
     )
 
-    assert resolved.tolerance == 0.25
+    assert resolved.tolerance_sigmas == 0.25
 
 
 def test_config_validation_rejects_invalid_protocol_shape():
@@ -36,8 +36,11 @@ def test_config_validation_rejects_invalid_protocol_shape():
     with pytest.raises(ValueError, match="expected 2"):
         validate_config(ProtocolConfig(n_states=8), message_count=1)
 
-    with pytest.raises(ValueError, match="tolerance"):
-        validate_config(ProtocolConfig(n_states=4, tolerance=-1.0), message_count=1)
+    with pytest.raises(ValueError, match="tolerance_sigmas"):
+        validate_config(
+            ProtocolConfig(n_states=4, tolerance_sigmas=-1.0),
+            message_count=1,
+        )
 
 
 def test_config_accepts_typed_squeeze_distribution():

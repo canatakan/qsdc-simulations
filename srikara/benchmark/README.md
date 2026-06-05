@@ -1,13 +1,13 @@
 # Srikara Benchmark
 
 Benchmark configs are strict JSON files. JSON does not allow comments, so use
-this README as the annotated reference and copy `configs/smoke.json` when
+this README as the annotated reference and copy `configs/test.json` when
 making a runnable config.
 
 Run a config with:
 
 ```bash
-srikara-benchmark srikara/benchmark/configs/smoke.json
+srikara-benchmark srikara/benchmark/configs/test.json
 srikara-benchmark path/to/config.json --output srikara/benchmark/results/custom
 ```
 
@@ -15,25 +15,22 @@ srikara-benchmark path/to/config.json --output srikara/benchmark/results/custom
 artifacts inside a child run directory named like:
 
 ```text
-run_1780576634533154000/
+run_1780576634/
 ```
 
 ## Full Runnable Shape
 
 ```json
 {
-  "name": "smoke",
+  "name": "test",
   "backend": "analytic",
   "random_source": "classical",
   "payload_bit_count": 12,
   "trials_per_combo": 2,
   "base_seed": 1000,
-  "output_dir": "srikara/benchmark/results/smoke",
+  "tolerance_sigmas": 1.0,
+  "output_dir": "srikara/benchmark/results/test",
   "one_probabilities": [0.1, 0.5, 0.9],
-  "tolerances": {
-    "kind": "explicit",
-    "values": [0.0000001, 0.05]
-  },
   "r_distributions": [
     {
       "kind": "uniform",
@@ -65,7 +62,7 @@ Benchmark name used in metadata and the default output path. Defaults to
 `"benchmark"` if omitted.
 
 ```json
-"name": "smoke"
+"name": "test"
 ```
 
 `backend`
@@ -159,6 +156,16 @@ Integer seed used to derive per-trial message and simulation seeds. Defaults to
 "base_seed": 1000
 ```
 
+`tolerance_sigmas`
+
+Optional non-negative number. This is the control/decoy check threshold in
+measurement noise sigmas. If omitted, the backend default is used. Current
+backend defaults are `1.0` for exact backends and `4.0` for `sf-sampled`.
+
+```json
+"tolerance_sigmas": 4.0
+```
+
 `output_dir`
 
 Optional parent directory for generated artifacts. If omitted, defaults to:
@@ -182,33 +189,6 @@ bit `1`.
 ```json
 "one_probabilities": [0.1, 0.5, 0.9]
 ```
-
-## Tolerance Sweep
-
-Exactly one tolerance sweep object is used per config.
-
-Explicit values:
-
-```json
-"tolerances": {
-  "kind": "explicit",
-  "values": [0.0000001, 0.01, 0.05]
-}
-```
-
-Linear sweep:
-
-```json
-"tolerances": {
-  "kind": "linear",
-  "start": 0.0,
-  "stop": 0.2,
-  "step": 0.01
-}
-```
-
-All tolerance values must be non-negative. Linear `step` must be positive, and
-`stop` must be greater than or equal to `start`.
 
 ## Squeezing r Distributions
 
@@ -308,19 +288,79 @@ Fixed value:
 The benchmark creates one combo for each Cartesian product of:
 
 ```text
-one_probability x tolerance x r_distribution
+one_probability x r_distribution
 ```
 
 For example:
 
 ```text
-3 one_probabilities * 2 tolerances * 2 r distributions = 12 combos
+3 one_probabilities * 2 r distributions = 6 combos
 ```
 
 Then it runs:
 
 ```text
-12 combos * trials_per_combo
+6 combos * trials_per_combo
 ```
 
 protocol trials.
+
+## Artifacts
+
+Each benchmark run writes these artifacts into its `run_<unix_seconds>/`
+directory:
+
+```text
+benchmark.json
+config.json
+combos.json
+combos.csv
+trials.jsonl
+plots/
+```
+
+`benchmark.json` is the run summary. It records the run id, derived protocol
+counts, aggregate acceptance rate, elapsed time, and the relative paths of all
+written artifacts.
+
+`config.json` is the effective runnable config for that run. It can be loaded
+again with `srikara-benchmark`.
+
+`combos.json` contains one aggregate object per parameter combo. Each combo has
+top-level rates for acceptance and protocol checks, plus nested metric groups:
+
+```text
+all
+accepted
+rejected
+```
+
+`combos.csv` is the same combo-level view flattened for spreadsheets and quick
+plotting. It includes the resolved `check_tolerance_sigmas`, total
+control/decoy check counts, failed check counts, failed check rates, and
+mean/max failed checks per trial so rejection severity is visible without
+opening `trials.jsonl`.
+
+`trials.jsonl` contains one JSON object per protocol trial.
+
+`plots/` contains matplotlib PNG plots generated from `combos.json` and
+`trials.jsonl`:
+
+```text
+bit_error_by_r.png
+symbol_error_by_r.png
+value_error_by_r.png
+derived_acceptance_tolerance_sigmas_curve.png
+```
+
+The threshold curve is derived from observed control and decoy deviations. For
+each trial, `required_acceptance_tolerance_sigmas` is the smallest tolerance,
+in measurement noise sigmas, that would accept that observed trial. The maximum
+required tolerance in a combo is the empirical threshold that would accept every
+observed trial in that combo.
+
+Existing run artifacts can be plotted again with:
+
+```bash
+srikara-benchmark-plot path/to/run_<unix_seconds>
+```

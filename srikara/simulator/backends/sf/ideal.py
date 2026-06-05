@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from srikara.simulator.core.config import DEFAULT_EXACT_TOLERANCE
+from srikara.simulator.core.config import (
+    DEFAULT_EXACT_MEASUREMENT_NOISE_SIGMA,
+    DEFAULT_EXACT_TOLERANCE_SIGMAS,
+)
 from srikara.simulator.backends.base import QSDCBackend
 from srikara.simulator.backends.sf.calculations import (
     build_control_program,
@@ -19,7 +22,8 @@ class SFBackend(QSDCBackend):
     """SF Gaussian circuits with exact state-mean readout."""
 
     name: str = "sf"
-    default_tolerance: float = DEFAULT_EXACT_TOLERANCE
+    default_tolerance_sigmas: float = DEFAULT_EXACT_TOLERANCE_SIGMAS
+    measurement_noise_sigma: float = DEFAULT_EXACT_MEASUREMENT_NOISE_SIGMA
 
     def begin_run(self, seed: int) -> None:
         pass

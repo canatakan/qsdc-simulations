@@ -25,11 +25,8 @@ class SFSampledBackend(QSDCBackend):
     """SF Gaussian circuits with sampled homodyne readout."""
 
     name: str = "sf-sampled"
-    homodyne_tolerance_sigmas: float = DEFAULT_SAMPLED_TOLERANCE_SIGMAS
-
-    @property
-    def default_tolerance(self) -> float:
-        return self.homodyne_tolerance_sigmas * homodyne_component_std()
+    default_tolerance_sigmas: float = DEFAULT_SAMPLED_TOLERANCE_SIGMAS
+    measurement_noise_sigma: float = homodyne_component_std()
 
     def begin_run(self, seed: int) -> None:
         np.random.seed(seed)

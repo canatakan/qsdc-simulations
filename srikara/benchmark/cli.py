@@ -15,7 +15,7 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_benchmark_config(args.config_path)
-    report = run_benchmark(config, output_dir=args.output_dir)
+    report = run_benchmark(config, output_dir=args.output_dir, progress=True)
     print(
         "Benchmark complete: "
         f"{report.summary['trial_count']} trials across "

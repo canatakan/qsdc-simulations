@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, replace
-from itertools import count
 from math import pi
 from pathlib import Path
-from typing import Any, Iterable, Protocol
+from typing import Any, Iterable
 
 from srikara.simulator.core.config import DEFAULT_ALPHA_BOUND
 from srikara.simulator.core.distributions import (
@@ -22,64 +21,6 @@ from srikara.simulator.core.distributions import (
 )
 
 
-class ToleranceSweep(Protocol):
-    def expand(self) -> tuple[float, ...]:
-        ...
-
-    def to_dict(self) -> dict[str, object]:
-        ...
-
-
-@dataclass(frozen=True)
-class ExplicitValues:
-    values: tuple[float, ...]
-
-    def __post_init__(self) -> None:
-        if not self.values:
-            raise ValueError("explicit tolerance sweep requires at least one value")
-        for value in self.values:
-            _validate_tolerance(value)
-
-    def expand(self) -> tuple[float, ...]:
-        return self.values
-
-    def to_dict(self) -> dict[str, object]:
-        return {"kind": "explicit", "values": list(self.values)}
-
-
-@dataclass(frozen=True)
-class LinearSweep:
-    start: float
-    stop: float
-    step: float
-
-    def __post_init__(self) -> None:
-        _validate_tolerance(self.start)
-        _validate_tolerance(self.stop)
-        if self.step <= 0:
-            raise ValueError("linear tolerance step must be positive")
-        if self.stop < self.start:
-            raise ValueError("linear tolerance stop must be >= start")
-
-    def expand(self) -> tuple[float, ...]:
-        values: list[float] = []
-        epsilon = self.step / 1_000_000
-        for index in count():
-            value = self.start + index * self.step
-            if value > self.stop + epsilon:
-                break
-            values.append(round(value, 12))
-        return tuple(values)
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "kind": "linear",
-            "start": self.start,
-            "stop": self.stop,
-            "step": self.step,
-        }
-
-
 @dataclass(frozen=True)
 class BenchmarkConfig:
     name: str
@@ -88,9 +29,9 @@ class BenchmarkConfig:
     payload_bit_count: int
     trials_per_combo: int
     base_seed: int
+    tolerance_sigmas: float | None
     output_dir: str | None
     one_probabilities: tuple[float, ...]
-    tolerances: ToleranceSweep
     r_distributions: tuple[SqueezeRDistribution, ...]
     alpha_distribution: AlphaDistribution
     theta_distribution: ThetaDistribution
@@ -102,6 +43,8 @@ class BenchmarkConfig:
             raise ValueError("payload_bit_count must be positive")
         if self.trials_per_combo <= 0:
             raise ValueError("trials_per_combo must be positive")
+        if self.tolerance_sigmas is not None and self.tolerance_sigmas < 0:
+            raise ValueError("tolerance_sigmas must be non-negative")
         if not self.one_probabilities:
             raise ValueError("one_probabilities must not be empty")
         for probability in self.one_probabilities:
@@ -129,9 +72,6 @@ class BenchmarkConfig:
     def with_output_dir(self, output_dir: str | None) -> "BenchmarkConfig":
         return replace(self, output_dir=output_dir)
 
-    def tolerance_values(self) -> tuple[float, ...]:
-        return self.tolerances.expand()
-
     def to_dict(self) -> dict[str, object]:
         return {
             "name": self.name,
@@ -140,9 +80,9 @@ class BenchmarkConfig:
             "payload_bit_count": self.payload_bit_count,
             "trials_per_combo": self.trials_per_combo,
             "base_seed": self.base_seed,
+            "tolerance_sigmas": self.tolerance_sigmas,
             "output_dir": self.output_dir,
             "one_probabilities": list(self.one_probabilities),
-            "tolerances": self.tolerances.to_dict(),
             "r_distributions": [
                 distribution.to_dict() for distribution in self.r_distributions
             ],
@@ -170,9 +110,9 @@ def parse_benchmark_config(raw: dict[str, Any]) -> BenchmarkConfig:
             "payload_bit_count",
             "trials_per_combo",
             "base_seed",
+            "tolerance_sigmas",
             "output_dir",
             "one_probabilities",
-            "tolerances",
             "r_distributions",
             "alpha_distribution",
             "theta_distribution",
@@ -186,9 +126,9 @@ def parse_benchmark_config(raw: dict[str, Any]) -> BenchmarkConfig:
         payload_bit_count=_parse_payload_bit_count(raw),
         trials_per_combo=int(raw.get("trials_per_combo", 1)),
         base_seed=int(raw.get("base_seed", 0)),
+        tolerance_sigmas=_optional_float(raw.get("tolerance_sigmas")),
         output_dir=_optional_str(raw.get("output_dir")),
         one_probabilities=_float_tuple(raw["one_probabilities"]),
-        tolerances=_parse_tolerances(raw["tolerances"]),
         r_distributions=tuple(
             _parse_r_distribution(item) for item in raw["r_distributions"]
         ),
@@ -208,21 +148,6 @@ def _parse_payload_bit_count(raw: dict[str, Any]) -> int:
     if "payload_bit_count" not in raw:
         raise ValueError("payload_bit_count is required")
     return int(raw["payload_bit_count"])
-
-
-def _parse_tolerances(raw: dict[str, Any]) -> ToleranceSweep:
-    kind = raw.get("kind")
-    if kind == "explicit":
-        _reject_unknown_keys(raw, {"kind", "values"}, "tolerances")
-        return ExplicitValues(_float_tuple(raw["values"]))
-    if kind == "linear":
-        _reject_unknown_keys(raw, {"kind", "start", "stop", "step"}, "tolerances")
-        return LinearSweep(
-            start=float(raw["start"]),
-            stop=float(raw["stop"]),
-            step=float(raw["step"]),
-        )
-    raise ValueError(f"unknown tolerance sweep kind {kind!r}")
 
 
 def _parse_r_distribution(raw: dict[str, Any]) -> SqueezeRDistribution:
@@ -283,6 +208,7 @@ def _optional_str(value: object) -> str | None:
     return str(value)
 
 
-def _validate_tolerance(value: float) -> None:
-    if value < 0:
-        raise ValueError("tolerance values must be non-negative")
+def _optional_float(value: object) -> float | None:
+    if value is None:
+        return None
+    return float(value)

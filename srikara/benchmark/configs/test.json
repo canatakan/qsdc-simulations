@@ -1,23 +1,17 @@
 {
-  "name": "smoke",
+  "name": "test",
   "backend": "analytic",
   "random_source": "classical",
   "payload_bit_count": 12,
   "trials_per_combo": 2,
   "base_seed": 1000,
-  "output_dir": "srikara/benchmark/results/smoke",
+  "tolerance_sigmas": 1.0,
+  "output_dir": "srikara/benchmark/results/test",
   "one_probabilities": [
     0.1,
     0.5,
     0.9
   ],
-  "tolerances": {
-    "kind": "explicit",
-    "values": [
-      0.0000001,
-      0.05
-    ]
-  },
   "r_distributions": [
     {
       "kind": "uniform",

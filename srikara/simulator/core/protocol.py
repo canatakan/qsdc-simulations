@@ -68,7 +68,8 @@ class MessageDecode:
 class ProtocolResult:
     backend_name: str
     random_source_name: str
-    check_tolerance: float
+    check_tolerance_sigmas: float
+    measurement_noise_sigma: float
     control_passed: bool
     decoy_passed: bool
     route: ModeRoute
@@ -139,7 +140,8 @@ def simulate_qsdc(
     return ProtocolResult(
         backend_name=active_backend.name,
         random_source_name=protocol_random.name,
-        check_tolerance=resolved_config.tolerance,
+        check_tolerance_sigmas=resolved_config.tolerance_sigmas,
+        measurement_noise_sigma=active_backend.measurement_noise_sigma,
         control_passed=control_passed,
         decoy_passed=decoy_passed,
         route=route,
@@ -177,12 +179,14 @@ def _check_control(
     measured = backend.control_measurement(
         state.alpha, state.squeeze_r, state.theta, axis
     )
+
+    tolerance = config.tolerance_sigmas * backend.measurement_noise_sigma
     return ControlCheck(
         index=state.index,
         axis=axis,
         expected=expected,
         measured=measured,
-        passed=abs(measured - expected) <= config.tolerance,
+        passed=abs(measured - expected) <= tolerance,
     )
 
 
@@ -197,12 +201,14 @@ def _check_decoy(
     measured = backend.returned_measurement(
         state.alpha, state.squeeze_r, state.theta, beta=0j, axis=axis
     )
+
+    tolerance = config.tolerance_sigmas * backend.measurement_noise_sigma
     return DecoyCheck(
         index=state.index,
         axis=axis,
         expected=expected,
         measured=measured,
-        passed=abs(measured - expected) <= config.tolerance,
+        passed=abs(measured - expected) <= tolerance,
     )
 
 

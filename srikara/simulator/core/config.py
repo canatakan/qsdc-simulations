@@ -19,7 +19,8 @@ DEFAULT_ALPHA_BOUND = 2.0
 DEFAULT_SQUEEZE_R_MIN = 0.05
 DEFAULT_SQUEEZE_R_MAX = 0.8
 DEFAULT_SEED = 11
-DEFAULT_EXACT_TOLERANCE = 1e-7
+DEFAULT_EXACT_MEASUREMENT_NOISE_SIGMA = 1e-7
+DEFAULT_EXACT_TOLERANCE_SIGMAS = 1.0
 DEFAULT_SAMPLED_TOLERANCE_SIGMAS = 4.0
 
 
@@ -38,7 +39,7 @@ class ProtocolConfig:
         )
     )
     theta_distribution: ThetaDistribution = field(default_factory=UniformTheta)
-    tolerance: float | None = None
+    tolerance_sigmas: float | None = None
     seed: int = DEFAULT_SEED
 
 
@@ -50,7 +51,7 @@ class ResolvedProtocolConfig:
     alpha_distribution: AlphaDistribution
     squeeze_r_distribution: SqueezeRDistribution
     theta_distribution: ThetaDistribution
-    tolerance: float
+    tolerance_sigmas: float
     seed: int
 
 
@@ -58,15 +59,17 @@ def resolve_config(
     config: ProtocolConfig, backend, message_count: int
 ) -> ResolvedProtocolConfig:
     validate_config(config, message_count)
-    tolerance = (
-        backend.default_tolerance if config.tolerance is None else config.tolerance
+    tolerance_sigmas = (
+        backend.default_tolerance_sigmas
+        if config.tolerance_sigmas is None
+        else config.tolerance_sigmas
     )
     return ResolvedProtocolConfig(
         n_states=config.n_states,
         alpha_distribution=config.alpha_distribution,
         squeeze_r_distribution=config.squeeze_r_distribution,
         theta_distribution=config.theta_distribution,
-        tolerance=tolerance,
+        tolerance_sigmas=tolerance_sigmas,
         seed=config.seed,
     )
 
@@ -80,5 +83,5 @@ def validate_config(config: ProtocolConfig, message_count: int) -> None:
             f"expected {expected_messages} 3-bit symbols for n={config.n_states}, "
             f"got {message_count}"
         )
-    if config.tolerance is not None and config.tolerance < 0:
-        raise ValueError("tolerance must be non-negative")
+    if config.tolerance_sigmas is not None and config.tolerance_sigmas < 0:
+        raise ValueError("tolerance_sigmas must be non-negative")

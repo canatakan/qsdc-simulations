@@ -61,9 +61,10 @@ Strawberry Fields gates and reads exact state means, matching the paper-level
 ideal protocol. The `sf-sampled` backend uses Strawberry Fields homodyne
 measurement samples, so decoded symbols can differ from the sent symbols.
 
-If `--tolerance` is omitted, the backend chooses the control/decoy tolerance:
-`analytic` and `sf` use `1e-7`, while `sf-sampled` uses a 4-sigma homodyne
-threshold derived from Strawberry Fields' `hbar`.
+If `--tolerance-sigmas` is omitted, the backend chooses the control/decoy
+sigma tolerance. `analytic` and `sf` use one numerical-precision sigma, while
+`sf-sampled` uses a 4-sigma homodyne threshold derived from Strawberry Fields'
+`hbar`.
 
 ## Tests
 
@@ -82,7 +83,7 @@ srikara/
       analytic/    # analytic backend and calculations
       sf/          # SF ideal/sampled backends and calculations
     core/
-      config.py    # protocol settings, validation, and backend tolerances
+      config.py    # protocol settings, validation, and backend sigma tolerances
       encoding.py  # 3-bit interval encoding
       flow.py      # optical switching, delay, and announcement records
       protocol.py  # CV QSDC protocol orchestration
