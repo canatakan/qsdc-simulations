@@ -370,3 +370,7 @@ Existing run artifacts can be plotted again with:
 ```bash
 srikara-benchmark-plot path/to/run_<unix_seconds>
 ```
+
+The code that writes runtime artifacts is grouped under
+`src/qsdc/protocols/srikara/benchmark/artifacts/`. Generated benchmark outputs
+still go to the configured `output_dir`; they are not source files.

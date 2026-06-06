@@ -27,33 +27,33 @@ python -m pip install --upgrade pip
 make install
 ```
 
-This installs the package, dependencies, test dependency, and the `srikara-demo`
-console command.
+This installs the package, dependencies, test dependency, and benchmark console
+commands.
 
 ## Quick Start
 
 Transmit a text message through the verbose channel demo:
 
 ```bash
-srikara-demo "hello" --backend sf
+python demos/srikara/message.py "hello" --backend sf
 ```
 
 Use `sf-sampled` to run actual sampled homodyne measurements:
 
 ```bash
-srikara-demo "hello" --backend sf-sampled
+python demos/srikara/message.py "hello" --backend sf-sampled
 ```
 
 Use the Strawberry Fields beam-splitter QRNG simulation for protocol choices:
 
 ```bash
-srikara-demo "hello" --backend sf --random-source sf-bs-qrng
+python demos/srikara/message.py "hello" --backend sf --random-source sf-bs-qrng
 ```
 
 Print a hand-checkable one-symbol calculation:
 
 ```bash
-srikara-basic-demo
+python demos/srikara/basic.py
 ```
 
 The `analytic` backend is the exact formula reference. The `sf` backend uses
@@ -75,20 +75,49 @@ make srikara/test
 ## Layout
 
 ```text
-srikara/
-  benchmark/       # benchmark runners and report generation
-  demo/            # srikara-demo command implementations
-  simulator/
-    backends/
-      analytic/    # analytic backend and calculations
-      sf/          # SF ideal/sampled backends and calculations
-    core/
-      config.py    # protocol settings, validation, and backend sigma tolerances
-      encoding.py  # 3-bit interval encoding
-      flow.py      # optical switching, delay, and announcement records
-      protocol.py  # CV QSDC protocol orchestration
-  tests/
+docs/protocols/srikara/
+  README.md
+  benchmark.md
   method.pdf
-../pyproject.toml
-../requirements.txt
+demos/srikara/
+  basic.py
+  message.py
+src/qsdc/common/
+  bits.py
+  random/
+    base.py
+    classical.py
+    sf_beamsplitter.py
+src/qsdc/protocols/srikara/
+  simulator/
+    config.py
+    distributions.py
+    encoding.py
+    flow.py
+    protocol.py
+    backends/
+      base.py
+      analytic/
+        calculations.py
+        ideal.py
+      strawberryfields/
+        calculations.py
+        ideal.py
+        sampled.py
+  benchmark/
+    config.py
+    engine.py
+    metrics.py
+    seeds.py
+    cli.py
+    configs/
+      sf.json
+      test.json
+    artifacts/
+      output.py
+      plots.py
+      workbook.py
+tests/protocols/srikara/
+  simulator/
+  benchmark/
 ```

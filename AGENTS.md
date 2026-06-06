@@ -5,7 +5,8 @@ This project contains separate simulators for different QSDC papers.
 - `src/qsdc/common/`: paper-independent utilities, such as bit handling and
   random-source interfaces.
 - `src/qsdc/protocols/<paper>/simulator/`: protocol logic for one paper.
-- `src/qsdc/protocols/<paper>/benchmark/`: benchmark runners and generated run reports.
+- `src/qsdc/protocols/<paper>/benchmark/`: benchmark configs, runners, metrics,
+  and artifact writers.
 - `demos/<paper>/`: runnable demos that show the protocol flow.
 - `tests/protocols/<paper>/`: tests for that paper's simulator.
 - `docs/protocols/<paper>/`: paper notes, method PDFs, and supporting documentation.
@@ -13,6 +14,8 @@ This project contains separate simulators for different QSDC papers.
 New papers should follow the same shape: keep the paper-specific simulator in
 its own directory, share only genuinely reusable helpers through
 `src/qsdc/common/`, and keep demos and benchmarks outside the simulator core.
+Benchmark output files should go to the configured output directory, not into
+the source tree.
 
 ## References
 
