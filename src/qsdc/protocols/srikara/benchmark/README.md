@@ -312,45 +312,30 @@ directory:
 
 ```text
 benchmark.json
-config.json
-combos.json
-benchmark.xlsx
-trials.jsonl
+report.html
+report.css
+combos.csv
+trials.csv
 plots/
 ```
 
 `benchmark.json` is the run summary. It records the run id, derived protocol
-counts, aggregate acceptance rate, elapsed time, and the relative paths of all
-written artifacts.
+counts, compact run parameters, aggregate acceptance rate, elapsed time, and the
+relative paths of all written artifacts.
 
-`config.json` is the effective runnable config for that run. It can be loaded
-again with `srikara-benchmark`.
+`report.html` is the first artifact to open when reviewing a run. It links the
+plots and renders every CSV table emitted by the benchmark.
 
-`combos.json` contains one aggregate object per parameter combo. Each combo has
-top-level rates for acceptance and protocol checks, plus nested metric groups:
+`combos.csv` contains one aggregate row per parameter combo. It includes
+acceptance, bit/symbol error, numeric error, control/decoy failure counts, and
+derived tolerance-threshold summaries.
 
-```text
-all
-accepted
-rejected
-```
+`trials.csv` is the trial log. It includes the combo/trial indices, trial seed,
+pass/fail state, failed control/decoy counts, required tolerance thresholds, and
+message recovery errors.
 
-`benchmark.xlsx` is the human-readable Excel workbook. It groups the benchmark
-views into separate sheets:
-
-```text
-Run              run metadata and derived protocol counts
-Overview         acceptance and protocol pass rates per combo
-Errors           bit, symbol, numeric, and accepted/rejected error metrics
-Checks           control/decoy check counts and failed-check severity
-Tolerance        configured sigma tolerance, noise sigma, and derived thresholds
-Trial Tolerance  per-trial required control/decoy/acceptance tolerances
-```
-
-`trials.jsonl` contains one JSON object per protocol trial.
-
-`plots/` contains matplotlib PNG plots generated from `combos.json` and
-`trials.jsonl`:
+`plots/` contains matplotlib PNG plots generated from `combos.csv` and
+`trials.csv`:
 
 ```text
 bit_error_by_r.png
@@ -370,6 +355,16 @@ Existing run artifacts can be plotted again with:
 ```bash
 srikara-benchmark-plot path/to/run_<unix_seconds>
 ```
+
+Multiple run directories can be presented as one static comparison UI with:
+
+```bash
+srikara-benchmark-ui path/to/results/srikara/benchmark
+```
+
+This writes `index.html` and `index.css` into the provided results directory.
+The index scans child run folders, compares alpha/theta/backend cases, and links
+to each run's `report.html`.
 
 The code that writes runtime artifacts is grouped under
 `src/qsdc/protocols/srikara/benchmark/artifacts/`. Generated benchmark outputs

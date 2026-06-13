@@ -1,0 +1,39 @@
+{
+  "name": "sf_sampled_alpha_low",
+  "backend": "sf-sampled",
+  "random_source": "classical",
+  "payload_bit_count": 1024,
+  "trials_per_combo": 5,
+  "base_seed": 4300,
+  "tolerance_sigmas": 4.0,
+  "output_dir": "results/srikara/benchmark/sf_sampled_alpha_low",
+  "one_probabilities": [
+    0.5
+  ],
+  "r_distributions": [
+    {
+      "kind": "uniform",
+      "lower": 0.05,
+      "upper": 0.2
+    },
+    {
+      "kind": "uniform",
+      "lower": 0.3,
+      "upper": 0.6
+    },
+    {
+      "kind": "uniform",
+      "lower": 0.6,
+      "upper": 1.0
+    }
+  ],
+  "alpha_distribution": {
+    "kind": "uniform_square",
+    "bound": 0.5
+  },
+  "theta_distribution": {
+    "kind": "uniform",
+    "lower_pi": 0.0,
+    "upper_pi": 2.0
+  }
+}

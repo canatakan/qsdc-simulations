@@ -1,0 +1,38 @@
+{
+  "name": "sf_sampled_theta_fixed",
+  "backend": "sf-sampled",
+  "random_source": "classical",
+  "payload_bit_count": 1024,
+  "trials_per_combo": 5,
+  "base_seed": 5500,
+  "tolerance_sigmas": 4.0,
+  "output_dir": "results/srikara/benchmark/sf_sampled_theta_fixed",
+  "one_probabilities": [
+    0.5
+  ],
+  "r_distributions": [
+    {
+      "kind": "uniform",
+      "lower": 0.05,
+      "upper": 0.2
+    },
+    {
+      "kind": "uniform",
+      "lower": 0.3,
+      "upper": 0.6
+    },
+    {
+      "kind": "uniform",
+      "lower": 0.6,
+      "upper": 1.0
+    }
+  ],
+  "alpha_distribution": {
+    "kind": "uniform_square",
+    "bound": 2.0
+  },
+  "theta_distribution": {
+    "kind": "fixed",
+    "value_pi": 0.0
+  }
+}

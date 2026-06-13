@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <main>
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">Srikara benchmark UI</p>
+        <h1>{{ heading }}</h1>
+      </div>
+      <p class="run-count">{{ run_count }} runs</p>
+    </header>
+
+    <section class="cards" aria-label="Benchmark run summary">
+      {{ cards }}
+    </section>
+
+    <section>
+      <h2>Run Comparison</h2>
+      {{ run_table }}
+    </section>
+  </main>
+</body>
+</html>

@@ -6,17 +6,24 @@ import argparse
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
+from typing import Any, Optional, Union
 
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from qsdc.protocols.srikara.benchmark.artifacts.report import (
+    write_benchmark_html_report,
+)
+from qsdc.protocols.srikara.benchmark.artifacts.tables import (
+    read_combo_csv,
+    read_trial_csv,
+)
+
 
 Combo = dict[str, Any]
 Trial = dict[str, Any]
-MetricGetter = Callable[[Combo], Optional[Union[float, int]]]
 
 
 @dataclass(frozen=True)
@@ -24,7 +31,7 @@ class ErrorPlotSpec:
     filename: str
     title: str
     y_label: str
-    metric: MetricGetter
+    metric_field: str
 
 
 ERROR_PLOT_SPECS: tuple[ErrorPlotSpec, ...] = (
@@ -32,19 +39,19 @@ ERROR_PLOT_SPECS: tuple[ErrorPlotSpec, ...] = (
         filename="bit_error_by_r.png",
         title="Payload Bit Error by r Distribution",
         y_label="bit error rate",
-        metric=lambda combo: combo["all"]["bit_error_rate"],
+        metric_field="bit_error_rate",
     ),
     ErrorPlotSpec(
         filename="symbol_error_by_r.png",
         title="3-Bit Symbol Error by r Distribution",
         y_label="symbol error rate",
-        metric=lambda combo: combo["all"]["symbol_error_rate"],
+        metric_field="symbol_error_rate",
     ),
     ErrorPlotSpec(
         filename="value_error_by_r.png",
         title="Mean Absolute Numeric Recovery Error by r Distribution",
         y_label="mean |decoded - sampled|",
-        metric=lambda combo: combo["all"]["mean_abs_value_error"],
+        metric_field="mean_abs_value_error",
     ),
 )
 
@@ -62,18 +69,21 @@ def main() -> None:
 
 def write_plots_from_artifacts(output_dir: str | Path) -> list[str]:
     output_path = Path(output_dir)
-    with (output_path / "combos.json").open("r", encoding="utf-8") as handle:
-        combos = json.load(handle)
-    if not isinstance(combos, list):
-        raise ValueError("combos.json must contain a list")
-
-    trials = _read_trials_jsonl(output_path / "trials.jsonl")
+    combos = read_combo_csv(output_path / "combos.csv")
+    trials = read_trial_csv(output_path / "trials.csv")
     plots = write_benchmark_plots(output_path, combos, trials)
     benchmark_path = output_path / "benchmark.json"
     if benchmark_path.exists():
         with benchmark_path.open("r", encoding="utf-8") as handle:
             benchmark = json.load(handle)
         benchmark.setdefault("artifacts", {})["plots"] = plots
+        benchmark["artifacts"]["html_report"] = write_benchmark_html_report(
+            output_path,
+            benchmark,
+            combos,
+            trials,
+        )
+        benchmark["artifacts"]["html_report_css"] = "report.css"
         with benchmark_path.open("w", encoding="utf-8") as handle:
             json.dump(benchmark, handle, indent=2, sort_keys=True)
             handle.write("\n")
@@ -100,16 +110,6 @@ def write_benchmark_plots(
     return plots
 
 
-def _read_trials_jsonl(path: Path) -> list[Trial]:
-    trials: list[Trial] = []
-    with path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            stripped = line.strip()
-            if stripped:
-                trials.append(json.loads(stripped))
-    return trials
-
-
 def _write_error_bar_plot(
     path: Path,
     combos: list[Combo],
@@ -117,7 +117,7 @@ def _write_error_bar_plot(
 ) -> None:
     r_labels = _unique_sorted(combo["r_distribution"] for combo in combos)
     probabilities = _unique_sorted(float(combo["one_probability"]) for combo in combos)
-    values = _combo_metric_table(combos, spec.metric)
+    values = _combo_metric_table(combos, spec.metric_field)
 
     figure, axis = plt.subplots(figsize=(9.5, 5.5), constrained_layout=True)
     positions = list(range(len(r_labels)))
@@ -149,11 +149,11 @@ def _write_error_bar_plot(
 
 def _combo_metric_table(
     combos: list[Combo],
-    metric: MetricGetter,
+    metric_field: str,
 ) -> dict[tuple[str, float], float]:
     values: dict[tuple[str, float], float] = {}
     for combo in combos:
-        y_value = metric(combo)
+        y_value = _combo_metric(combo, metric_field)
         if y_value is None:
             continue
         values[
@@ -163,6 +163,17 @@ def _combo_metric_table(
             )
         ] = float(y_value)
     return values
+
+
+def _combo_metric(
+    combo: Combo,
+    metric_field: str,
+) -> Optional[Union[float, int]]:
+    if metric_field in combo:
+        return float(combo[metric_field])
+    if "all" in combo and metric_field in combo["all"]:
+        return float(combo["all"][metric_field])
+    return None
 
 
 def _write_threshold_curve(path: Path, trials: list[Trial]) -> None:

@@ -107,10 +107,20 @@ def run_benchmark(
     summary = {
         "name": effective_config.name,
         "benchmark_run_id": benchmark_run_id,
-        "benchmark_run_unix_seconds": int(benchmark_run_id.removeprefix("run_")),
         "base_output_dir": base_output_dir,
         "output_dir": benchmark_run_dir,
-        "effective_config": effective_config.to_dict(),
+        "parameters": {
+            "backend": effective_config.backend,
+            "random_source": effective_config.random_source,
+            "tolerance_sigmas": effective_config.tolerance_sigmas,
+            "one_probabilities": list(effective_config.one_probabilities),
+            "r_distributions": [
+                distribution.summary()
+                for distribution in effective_config.r_distributions
+            ],
+            "alpha_distribution": effective_config.alpha_distribution.summary(),
+            "theta_distribution": effective_config.theta_distribution.summary(),
+        },
         "derived_counts": {
             "payload_bit_count": effective_config.payload_bit_count,
             "padding_bit_count": effective_config.padding_bit_count,
@@ -128,10 +138,10 @@ def run_benchmark(
         "elapsed_seconds": time() - started_at,
         "artifacts": {
             "benchmark": "benchmark.json",
-            "config": "config.json",
-            "trials": "trials.jsonl",
-            "combos_json": "combos.json",
-            "workbook": "benchmark.xlsx",
+            "combos_csv": "combos.csv",
+            "trials_csv": "trials.csv",
+            "html_report": "report.html",
+            "html_report_css": "report.css",
             "plots": [],
         },
     }

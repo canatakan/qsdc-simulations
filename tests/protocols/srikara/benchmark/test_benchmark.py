@@ -1,8 +1,11 @@
 from io import StringIO
 from pathlib import Path
 
-from openpyxl import load_workbook
-
+from qsdc.protocols.srikara.benchmark.artifacts.tables import (
+    read_combo_csv,
+    read_trial_csv,
+)
+from qsdc.protocols.srikara.benchmark.artifacts.ui.index import write_benchmark_index
 from qsdc.protocols.srikara.benchmark.config import (
     load_benchmark_config,
     parse_benchmark_config,
@@ -155,28 +158,27 @@ def test_benchmark_runs_with_analytic_backend(tmp_path):
     )
     assert all("all_bit_error_rate" not in combo for combo in report.combos)
     assert Path(report.output_dir).parent == tmp_path / "test"
-    assert (Path(report.output_dir) / "trials.jsonl").exists()
-    assert not (Path(report.output_dir) / "combos.csv").exists()
-    workbook_path = Path(report.output_dir) / "benchmark.xlsx"
-    assert workbook_path.exists()
-    workbook = load_workbook(workbook_path, read_only=True)
-    assert workbook.sheetnames == [
-        "Run",
-        "Overview",
-        "Errors",
-        "Checks",
-        "Tolerance",
-        "Trial Tolerance",
-    ]
-    assert workbook["Tolerance"]["D1"].value == "check_tolerance_sigmas"
-    assert workbook["Tolerance"]["E1"].value == "measurement_noise_sigma"
-    assert (
-        workbook["Tolerance"]["J1"].value
-        == "required_acceptance_tolerance_sigmas_max"
-    )
-    assert workbook["Checks"]["E1"].value == "control_failed_check_count"
-    assert workbook["Checks"]["M1"].value == "decoy_max_failed_check_count_per_trial"
-    assert report.summary["artifacts"]["workbook"] == "benchmark.xlsx"
+    assert (Path(report.output_dir) / "combos.csv").exists()
+    assert (Path(report.output_dir) / "trials.csv").exists()
+    assert not (Path(report.output_dir) / "benchmark.xlsx").exists()
+    assert not (Path(report.output_dir) / "config.json").exists()
+    assert not (Path(report.output_dir) / "combos.json").exists()
+    assert not (Path(report.output_dir) / "trials.jsonl").exists()
+    combo_rows = read_combo_csv(Path(report.output_dir) / "combos.csv")
+    trial_rows = read_trial_csv(Path(report.output_dir) / "trials.csv")
+    assert len(combo_rows) == 6
+    assert len(trial_rows) == 12
+    assert combo_rows[0]["bit_error_rate"] == "0.0"
+    assert combo_rows[0]["required_acceptance_tolerance_sigmas_max"] == "0.0"
+    assert trial_rows[0]["required_acceptance_tolerance_sigmas"] == "0.0"
+    assert report.summary["artifacts"]["combos_csv"] == "combos.csv"
+    assert report.summary["artifacts"]["trials_csv"] == "trials.csv"
+    assert report.summary["artifacts"]["html_report"] == "report.html"
+    assert report.summary["artifacts"]["html_report_css"] == "report.css"
+    assert "effective_config" not in report.summary
+    assert "benchmark_run_unix_seconds" not in report.summary
+    assert (Path(report.output_dir) / "report.html").exists()
+    assert (Path(report.output_dir) / "report.css").exists()
     assert report.summary["artifacts"]["plots"] == [
         "plots/bit_error_by_r.png",
         "plots/symbol_error_by_r.png",
@@ -185,6 +187,55 @@ def test_benchmark_runs_with_analytic_backend(tmp_path):
     ]
     for plot_path in report.summary["artifacts"]["plots"]:
         assert (Path(report.output_dir) / plot_path).exists()
+
+
+def test_benchmark_report_contains_core_sections(tmp_path):
+    config = load_benchmark_config(
+        Path("src")
+        / "qsdc"
+        / "protocols"
+        / "srikara"
+        / "benchmark"
+        / "configs"
+        / "test.json"
+    ).with_output_dir(str(tmp_path / "test"))
+
+    report = run_benchmark(config)
+    html = (Path(report.output_dir) / "report.html").read_text(encoding="utf-8")
+
+    assert "Run Setup" in html
+    assert "Combo Outcomes" in html
+    assert "Check Failures" in html
+    assert "Tolerance Thresholds" in html
+    assert "Raw Tables" in html
+    assert "Metric Meanings" in html
+    assert "combos.csv" in html
+    assert "trials.csv" in html
+    assert "benchmark.xlsx" not in html
+    assert "config.json" not in html
+
+
+def test_benchmark_ui_index_lists_runs(tmp_path):
+    config = load_benchmark_config(
+        Path("src")
+        / "qsdc"
+        / "protocols"
+        / "srikara"
+        / "benchmark"
+        / "configs"
+        / "test.json"
+    ).with_output_dir(str(tmp_path / "test"))
+    report = run_benchmark(config)
+
+    index_path = Path(write_benchmark_index(Path(report.output_dir).parent))
+    html = index_path.read_text(encoding="utf-8")
+
+    assert index_path.name == "index.html"
+    assert "Run Comparison" in html
+    assert "alpha=uniform_square" in html
+    assert "theta=uniform" in html
+    assert "open" in html
+    assert (index_path.parent / "index.css").exists()
 
 
 def test_benchmark_progress_reports_completed_trials(tmp_path):

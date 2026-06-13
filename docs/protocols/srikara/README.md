@@ -75,49 +75,12 @@ make srikara/test
 ## Layout
 
 ```text
-docs/protocols/srikara/
-  README.md
-  benchmark.md
-  method.pdf
-demos/srikara/
-  basic.py
-  message.py
-src/qsdc/common/
-  bits.py
-  random/
-    base.py
-    classical.py
-    sf_beamsplitter.py
+docs/protocols/srikara/        protocol notes and paper material
+demos/srikara/                 runnable protocol demos
+src/qsdc/common/               shared bit and random-source utilities
 src/qsdc/protocols/srikara/
-  simulator/
-    config.py
-    distributions.py
-    encoding.py
-    flow.py
-    protocol.py
-    backends/
-      base.py
-      analytic/
-        calculations.py
-        ideal.py
-      strawberryfields/
-        calculations.py
-        ideal.py
-        sampled.py
-  benchmark/
-    config.py
-    engine.py
-    metrics.py
-    seeds.py
-    cli.py
-    configs/
-      sf.json
-      test.json
-    artifacts/
-      output.py
-      plots.py
-      workbook.py
-tests/protocols/srikara/
-  simulator/
-  benchmark/
+  simulator/                   protocol simulation core and backends
+  benchmark/                   benchmark configs, runner, metrics, and outputs
+    artifacts/                 code that writes generated benchmark artifacts
+tests/protocols/srikara/       simulator and benchmark tests
 ```
