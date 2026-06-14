@@ -11,6 +11,7 @@ from typing import Any, Callable, TextIO
 
 from qsdc.common.bits import chunk_bits
 from qsdc.common.bits import weighted_random_bits
+from qsdc.common.random import make_random_source
 from qsdc.common.random.base import RandomSource
 from qsdc.common.random.classical import ClassicalRandomSource
 from qsdc.protocols.srikara.benchmark.config import BenchmarkConfig
@@ -21,7 +22,7 @@ from qsdc.protocols.srikara.benchmark.metrics import (
 )
 from qsdc.protocols.srikara.benchmark.artifacts.output import write_benchmark_artifacts
 from qsdc.protocols.srikara.benchmark.seeds import derive_seed
-from qsdc.protocols.srikara.simulator.backends.analytic.ideal import AnalyticBackend
+from qsdc.protocols.srikara.simulator.backends import make_backend
 from qsdc.protocols.srikara.simulator.backends.base import QSDCBackend
 from qsdc.protocols.srikara.simulator.config import ProtocolConfig
 from qsdc.protocols.srikara.simulator.distributions import SqueezeRDistribution
@@ -30,18 +31,6 @@ from qsdc.protocols.srikara.simulator.protocol import simulate_qsdc
 
 BackendFactory = Callable[[str], QSDCBackend]
 RandomSourceFactory = Callable[[str, int], RandomSource]
-
-
-def make_backend(name: str) -> QSDCBackend:
-    if name == "analytic":
-        return AnalyticBackend()
-    raise ValueError(f"unknown backend {name!r}")
-
-
-def make_random_source(name: str, seed: int) -> RandomSource:
-    if name == "classical":
-        return ClassicalRandomSource(seed)
-    raise ValueError(f"unknown random source {name!r}")
 
 
 @dataclass(frozen=True)

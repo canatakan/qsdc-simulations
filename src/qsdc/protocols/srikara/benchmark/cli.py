@@ -4,33 +4,10 @@ from __future__ import annotations
 
 import argparse
 
-from qsdc.common.random.classical import ClassicalRandomSource
-from qsdc.common.random.sf_beamsplitter import SFBeamSplitterQRNG
+from qsdc.common.random import make_random_source
 from qsdc.protocols.srikara.benchmark.config import load_benchmark_config
 from qsdc.protocols.srikara.benchmark.engine import run_benchmark
-from qsdc.protocols.srikara.simulator.backends.analytic.ideal import AnalyticBackend
-from qsdc.protocols.srikara.simulator.backends.strawberryfields.ideal import SFBackend
-from qsdc.protocols.srikara.simulator.backends.strawberryfields.sampled import (
-    SFSampledBackend,
-)
-
-
-def make_backend(name):
-    if name == "analytic":
-        return AnalyticBackend()
-    if name == "sf":
-        return SFBackend()
-    if name == "sf-sampled":
-        return SFSampledBackend()
-    raise ValueError(f"unknown backend {name!r}")
-
-
-def make_random_source(name, seed):
-    if name == "classical":
-        return ClassicalRandomSource(seed)
-    if name == "sf-bs-qrng":
-        return SFBeamSplitterQRNG(seed=seed)
-    raise ValueError(f"unknown random source {name!r}")
+from qsdc.protocols.srikara.simulator.backends import make_backend
 
 
 def main() -> None:
