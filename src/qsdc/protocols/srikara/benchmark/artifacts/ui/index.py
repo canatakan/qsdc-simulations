@@ -102,9 +102,9 @@ def _cards(runs: list[dict[str, Any]]) -> str:
         [
             _card("Runs", len(runs), "benchmark reports found"),
             _card(
-                "Best acceptance",
+                "Best accepted trials",
                 _best_rate(runs, "accepted_rate"),
-                "highest accepted rate",
+                "highest accepted-trial rate",
             ),
             _card(
                 "Worst symbol error",
@@ -137,32 +137,32 @@ def _run_table(runs: list[dict[str, Any]]) -> str:
         "backend",
         "alpha",
         "theta",
-        "accepted",
+        "trials",
+        "combos",
+        "report",
+        "accepted trials",
         "max symbol error",
         "max numeric error",
         "max required sigmas",
         "max check fail",
-        "trials",
-        "combos",
-        "report",
     ]
     rows = []
     for run in runs:
         rows.append(
             [
                 run["name"],
-                run["run_id"],
+                _format_run_id(run["run_id"]),
                 run["backend"],
-                run["alpha_distribution"],
-                run["theta_distribution"],
+                _distribution_body(run["alpha_distribution"]),
+                _distribution_body(run["theta_distribution"]),
+                run["trial_count"],
+                run["combo_count"],
+                f'<a href="{escape(str(run["report_href"]))}">open</a>',
                 _format_rate(run["accepted_rate"]),
                 _format_rate(run["max_symbol_error_rate"]),
                 _format_number(run["max_mean_abs_value_error"]),
                 _format_number(run["max_required_tolerance_sigmas"]),
                 _format_rate(run["max_check_failure_rate"]),
-                run["trial_count"],
-                run["combo_count"],
-                f'<a href="{escape(str(run["report_href"]))}">open</a>',
             ]
         )
     header_html = "".join(f"<th>{escape(header)}</th>" for header in headers)
@@ -226,6 +226,22 @@ def _format_number(value: object) -> str:
     if abs(number) < 1e-4 or abs(number) >= 1e5:
         return f"{number:.6e}"
     return f"{number:.6g}"
+
+
+def _format_run_id(value: object) -> str:
+    if value is None:
+        return "n/a"
+    run_id = str(value)
+    if run_id.startswith("run_"):
+        return f"#{run_id.removeprefix('run_')}"
+    return f"#{run_id}" if run_id.isdigit() else run_id
+
+
+def _distribution_body(value: object) -> object:
+    if not isinstance(value, str):
+        return value
+    _, separator, body = value.partition("=")
+    return body if separator else value
 
 
 def _text(value: object) -> str:

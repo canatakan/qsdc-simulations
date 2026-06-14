@@ -68,7 +68,6 @@ def _render_report(
         ),
         "combo_table": _table(_RAW_COMBO_FIELDS, _combo_table_rows(combos)),
         "trial_table": _table(TRIAL_FIELDS, _trial_table_rows(trials)),
-        "definitions": _definitions(),
         "artifact_links": _artifact_links(summary),
     }
     return _replace_placeholders(template, replacements)
@@ -110,12 +109,11 @@ _RAW_COMBO_FIELDS = tuple(
 def _run_meta(summary: dict[str, Any]) -> str:
     parameters = summary.get("parameters", {})
     rows = [
-        ("Run", summary.get("benchmark_run_id")),
+        ("Run", _format_run_id(summary.get("benchmark_run_id"))),
         ("Backend", parameters.get("backend")),
         ("Random source", parameters.get("random_source")),
         ("Trials", summary.get("trial_count")),
         ("Combos", summary.get("combo_count")),
-        ("Accepted", _format_rate(summary.get("accepted_rate"))),
     ]
     return "\n".join(
         f"<div><dt>{escape(label)}</dt><dd>{_text(value)}</dd></div>"
@@ -129,8 +127,8 @@ def _context_panel(summary: dict[str, Any], combos: list[Combo]) -> str:
     rows = [
         ("configured sigmas", _configured_sigmas(summary, combos)),
         ("noise sigma", _noise_sigma(combos)),
-        ("alpha", parameters.get("alpha_distribution")),
-        ("theta", parameters.get("theta_distribution")),
+        ("alpha", _distribution_body(parameters.get("alpha_distribution"))),
+        ("theta", _distribution_body(parameters.get("theta_distribution"))),
         ("payload bits", derived_counts.get("payload_bit_count")),
         ("padding bits", derived_counts.get("padding_bit_count")),
         ("transmitted bits", derived_counts.get("transmitted_message_bit_count")),
@@ -201,38 +199,6 @@ def _plot_cards(plots: object) -> str:
             """
         )
     return "\n".join(cards)
-
-
-def _definitions() -> str:
-    return _table(
-        ["metric", "meaning"],
-        [
-            {
-                "metric": "accepted_rate",
-                "meaning": "Fraction of trials where both control and decoy checks passed at the configured sigma tolerance.",
-            },
-            {
-                "metric": "bit_error_rate",
-                "meaning": "Payload bit mismatches divided by payload bit count.",
-            },
-            {
-                "metric": "symbol_error_rate",
-                "meaning": "3-bit message symbols decoded into the wrong interval divided by message symbol count.",
-            },
-            {
-                "metric": "mean_abs_value_error",
-                "meaning": "Average absolute numeric error before interval decoding.",
-            },
-            {
-                "metric": "required_acceptance_tolerance_sigmas",
-                "meaning": "Smallest sigma tolerance that would accept a trial; combo columns summarize those trial thresholds.",
-            },
-            {
-                "metric": "failed_check_count",
-                "meaning": "Number of control or decoy measurements outside the configured sigma tolerance.",
-            },
-        ],
-    )
 
 
 def _artifact_links(summary: dict[str, Any]) -> str:
@@ -348,6 +314,22 @@ def _format_number(value: object) -> str:
     if abs(number) < 1e-4 or abs(number) >= 1e5:
         return f"{number:.6e}"
     return f"{number:.6g}"
+
+
+def _format_run_id(value: object) -> str:
+    if value is None:
+        return "n/a"
+    run_id = str(value)
+    if run_id.startswith("run_"):
+        return f"#{run_id.removeprefix('run_')}"
+    return f"#{run_id}" if run_id.isdigit() else run_id
+
+
+def _distribution_body(value: object) -> object:
+    if not isinstance(value, str):
+        return value
+    _, separator, body = value.partition("=")
+    return body if separator else value
 
 
 def _text(value: object) -> str:

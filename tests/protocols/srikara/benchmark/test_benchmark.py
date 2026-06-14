@@ -208,7 +208,6 @@ def test_benchmark_report_contains_core_sections(tmp_path):
     assert "Check Failures" in html
     assert "Tolerance Thresholds" in html
     assert "Raw Tables" in html
-    assert "Metric Meanings" in html
     assert "combos.csv" in html
     assert "trials.csv" in html
     assert "benchmark.xlsx" not in html
@@ -232,8 +231,11 @@ def test_benchmark_ui_index_lists_runs(tmp_path):
 
     assert index_path.name == "index.html"
     assert "Run Comparison" in html
-    assert "alpha=uniform_square" in html
-    assert "theta=uniform" in html
+    assert "uniform_square" in html
+    assert "alpha=uniform_square" not in html
+    assert "uniform[0,2pi]" in html
+    assert "theta=uniform" not in html
+    assert "accepted trials" in html
     assert "open" in html
     assert (index_path.parent / "index.css").exists()
 
