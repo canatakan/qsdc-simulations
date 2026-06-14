@@ -21,8 +21,6 @@ dev = [
 
 [project.scripts]
 srikara-benchmark = "qsdc.protocols.srikara.benchmark.cli:main"
-srikara-benchmark-plot = "qsdc.protocols.srikara.benchmark.artifacts.plots:main"
-srikara-benchmark-ui = "qsdc.protocols.srikara.benchmark.artifacts.ui.index:main"
 
 [tool.hatch.build.targets.wheel]
 packages = [

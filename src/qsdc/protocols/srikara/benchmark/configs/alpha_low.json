@@ -1,12 +1,12 @@
 {
-  "name": "test",
-  "backend": "analytic",
+  "name": "alpha_low",
+  "backend": "sf-sampled",
   "random_source": "classical",
-  "payload_bit_count": 12,
-  "trials_per_combo": 2,
-  "base_seed": 1000,
-  "tolerance_sigmas": 1.0,
-  "output_dir": "results/srikara/benchmark/test",
+  "payload_bit_count": 4096,
+  "trials_per_combo": 5,
+  "base_seed": 4300,
+  "tolerance_sigmas": 4.0,
+  "output_dir": "results/srikara/benchmark/alpha_low",
   "one_probabilities": [
     0.1,
     0.5,
@@ -14,18 +14,17 @@
   ],
   "r_distributions": [
     {
-      "kind": "uniform",
-      "lower": 0.05,
-      "upper": 0.2
+      "kind": "fixed",
+      "value": 0.25
     },
     {
       "kind": "fixed",
-      "value": 0.4
+      "value": 0.575646
     }
   ],
   "alpha_distribution": {
     "kind": "uniform_square",
-    "bound": 2.0
+    "bound": 0.5
   },
   "theta_distribution": {
     "kind": "uniform",

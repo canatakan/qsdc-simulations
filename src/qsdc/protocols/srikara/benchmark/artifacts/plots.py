@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import dataclass
+from itertools import cycle
 from pathlib import Path
 from typing import Any, Optional, Union
 
@@ -56,6 +57,7 @@ ERROR_PLOT_SPECS: tuple[ErrorPlotSpec, ...] = (
 )
 
 THRESHOLD_CURVE_FILENAME = "derived_acceptance_tolerance_sigmas_curve.png"
+THRESHOLD_MARKERS = ("o", "s", "^", "D", "v", "P", "X", "*", "<", ">")
 
 
 def main() -> None:
@@ -177,11 +179,30 @@ def _combo_metric(
 
 
 def _write_threshold_curve(path: Path, trials: list[Trial]) -> None:
-    figure, axis = plt.subplots(figsize=(9.5, 5.5), constrained_layout=True)
-    for label, thresholds in _threshold_series(trials).items():
+    series = _threshold_series(trials)
+    figure_height = max(5.5, min(12.0, 4.5 + 0.18 * len(series)))
+    figure, axis = plt.subplots(figsize=(10.5, figure_height), constrained_layout=True)
+    colors = _threshold_colors(len(series))
+    markers = cycle(THRESHOLD_MARKERS)
+    for (label, thresholds), color in zip(series.items(), colors):
         x_values, y_values = _acceptance_curve(thresholds)
-        axis.step(x_values, y_values, where="post", linewidth=2, label=label)
-        axis.plot(x_values, y_values, marker="o", linestyle="none", markersize=3)
+        marker = next(markers)
+        axis.step(
+            x_values,
+            y_values,
+            where="post",
+            linewidth=2,
+            color=color,
+            label=label,
+        )
+        axis.plot(
+            x_values,
+            y_values,
+            marker=marker,
+            color=color,
+            linestyle="none",
+            markersize=3,
+        )
 
     axis.set_title("Derived Acceptance Tolerance Sigmas Curve")
     axis.set_xlabel("candidate tolerance sigmas")
@@ -214,6 +235,16 @@ def _threshold_series(trials: list[Trial]) -> dict[str, list[float]]:
             float(trial["required_acceptance_tolerance_sigmas"])
         )
     return series
+
+
+def _threshold_colors(series_count: int) -> list:
+    if series_count <= 0:
+        return []
+    if series_count <= 20:
+        colormap = plt.get_cmap("tab20")
+        return [colormap(index) for index in range(series_count)]
+    colormap = plt.get_cmap("nipy_spectral")
+    return [colormap((index + 0.5) / series_count) for index in range(series_count)]
 
 
 def _acceptance_curve(thresholds: list[float]) -> tuple[list[float], list[float]]:

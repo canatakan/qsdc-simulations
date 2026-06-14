@@ -12,9 +12,13 @@
   ],
   "r_distributions": [
     {
+      "kind": "fixed",
+      "value": 0.25
+    },
+    {
       "kind": "uniform",
       "lower": 0.05,
-      "upper": 0.2
+      "upper": 0.5
     }
   ],
   "alpha_distribution": {

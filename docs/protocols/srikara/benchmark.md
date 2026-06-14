@@ -1,41 +1,38 @@
 # Srikara Benchmark
 
-The Srikara benchmark sweeps payload bit bias and squeezing-`r` distributions
-over repeated protocol trials. Configs are strict JSON and live with the
-benchmark package:
+The Srikara benchmark runner executes every config in the benchmark package and
+writes results beside those configs.
 
-```text
-src/qsdc/protocols/srikara/benchmark/configs/
-  test.json
-  sf.json
-```
-
-Run the analytic smoke config with:
+Run it from the benchmark directory:
 
 ```bash
-srikara-benchmark src/qsdc/protocols/srikara/benchmark/configs/test.json
+cd src/qsdc/protocols/srikara/benchmark
+srikara-benchmark
 ```
 
-Each invocation writes a child `run_<unix_seconds>/` directory under the
-configured `output_dir`. The generated run directory contains:
+By default, the runner reads every `configs/*.json` file. Run one config with
+`srikara-benchmark --config r_sweep`.
+
+It writes:
+
+```text
+results/<config-name>/run_<unix_seconds>/
+results/index.html
+```
+
+Each run directory contains:
 
 ```text
 benchmark.json
-config.json
-combos.json
-trials.jsonl
-benchmark.xlsx
+combos.csv
+trials.csv
+report.html
+report.css
 plots/
 ```
 
-The source modules that write those files are grouped under:
+Use `--skip-existing` to leave configs with an existing
+`results/<config-name>/run_*/benchmark.json` alone.
 
-```text
-src/qsdc/protocols/srikara/benchmark/artifacts/
-  output.py
-  plots.py
-  workbook.py
-```
-
-The full config field reference is maintained in
+Operational details are maintained in
 `src/qsdc/protocols/srikara/benchmark/README.md`.

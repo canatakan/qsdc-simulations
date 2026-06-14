@@ -1,10 +1,12 @@
-"""Command-line interface for Srikara benchmark runs."""
+"""Run Srikara benchmark configs."""
 
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 from qsdc.common.random import make_random_source
+from qsdc.protocols.srikara.benchmark.artifacts.ui.index import write_benchmark_index
 from qsdc.protocols.srikara.benchmark.config import load_benchmark_config
 from qsdc.protocols.srikara.benchmark.engine import run_benchmark
 from qsdc.protocols.srikara.simulator.backends import make_backend
@@ -12,25 +14,100 @@ from qsdc.protocols.srikara.simulator.backends import make_backend
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("config_path")
-    parser.add_argument("--output", dest="output_dir", default=None)
+    parser.add_argument(
+        "--config-dir",
+        default="configs",
+        help="directory containing benchmark JSON configs",
+    )
+    parser.add_argument(
+        "--config",
+        action="append",
+        default=(),
+        help="config name or path to run; can be passed more than once",
+    )
+    parser.add_argument(
+        "--output-root",
+        default="results",
+        help="directory where per-config result folders are written",
+    )
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="skip configs that already have a run under the output root",
+    )
+    parser.add_argument(
+        "--keep-going",
+        action="store_true",
+        help="continue running remaining configs if one config fails",
+    )
     args = parser.parse_args()
 
-    config = load_benchmark_config(args.config_path)
-    report = run_benchmark(
-        config,
-        output_dir=args.output_dir,
-        progress=True,
-        backend_factory=make_backend,
-        random_source_factory=make_random_source,
-    )
-    print(
-        "Benchmark complete: "
-        f"{report.summary['trial_count']} trials across "
-        f"{report.summary['combo_count']} combos, "
-        f"accepted_rate={report.summary['accepted_rate']:.3f}"
-    )
-    print(f"Artifacts written to {report.output_dir}")
+    config_dir = Path(args.config_dir)
+    output_root = Path(args.output_root)
+    config_paths = _config_paths(config_dir, args.config)
+    if not config_paths:
+        raise SystemExit(f"No benchmark configs found in {config_dir}")
+
+    output_root.mkdir(parents=True, exist_ok=True)
+    failures = []
+    for index, config_path in enumerate(config_paths, start=1):
+        config = load_benchmark_config(config_path)
+        config_output_dir = output_root / config.name
+        print(f"[{index}/{len(config_paths)}] {config.name}: {config_path}")
+        if args.skip_existing and _has_existing_run(config_output_dir):
+            print(f"Skipping existing results in {config_output_dir}")
+            continue
+        try:
+            report = run_benchmark(
+                config.with_output_dir(str(config_output_dir)),
+                progress=True,
+                backend_factory=make_backend,
+                random_source_factory=make_random_source,
+            )
+        except Exception as error:
+            if not args.keep_going:
+                raise
+            failures.append((config_path, error))
+            print(f"Failed {config_path}: {error}")
+            continue
+        print(f"Artifacts written to {report.output_dir}")
+
+    index_path = write_benchmark_index(output_root)
+    print(f"Generated benchmark index at {index_path}")
+    if failures:
+        print(f"{len(failures)} config(s) failed:")
+        for config_path, error in failures:
+            print(f"- {config_path}: {error}")
+        raise SystemExit(1)
+
+
+def _config_paths(config_dir: Path, selected_configs: tuple[str, ...]) -> list[Path]:
+    if not config_dir.exists():
+        raise SystemExit(f"Config directory does not exist: {config_dir}")
+    if not selected_configs:
+        return sorted(config_dir.glob("*.json"))
+    return [_resolve_config_path(config_dir, selected) for selected in selected_configs]
+
+
+def _resolve_config_path(config_dir: Path, selected_config: str) -> Path:
+    path = Path(selected_config)
+    candidates = [path]
+    if not path.is_absolute():
+        candidates.append(config_dir / path)
+        if path.suffix != ".json":
+            candidates.append(config_dir / f"{selected_config}.json")
+    elif path.suffix != ".json":
+        candidates.append(path.with_suffix(".json"))
+
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    tried = ", ".join(str(candidate) for candidate in candidates)
+    raise SystemExit(f"Config not found: {selected_config} (tried {tried})")
+
+
+def _has_existing_run(config_output_dir: Path) -> bool:
+    return any(config_output_dir.glob("run_*/benchmark.json"))
 
 
 if __name__ == "__main__":

@@ -38,5 +38,6 @@ make srikara/demo/sf-sampled
 Benchmark configs are stored with the benchmark package:
 
 ```bash
-srikara-benchmark src/qsdc/protocols/srikara/benchmark/configs/test.json
+cd src/qsdc/protocols/srikara/benchmark
+srikara-benchmark
 ```

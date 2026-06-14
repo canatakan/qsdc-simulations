@@ -1,341 +1,98 @@
 # Srikara Benchmark
 
-Benchmark configs are strict JSON files. JSON does not allow comments, so use
-this README as the annotated reference and copy
-`src/qsdc/protocols/srikara/benchmark/configs/test.json` when making a runnable config.
+This benchmark runs every JSON config in `configs/` and writes all outputs under
+a local `results/` directory.
 
-Run a config with:
+## Run
+
+From this directory:
 
 ```bash
-srikara-benchmark src/qsdc/protocols/srikara/benchmark/configs/test.json
-srikara-benchmark path/to/config.json --output results/srikara/benchmark/custom
+srikara-benchmark
 ```
 
-`output_dir` is the parent output directory. Each benchmark invocation writes
-artifacts inside a child run directory named like:
+Equivalent explicit form:
+
+```bash
+srikara-benchmark --config-dir configs --output-root results
+```
+
+Run one config by name or path:
+
+```bash
+srikara-benchmark --config r_sweep
+srikara-benchmark --config configs/r_sweep.json
+```
+
+Resume without rerunning configs that already have completed output:
+
+```bash
+srikara-benchmark --skip-existing
+```
+
+Keep going after a failed config:
+
+```bash
+srikara-benchmark --keep-going
+```
+
+These flags can be combined:
+
+```bash
+srikara-benchmark --config r_sweep --skip-existing --keep-going
+```
+
+## Inputs
+
+Configs live in:
 
 ```text
-run_1780576634/
+configs/
 ```
 
-## Full Runnable Shape
+By default, the runner executes every `*.json` file in that directory, sorted by
+filename. Use `--config` to run one or more selected configs. Each config's
+`name` controls its output folder under `results/`.
 
-```json
-{
-  "name": "test",
-  "backend": "analytic",
-  "random_source": "classical",
-  "payload_bit_count": 12,
-  "trials_per_combo": 2,
-  "base_seed": 1000,
-  "tolerance_sigmas": 1.0,
-  "output_dir": "results/srikara/benchmark/test",
-  "one_probabilities": [0.1, 0.5, 0.9],
-  "r_distributions": [
-    {
-      "kind": "uniform",
-      "lower": 0.05,
-      "upper": 0.2
-    },
-    {
-      "kind": "fixed",
-      "value": 0.4
-    }
-  ],
-  "alpha_distribution": {
-    "kind": "uniform_square",
-    "bound": 2.0
-  },
-  "theta_distribution": {
-    "kind": "uniform",
-    "lower_pi": 0.0,
-    "upper_pi": 2.0
-  }
-}
-```
-
-## Top-Level Fields
-
-`name`
-
-Benchmark name used in metadata and the default output path. Defaults to
-`"benchmark"` if omitted.
-
-```json
-"name": "test"
-```
-
-`backend`
-
-One backend per config. Defaults to `"sf-sampled"` if omitted.
-
-Allowed values:
-
-```json
-"backend": "analytic"
-```
-
-```json
-"backend": "sf"
-```
-
-```json
-"backend": "sf-sampled"
-```
-
-`analytic` is deterministic and fast. `sf` and `sf-sampled` require the
-Strawberry Fields dependency.
-
-`random_source`
-
-Protocol random source for routing, axes, Bob preparation, and message values.
-Defaults to `"classical"` if omitted.
-
-Allowed values:
-
-```json
-"random_source": "classical"
-```
-
-```json
-"random_source": "sf-bs-qrng"
-```
-
-`sf-bs-qrng` is a Quantum Random Number Generator with a beam splitter using
-Strawberry Fields.
-
-`payload_bit_count`
-
-Required positive integer. Number of classical payload bits Alice wants to send
-per trial, before any padding is added.
-
-The simulator pads this payload with zero bits until its length is divisible by
-3, because each protocol message mode carries one 3-bit interval symbol.
-
-Derived counts:
+Current case configs:
 
 ```text
-padding_bit_count = (-payload_bit_count) mod 3
-transmitted_message_bit_count = payload_bit_count + padding_bit_count
-message_symbol_count = transmitted_message_bit_count / 3
-message_mode_count = message_symbol_count
-n_states = 4 * message_mode_count
+alpha_high.json
+alpha_low.json
+large.json
+r_fixed.json
+r_sweep.json
+theta_fixed.json
 ```
 
-Example:
+## Outputs
 
-```json
-"payload_bit_count": 16
-```
-
-This derives:
+Each config writes one timestamped run directory:
 
 ```text
-padding_bit_count = 2
-transmitted_message_bit_count = 18
-message_symbol_count = 6
-message_mode_count = 6
-n_states = 24
+results/<config-name>/run_<unix_seconds>/
 ```
 
-`trials_per_combo`
-
-Positive integer. Number of repeated protocol trials per parameter combination.
-Defaults to `1` if omitted.
-
-```json
-"trials_per_combo": 100
-```
-
-`base_seed`
-
-Integer seed used to derive per-trial message and simulation seeds. Defaults to
-`0` if omitted.
-
-```json
-"base_seed": 1000
-```
-
-`tolerance_sigmas`
-
-Optional non-negative number. This is the control/decoy check threshold in
-measurement noise sigmas. If omitted, the backend default is used. Current
-backend defaults are `1.0` for exact backends and `4.0` for `sf-sampled`.
-
-```json
-"tolerance_sigmas": 4.0
-```
-
-`output_dir`
-
-Optional parent directory for generated artifacts. If omitted, defaults to:
-
-```text
-results/srikara/benchmark/<name>
-```
-
-Every benchmark run creates a child directory under this path:
-
-```json
-"output_dir": "results/srikara/benchmark/my-benchmark"
-```
-
-`one_probabilities`
-
-Required non-empty array. Each value must be between `0.0` and `1.0`.
-Benchmark message bits are generated independently with this probability of
-bit `1`.
-
-```json
-"one_probabilities": [0.1, 0.5, 0.9]
-```
-
-## Squeezing r Distributions
-
-`r_distributions` is required and must contain at least one distribution. This
-is a sweep dimension, so each listed distribution creates benchmark combos.
-
-Uniform range:
-
-```json
-{
-  "kind": "uniform",
-  "lower": 0.05,
-  "upper": 0.2
-}
-```
-
-Fixed value:
-
-```json
-{
-  "kind": "fixed",
-  "value": 0.4
-}
-```
-
-Validation rules:
-
-- uniform `lower >= 0`
-- uniform `upper >= lower`
-- fixed `value >= 0`
-
-## Alpha Distribution
-
-Optional. Defaults to:
-
-```json
-"alpha_distribution": {
-  "kind": "uniform_square",
-  "bound": 2.0
-}
-```
-
-Currently supported option:
-
-```json
-"alpha_distribution": {
-  "kind": "uniform_square",
-  "bound": 2.0
-}
-```
-
-This samples Bob's alpha from a square in the complex plane:
-
-```text
-real(alpha), imag(alpha) ~ uniform(-bound, bound)
-```
-
-Validation rule:
-
-- `bound >= 0`
-
-## Theta Distribution
-
-Optional. Defaults to a uniform full rotation:
-
-```json
-"theta_distribution": {
-  "kind": "uniform",
-  "lower_pi": 0.0,
-  "upper_pi": 2.0
-}
-```
-
-Theta config values are expressed in multiples of pi radians.
-
-Uniform interval:
-
-```json
-"theta_distribution": {
-  "kind": "uniform",
-  "lower_pi": 0.0,
-  "upper_pi": 2.0
-}
-```
-
-Fixed value:
-
-```json
-"theta_distribution": {
-  "kind": "fixed",
-  "value_pi": 0.5
-}
-```
-
-## Combo Expansion
-
-The benchmark creates one combo for each Cartesian product of:
-
-```text
-one_probability x r_distribution
-```
-
-For example:
-
-```text
-3 one_probabilities * 2 r distributions = 6 combos
-```
-
-Then it runs:
-
-```text
-6 combos * trials_per_combo
-```
-
-protocol trials.
-
-## Artifacts
-
-Each benchmark run writes these artifacts into its `run_<unix_seconds>/`
-directory:
+Each run directory contains:
 
 ```text
 benchmark.json
-report.html
-report.css
 combos.csv
 trials.csv
+report.html
+report.css
 plots/
 ```
 
-`benchmark.json` is the run summary. It records the run id, derived protocol
-counts, compact run parameters, aggregate acceptance rate, elapsed time, and the
-relative paths of all written artifacts.
+`benchmark.json` is the run summary and metadata.
 
-`report.html` is the first artifact to open when reviewing a run. It links the
-plots and renders every CSV table emitted by the benchmark.
+`combos.csv` contains one aggregate row per parameter combo.
 
-`combos.csv` contains one aggregate row per parameter combo. It includes
-acceptance, bit/symbol error, numeric error, control/decoy failure counts, and
-derived tolerance-threshold summaries.
+`trials.csv` contains one row per protocol trial.
 
-`trials.csv` is the trial log. It includes the combo/trial indices, trial seed,
-pass/fail state, failed control/decoy counts, required tolerance thresholds, and
-message recovery errors.
+`report.html` is the main per-run report to open.
 
-`plots/` contains matplotlib PNG plots generated from `combos.csv` and
-`trials.csv`:
+`plots/` contains:
 
 ```text
 bit_error_by_r.png
@@ -344,28 +101,40 @@ value_error_by_r.png
 derived_acceptance_tolerance_sigmas_curve.png
 ```
 
-The threshold curve is derived from observed control and decoy deviations. For
-each trial, `required_acceptance_tolerance_sigmas` is the smallest tolerance,
-in measurement noise sigmas, that would accept that observed trial. The maximum
-required tolerance in a combo is the empirical threshold that would accept every
-observed trial in that combo.
+After all selected configs finish, the runner also writes a comparison UI:
 
-Existing run artifacts can be plotted again with:
-
-```bash
-srikara-benchmark-plot path/to/run_<unix_seconds>
+```text
+results/index.html
+results/index.css
 ```
 
-Multiple run directories can be presented as one static comparison UI with:
+`--skip-existing` treats a config as complete when this pattern exists:
 
-```bash
-srikara-benchmark-ui path/to/results/srikara/benchmark
+```text
+results/<config-name>/run_*/benchmark.json
 ```
 
-This writes `index.html` and `index.css` into the provided results directory.
-The index scans child run folders, compares alpha/theta/backend cases, and links
-to each run's `report.html`.
+## Config Shape
 
-The code that writes runtime artifacts is grouped under
-`src/qsdc/protocols/srikara/benchmark/artifacts/`. Generated benchmark outputs
-still go to the configured `output_dir`; they are not source files.
+Configs are strict JSON. Important fields are:
+
+- `name`: case name and output folder name
+- `backend`: `analytic`, `sf`, or `sf-sampled`
+- `random_source`: `classical` or `sf-bs-qrng`
+- `payload_bit_count`: payload bits per trial before padding
+- `trials_per_combo`: repeated trials per parameter combo
+- `base_seed`: root seed for derived message/simulation seeds
+- `tolerance_sigmas`: control/decoy threshold in measurement-noise sigmas
+- `one_probabilities`: message bit-bias sweep
+- `r_distributions`: squeezing-`r` sweep
+- `alpha_distribution`: Bob alpha sampling
+- `theta_distribution`: squeeze angle sampling
+
+The benchmark expands combos as:
+
+```text
+one_probability x r_distribution
+```
+
+Generated benchmark outputs are runtime artifacts and should stay under
+`results/`.

@@ -1,3 +1,4 @@
+import json
 from io import StringIO
 from pathlib import Path
 
@@ -15,6 +16,52 @@ from qsdc.protocols.srikara.benchmark.engine import run_benchmark
 from qsdc.protocols.srikara.benchmark.seeds import derive_seed
 
 
+TEST_BENCHMARK_CONFIG = {
+    "name": "test",
+    "backend": "analytic",
+    "random_source": "classical",
+    "payload_bit_count": 12,
+    "trials_per_combo": 2,
+    "base_seed": 1000,
+    "tolerance_sigmas": 1.0,
+    "output_dir": "results/srikara/benchmark/test",
+    "one_probabilities": [0.1, 0.5, 0.9],
+    "r_distributions": [
+        {
+            "kind": "uniform",
+            "lower": 0.05,
+            "upper": 0.2,
+        },
+        {
+            "kind": "fixed",
+            "value": 0.4,
+        },
+    ],
+    "alpha_distribution": {
+        "kind": "uniform_square",
+        "bound": 2.0,
+    },
+    "theta_distribution": {
+        "kind": "uniform",
+        "lower_pi": 0.0,
+        "upper_pi": 2.0,
+    },
+}
+
+
+def _write_test_benchmark_config(tmp_path: Path) -> Path:
+    config_path = tmp_path / "benchmark.json"
+    config_path.write_text(
+        json.dumps(TEST_BENCHMARK_CONFIG, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return config_path
+
+
+def _test_benchmark_config():
+    return parse_benchmark_config(TEST_BENCHMARK_CONFIG)
+
+
 def test_seed_derivation_is_stable():
     assert derive_seed(1000, 2, 3) == derive_seed(1000, 2, 3)
     assert derive_seed(derive_seed(1000, 2, 3), "message") != derive_seed(
@@ -23,16 +70,8 @@ def test_seed_derivation_is_stable():
     )
 
 
-def test_benchmark_config_parses_test_config():
-    config = load_benchmark_config(
-        Path("src")
-        / "qsdc"
-        / "protocols"
-        / "srikara"
-        / "benchmark"
-        / "configs"
-        / "test.json"
-    )
+def test_benchmark_config_loads_json_file(tmp_path):
+    config = load_benchmark_config(_write_test_benchmark_config(tmp_path))
 
     assert config.name == "test"
     assert config.backend == "analytic"
@@ -117,15 +156,7 @@ def test_aggregate_metrics_include_symbol_errors_and_thresholds():
 
 
 def test_benchmark_runs_with_analytic_backend(tmp_path):
-    config = load_benchmark_config(
-        Path("src")
-        / "qsdc"
-        / "protocols"
-        / "srikara"
-        / "benchmark"
-        / "configs"
-        / "test.json"
-    ).with_output_dir(str(tmp_path / "test"))
+    config = _test_benchmark_config().with_output_dir(str(tmp_path / "test"))
 
     report = run_benchmark(config)
 
@@ -190,15 +221,7 @@ def test_benchmark_runs_with_analytic_backend(tmp_path):
 
 
 def test_benchmark_report_contains_core_sections(tmp_path):
-    config = load_benchmark_config(
-        Path("src")
-        / "qsdc"
-        / "protocols"
-        / "srikara"
-        / "benchmark"
-        / "configs"
-        / "test.json"
-    ).with_output_dir(str(tmp_path / "test"))
+    config = _test_benchmark_config().with_output_dir(str(tmp_path / "test"))
 
     report = run_benchmark(config)
     html = (Path(report.output_dir) / "report.html").read_text(encoding="utf-8")
@@ -215,15 +238,7 @@ def test_benchmark_report_contains_core_sections(tmp_path):
 
 
 def test_benchmark_ui_index_lists_runs(tmp_path):
-    config = load_benchmark_config(
-        Path("src")
-        / "qsdc"
-        / "protocols"
-        / "srikara"
-        / "benchmark"
-        / "configs"
-        / "test.json"
-    ).with_output_dir(str(tmp_path / "test"))
+    config = _test_benchmark_config().with_output_dir(str(tmp_path / "test"))
     report = run_benchmark(config)
 
     index_path = Path(write_benchmark_index(Path(report.output_dir).parent))
@@ -241,15 +256,7 @@ def test_benchmark_ui_index_lists_runs(tmp_path):
 
 
 def test_benchmark_progress_reports_completed_trials(tmp_path):
-    config = load_benchmark_config(
-        Path("src")
-        / "qsdc"
-        / "protocols"
-        / "srikara"
-        / "benchmark"
-        / "configs"
-        / "test.json"
-    ).with_output_dir(str(tmp_path / "test"))
+    config = _test_benchmark_config().with_output_dir(str(tmp_path / "test"))
     progress_output = StringIO()
 
     run_benchmark(
