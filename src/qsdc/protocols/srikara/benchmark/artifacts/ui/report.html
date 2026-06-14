@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="report.css">
+</head>
+<body>
+  <main>
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">Srikara benchmark</p>
+        <h1>{{ name }}</h1>
+      </div>
+      <dl class="run-meta">
+        {{ run_meta }}
+      </dl>
+    </header>
+
+    <section class="cards" aria-label="Benchmark summary">
+      {{ cards }}
+    </section>
+
+    <section>
+      <h2>Run Setup</h2>
+      {{ context }}
+    </section>
+
+    <section>
+      <h2>Plots</h2>
+      <div class="plot-grid">
+        {{ plots }}
+      </div>
+    </section>
+
+    <section>
+      <h2>Combo Outcomes</h2>
+      {{ combo_outcomes }}
+    </section>
+
+    <section>
+      <h2>Check Failures</h2>
+      {{ check_failures }}
+    </section>
+
+    <section>
+      <h2>Tolerance Thresholds</h2>
+      {{ tolerance_thresholds }}
+    </section>
+
+    <section class="raw-data">
+      <h2>Raw Tables</h2>
+      <details>
+        <summary>combos.csv</summary>
+        {{ combo_table }}
+      </details>
+      <details>
+        <summary>trials.csv</summary>
+        {{ trial_table }}
+      </details>
+    </section>
+
+    <section>
+      <h2>Artifacts</h2>
+      <nav class="artifact-links">
+        {{ artifact_links }}
+      </nav>
+    </section>
+  </main>
+</body>
+</html>

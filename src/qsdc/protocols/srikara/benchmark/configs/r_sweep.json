@@ -1,0 +1,51 @@
+{
+  "name": "r_sweep",
+  "backend": "sf-sampled",
+  "random_source": "classical",
+  "payload_bit_count": 4096,
+  "trials_per_combo": 5,
+  "base_seed": 3300,
+  "tolerance_sigmas": 4.0,
+  "output_dir": "results/srikara/benchmark/r_sweep",
+  "one_probabilities": [
+    0.1,
+    0.5,
+    0.9
+  ],
+  "r_distributions": [
+    {
+      "kind": "uniform",
+      "lower": 0.01,
+      "upper": 0.1
+    },
+    {
+      "kind": "uniform",
+      "lower": 0.1,
+      "upper": 0.3
+    },
+    {
+      "kind": "uniform",
+      "lower": 0.3,
+      "upper": 0.6
+    },
+    {
+      "kind": "uniform",
+      "lower": 0.6,
+      "upper": 1.0
+    },
+    {
+      "kind": "uniform",
+      "lower": 1.0,
+      "upper": 2.0
+    }
+  ],
+  "alpha_distribution": {
+    "kind": "uniform_square",
+    "bound": 2.0
+  },
+  "theta_distribution": {
+    "kind": "uniform",
+    "lower_pi": 0.0,
+    "upper_pi": 2.0
+  }
+}

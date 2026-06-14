@@ -1,0 +1,38 @@
+{
+  "name": "r_fixed",
+  "backend": "sf-sampled",
+  "random_source": "classical",
+  "payload_bit_count": 4096,
+  "trials_per_combo": 5,
+  "base_seed": 6600,
+  "tolerance_sigmas": 4.0,
+  "output_dir": "results/srikara/benchmark/r_fixed",
+  "one_probabilities": [
+    0,
+    0.1,
+    0.25,
+    0.5,
+    0.75,
+    0.9,
+    1
+  ],
+  "r_distributions": [
+    {
+      "kind": "fixed",
+      "value": 0.25
+    },
+    {
+      "kind": "fixed",
+      "value": 0.575646
+    }
+  ],
+  "alpha_distribution": {
+    "kind": "uniform_square",
+    "bound": 2.0
+  },
+  "theta_distribution": {
+    "kind": "uniform",
+    "lower_pi": 0.0,
+    "upper_pi": 2.0
+  }
+}

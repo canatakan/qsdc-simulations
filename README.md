@@ -1,6 +1,11 @@
 # QSDC Simulations
 
-Independent QSDC protocol simulators organized by the paper reference.
+Independent QSDC protocol simulators organized by protocol/paper reference.
+
+Importable code lives under `src/qsdc`, reusable utilities live under
+`src/qsdc/common`, protocol implementations live under
+`src/qsdc/protocols/<protocol>`, demos live under `demos/<protocol>`, and paper
+notes live under `docs/protocols/<protocol>`.
 
 ## Setup
 
@@ -23,6 +28,16 @@ make install
 
 ```bash
 make test
+make srikara/test
+make srikara/demo/basic
+make srikara/demo/analytic
 make srikara/demo/sf
 make srikara/demo/sf-sampled
+```
+
+Benchmark configs are stored with the benchmark package:
+
+```bash
+cd src/qsdc/protocols/srikara/benchmark
+srikara-benchmark
 ```
