@@ -71,6 +71,7 @@ class ProtocolResult:
     backend_name: str
     random_source_name: str
     check_tolerance_sigmas: float
+    message_axis_policy: str
     measurement_noise_sigma: float
     control_passed: bool
     decoy_passed: bool
@@ -134,6 +135,7 @@ def simulate_qsdc(
             prepared_states[index],
             message_by_index[index],
             active_backend,
+            resolved_config,
             protocol_random,
         )
         for index in route.message_indices
@@ -143,6 +145,7 @@ def simulate_qsdc(
         backend_name=active_backend.name,
         random_source_name=protocol_random.name,
         check_tolerance_sigmas=resolved_config.tolerance_sigmas,
+        message_axis_policy=resolved_config.message_axis_policy,
         measurement_noise_sigma=active_backend.measurement_noise_sigma,
         control_passed=control_passed,
         decoy_passed=decoy_passed,
@@ -218,10 +221,11 @@ def _decode_message(
     state: BobPreparedState,
     message: tuple[str, float, complex],
     backend: QSDCBackend,
+    config: ResolvedProtocolConfig,
     random_source: RandomSource,
 ) -> MessageDecode:
     bits, message_value, alice_beta = message
-    axis = _message_axis(random_source)
+    axis = _message_axis(state, backend, config, random_source)
     measured = backend.returned_measurement(
         state.alpha, state.squeeze_r, state.theta, beta=alice_beta, axis=axis
     )
@@ -248,5 +252,20 @@ def _decode_message(
     )
 
 
-def _message_axis(random_source: RandomSource) -> str:
-    return random_source.choice(("q", "p"))
+def _message_axis(
+    state: BobPreparedState,
+    backend: QSDCBackend,
+    config: ResolvedProtocolConfig,
+    random_source: RandomSource,
+) -> str:
+    if config.message_axis_policy == "random":
+        return random_source.choice(("q", "p"))
+    if config.message_axis_policy == "best_response":
+        q_response = backend.message_response_factor(
+            state.squeeze_r, state.theta, "q"
+        )
+        p_response = backend.message_response_factor(
+            state.squeeze_r, state.theta, "p"
+        )
+        return "q" if abs(q_response) >= abs(p_response) else "p"
+    raise ValueError(f"unknown message_axis_policy {config.message_axis_policy!r}")

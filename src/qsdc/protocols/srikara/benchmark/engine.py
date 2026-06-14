@@ -102,6 +102,7 @@ def run_benchmark(
             "backend": effective_config.backend,
             "random_source": effective_config.random_source,
             "tolerance_sigmas": effective_config.tolerance_sigmas,
+            "message_axis_policy": effective_config.message_axis_policy,
             "one_probabilities": list(effective_config.one_probabilities),
             "r_distributions": [
                 distribution.summary()
@@ -239,6 +240,7 @@ def _run_trial(
             squeeze_r_distribution=combo.r_distribution,
             theta_distribution=config.theta_distribution,
             tolerance_sigmas=config.tolerance_sigmas,
+            message_axis_policy=config.message_axis_policy,
             seed=simulation_seed,
         ),
         backend=backend_factory(config.backend),
@@ -268,6 +270,7 @@ def _run_trial(
         "simulation_seed": simulation_seed,
         "backend": result.backend_name,
         "random_source": result.random_source_name,
+        "message_axis_policy": result.message_axis_policy,
         "one_probability": combo.one_probability,
         "check_tolerance_sigmas": result.check_tolerance_sigmas,
         "measurement_noise_sigma": result.measurement_noise_sigma,

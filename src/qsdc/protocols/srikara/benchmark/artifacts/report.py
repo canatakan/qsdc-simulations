@@ -112,6 +112,7 @@ def _run_meta(summary: dict[str, Any]) -> str:
         ("Run", _format_run_id(summary.get("benchmark_run_id"))),
         ("Backend", parameters.get("backend")),
         ("Random source", parameters.get("random_source")),
+        ("Message axis policy", parameters.get("message_axis_policy")),
         ("Trials", summary.get("trial_count")),
         ("Combos", summary.get("combo_count")),
     ]
