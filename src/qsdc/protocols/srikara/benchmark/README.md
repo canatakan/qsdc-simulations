@@ -61,9 +61,14 @@ alpha_high.json
 alpha_low.json
 large.json
 r_fixed.json
+r_fixed_best_response.json
 r_sweep.json
 theta_fixed.json
 ```
+
+`r_fixed_best_response.json` mirrors `r_fixed.json` but sets
+`message_axis_policy` to `best_response`, so those two runs can be compared
+directly.
 
 ## Outputs
 
@@ -125,6 +130,8 @@ Configs are strict JSON. Important fields are:
 - `trials_per_combo`: repeated trials per parameter combo
 - `base_seed`: root seed for derived message/simulation seeds
 - `tolerance_sigmas`: control/decoy threshold in measurement-noise sigmas
+- `message_axis_policy`: message decoding axis policy, `random` by default or
+  `best_response` to choose the larger absolute response factor known to Bob
 - `one_probabilities`: message bit-bias sweep
 - `r_distributions`: squeezing-`r` sweep
 - `alpha_distribution`: Bob alpha sampling

@@ -6,38 +6,18 @@ import argparse
 import textwrap
 
 from qsdc.common.bits import bits_to_bytes, bytes_to_bits
-from qsdc.common.random.classical import ClassicalRandomSource
-from qsdc.common.random.sf_beamsplitter import SFBeamSplitterQRNG
-from qsdc.protocols.srikara.simulator.backends.analytic.ideal import AnalyticBackend
-from qsdc.protocols.srikara.simulator.backends.strawberryfields.ideal import SFBackend
-from qsdc.protocols.srikara.simulator.backends.strawberryfields.sampled import (
-    SFSampledBackend,
+from qsdc.common.random import make_random_source
+from qsdc.protocols.srikara.simulator.backends import make_backend
+from qsdc.protocols.srikara.simulator.config import (
+    MESSAGE_AXIS_POLICIES,
+    ProtocolConfig,
 )
-from qsdc.protocols.srikara.simulator.config import ProtocolConfig
 from qsdc.protocols.srikara.simulator.encoding import interval_for_bits
 from qsdc.protocols.srikara.simulator.protocol import simulate_qsdc
 
 
 BACKEND_CHOICES = ("analytic", "sf", "sf-sampled")
 RANDOM_SOURCE_CHOICES = ("classical", "sf-bs-qrng")
-
-
-def make_backend(name):
-    if name == "analytic":
-        return AnalyticBackend()
-    if name == "sf":
-        return SFBackend()
-    if name == "sf-sampled":
-        return SFSampledBackend()
-    raise ValueError(f"unknown backend {name!r}")
-
-
-def make_random_source(name, seed):
-    if name == "classical":
-        return ClassicalRandomSource(seed)
-    if name == "sf-bs-qrng":
-        return SFBeamSplitterQRNG(seed=seed)
-    raise ValueError(f"unknown random source {name!r}")
 
 
 def main() -> None:
@@ -70,6 +50,15 @@ def main() -> None:
         default="classical",
         help="protocol random source for routing, basis choices, and values",
     )
+    parser.add_argument(
+        "--message-axis-policy",
+        choices=MESSAGE_AXIS_POLICIES,
+        default="random",
+        help=(
+            "message decoding axis policy; best_response chooses the q/p axis "
+            "with the larger absolute response factor"
+        ),
+    )
     args = parser.parse_args()
 
     message = args.message if args.message is not None else input("Message: ")
@@ -89,6 +78,7 @@ def main() -> None:
         n_states=4 * len(symbols),
         seed=args.seed,
         tolerance_sigmas=args.tolerance_sigmas,
+        message_axis_policy=args.message_axis_policy,
     )
     result = simulate_qsdc(
         symbols,
@@ -124,6 +114,7 @@ def main() -> None:
     print_header("3. Quantum channel configuration")
     print(f"Backend: {result.backend_name}")
     print(f"Protocol random source: {result.random_source_name}")
+    print(f"Message axis policy: {result.message_axis_policy}")
     print(f"Random seed: {args.seed}")
     print(f"Backend measurement seed: {args.seed}")
     print(

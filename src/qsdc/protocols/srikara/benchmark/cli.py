@@ -22,7 +22,7 @@ def main() -> None:
     parser.add_argument(
         "--config",
         action="append",
-        default=(),
+        default=None,
         help="config name or path to run; can be passed more than once",
     )
     parser.add_argument(
@@ -44,7 +44,8 @@ def main() -> None:
 
     config_dir = Path(args.config_dir)
     output_root = Path(args.output_root)
-    config_paths = _config_paths(config_dir, args.config)
+    selected_configs = tuple(args.config or ())
+    config_paths = _config_paths(config_dir, selected_configs)
     if not config_paths:
         raise SystemExit(f"No benchmark configs found in {config_dir}")
 
