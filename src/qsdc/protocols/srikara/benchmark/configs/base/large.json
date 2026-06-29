@@ -13,19 +13,7 @@
   "r_distributions": [
     {
       "kind": "fixed",
-      "value": 0.115
-    },
-    {
-      "kind": "fixed",
       "value": 0.345
-    },
-    {
-      "kind": "fixed",
-      "value": 0.576
-    },
-    {
-      "kind": "fixed",
-      "value": 1.151
     }
   ],
   "alpha_distribution": {
