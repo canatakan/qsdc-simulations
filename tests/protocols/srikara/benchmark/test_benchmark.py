@@ -11,6 +11,7 @@ from qsdc.protocols.srikara.benchmark.config import (
     load_benchmark_config,
     parse_benchmark_config,
 )
+from qsdc.protocols.srikara.benchmark.cli import _config_paths
 from qsdc.protocols.srikara.benchmark.metrics import aggregate_trial_metrics
 from qsdc.protocols.srikara.benchmark.engine import run_benchmark
 from qsdc.protocols.srikara.benchmark.seeds import derive_seed
@@ -253,6 +254,21 @@ def test_benchmark_ui_index_lists_runs(tmp_path):
     assert "accepted trials" in html
     assert "open" in html
     assert (index_path.parent / "index.css").exists()
+
+
+def test_benchmark_config_discovery_recurses_into_groups(tmp_path):
+    config_dir = tmp_path / "configs"
+    base_dir = config_dir / "base"
+    base_dir.mkdir(parents=True)
+    alpha = base_dir / "alpha_low.json"
+    fixed = base_dir / "r_fixed.json"
+    alpha.write_text("{}", encoding="utf-8")
+    fixed.write_text("{}", encoding="utf-8")
+
+    assert _config_paths(config_dir, ()) == [alpha, fixed]
+    assert _config_paths(config_dir, ("base",)) == [alpha, fixed]
+    assert _config_paths(config_dir, ("base/r_fixed",)) == [fixed]
+    assert _config_paths(config_dir, ("r_fixed",)) == [fixed]
 
 
 def test_benchmark_progress_reports_completed_trials(tmp_path):

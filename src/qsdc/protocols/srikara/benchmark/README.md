@@ -1,7 +1,7 @@
 # Srikara Benchmark
 
-This benchmark runs every JSON config in `configs/` and writes all outputs under
-a local `results/` directory.
+This benchmark runs every JSON config under `configs/` and writes all outputs
+under a local `results/` directory.
 
 ## Run
 
@@ -20,8 +20,10 @@ srikara-benchmark --config-dir configs --output-root results
 Run one config by name or path:
 
 ```bash
-srikara-benchmark --config r_sweep
-srikara-benchmark --config configs/r_sweep.json
+srikara-benchmark --config r_fixed
+srikara-benchmark --config base/r_fixed
+srikara-benchmark --config configs/base/r_fixed.json
+srikara-benchmark --config base
 ```
 
 Resume without rerunning configs that already have completed output:
@@ -48,27 +50,32 @@ Configs live in:
 
 ```text
 configs/
+  base/
 ```
 
-By default, the runner executes every `*.json` file in that directory, sorted by
-filename. Use `--config` to run one or more selected configs. Each config's
-`name` controls its output folder under `results/`.
+By default, the runner executes every `*.json` file under that directory,
+including grouped subdirectories, sorted by path. Use `--config` to run one or
+more selected config files, grouped directories, or unambiguous config names.
+Each config's `name` controls its output folder under `results/`.
 
-Current case configs:
+Current base configs:
 
 ```text
-alpha_high.json
-alpha_low.json
-large.json
-r_fixed.json
-r_fixed_best_response.json
-r_sweep.json
-theta_fixed.json
+base/alpha_high.json
+base/alpha_low.json
+base/large.json
+base/r_fixed.json
+base/r_uniform_sweep.json
+base/theta_fixed.json
+base/theta_uniform.json
 ```
 
-`r_fixed_best_response.json` mirrors `r_fixed.json` but sets
-`message_axis_policy` to `best_response`, so those two runs can be compared
-directly.
+All base configs use the same `base_seed` so comparable cases share derived
+message and simulation seeds. `r_fixed.json` sweeps the fixed squeezing values
+from \(-0.5\) dB through \(-20\) dB. `r_uniform_sweep.json` uses interval bands
+around the main squeezing checkpoints, including a wide \(-0.5\) dB to
+\(-10\) dB band. Non-r-focused base configs use the fixed \(-1\), \(-3\),
+\(-5\), and \(-10\) dB checkpoints.
 
 ## Outputs
 
