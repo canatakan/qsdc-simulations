@@ -46,7 +46,7 @@ def _render_report(
     replacements = {
         "title": _text(f"{summary.get('name')} benchmark report"),
         "name": _text(summary.get("name")),
-        "run_id": _text(summary.get("benchmark_run_id")),
+        "run_id": _text(_format_run_id(summary.get("benchmark_run_id"))),
         "run_meta": _run_meta(summary),
         "context": _context_panel(summary, combos),
         "cards": _summary_cards(summary, combos),
@@ -109,7 +109,6 @@ _RAW_COMBO_FIELDS = tuple(
 def _run_meta(summary: dict[str, Any]) -> str:
     parameters = summary.get("parameters", {})
     rows = [
-        ("Run", _format_run_id(summary.get("benchmark_run_id"))),
         ("Backend", parameters.get("backend")),
         ("Random source", parameters.get("random_source")),
         ("Message axis policy", parameters.get("message_axis_policy")),
