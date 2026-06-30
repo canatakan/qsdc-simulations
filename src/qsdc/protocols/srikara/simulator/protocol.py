@@ -71,6 +71,7 @@ class ProtocolResult:
     backend_name: str
     random_source_name: str
     check_tolerance_sigmas: float
+    check_axis_policy: str
     message_axis_policy: str
     measurement_noise_sigma: float
     control_passed: bool
@@ -145,6 +146,7 @@ def simulate_qsdc(
         backend_name=active_backend.name,
         random_source_name=protocol_random.name,
         check_tolerance_sigmas=resolved_config.tolerance_sigmas,
+        check_axis_policy=resolved_config.check_axis_policy,
         message_axis_policy=resolved_config.message_axis_policy,
         measurement_noise_sigma=active_backend.measurement_noise_sigma,
         control_passed=control_passed,
@@ -179,7 +181,7 @@ def _check_control(
     config: ResolvedProtocolConfig,
     random_source: RandomSource,
 ) -> ControlCheck:
-    axis = random_source.choice(("q", "p"))
+    axis = _check_axis(state, config, random_source)
     expected = state.alpha.real if axis == "q" else state.alpha.imag
     measured = backend.control_measurement(
         state.alpha, state.squeeze_r, state.theta, axis
@@ -201,7 +203,7 @@ def _check_decoy(
     config: ResolvedProtocolConfig,
     random_source: RandomSource,
 ) -> DecoyCheck:
-    axis = random_source.choice(("q", "p"))
+    axis = _check_axis(state, config, random_source)
     expected = state.alpha.real if axis == "q" else state.alpha.imag
     measured = backend.returned_measurement(
         state.alpha, state.squeeze_r, state.theta, beta=0j, axis=axis
@@ -215,6 +217,18 @@ def _check_decoy(
         measured=measured,
         passed=abs(measured - expected) <= tolerance,
     )
+
+
+def _check_axis(
+    state: BobPreparedState,
+    config: ResolvedProtocolConfig,
+    random_source: RandomSource,
+) -> str:
+    if config.check_axis_policy == "random":
+        return random_source.choice(("q", "p"))
+    if config.check_axis_policy == "optimized":
+        return "q" if abs(state.alpha.real) >= abs(state.alpha.imag) else "p"
+    raise ValueError(f"unknown check_axis_policy {config.check_axis_policy!r}")
 
 
 def _decode_message(
@@ -260,7 +274,7 @@ def _message_axis(
 ) -> str:
     if config.message_axis_policy == "random":
         return random_source.choice(("q", "p"))
-    if config.message_axis_policy == "best_response":
+    if config.message_axis_policy == "optimized":
         q_response = backend.message_response_factor(
             state.squeeze_r, state.theta, "q"
         )

@@ -7,7 +7,6 @@
   "base_seed": 20260629,
   "tolerance_sigmas": 4.0,
   "output_dir": "results/srikara/benchmark/axis_policy/alpha_high",
-  "message_axis_policy": "best_response",
   "one_probabilities": [
     0.1,
     0.5,
@@ -39,5 +38,7 @@
     "kind": "uniform",
     "lower_pi": 0.0,
     "upper_pi": 2.0
-  }
+  },
+  "check_axis_policy": "optimized",
+  "message_axis_policy": "optimized"
 }

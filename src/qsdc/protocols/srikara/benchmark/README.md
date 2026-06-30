@@ -51,6 +51,7 @@ Configs live in:
 ```text
 configs/
   base/
+  axis_policy/
 ```
 
 By default, the runner executes every `*.json` file under that directory,
@@ -76,6 +77,21 @@ from \(-0.5\) dB through \(-20\) dB. `r_uniform_sweep.json` uses interval bands
 around the main squeezing checkpoints, including a wide \(-0.5\) dB to
 \(-10\) dB band. Non-r-focused base configs use the fixed \(-1\), \(-3\),
 \(-5\), and \(-10\) dB checkpoints.
+
+Current axis-policy configs:
+
+```text
+axis_policy/alpha_high.json
+axis_policy/alpha_low.json
+axis_policy/large.json
+axis_policy/r_fixed.json
+axis_policy/r_uniform_sweep.json
+axis_policy/theta_fixed.json
+axis_policy/theta_uniform.json
+```
+
+The axis-policy configs mirror the base configs with `message_axis_policy` set
+to `optimized` and `check_axis_policy` set to `optimized`.
 
 ## Outputs
 
@@ -137,8 +153,11 @@ Configs are strict JSON. Important fields are:
 - `trials_per_combo`: repeated trials per parameter combo
 - `base_seed`: root seed for derived message/simulation seeds
 - `tolerance_sigmas`: control/decoy threshold in measurement-noise sigmas
+- `check_axis_policy`: control/decoy measurement axis policy, `random` by
+  default or `optimized` to choose the larger absolute coherent
+  displacement component
 - `message_axis_policy`: message decoding axis policy, `random` by default or
-  `best_response` to choose the larger absolute response factor known to Bob
+  `optimized` to choose the larger absolute response factor known to Bob
 - `one_probabilities`: message bit-bias sweep
 - `r_distributions`: squeezing-`r` sweep
 - `alpha_distribution`: Bob alpha sampling

@@ -76,6 +76,7 @@ def test_benchmark_config_loads_json_file(tmp_path):
 
     assert config.name == "test"
     assert config.backend == "analytic"
+    assert config.check_axis_policy == "random"
     assert config.payload_bit_count == 12
     assert config.tolerance_sigmas == 1.0
     assert config.padding_bit_count == 0
@@ -202,6 +203,8 @@ def test_benchmark_runs_with_analytic_backend(tmp_path):
     assert len(trial_rows) == 12
     assert combo_rows[0]["bit_error_rate"] == "0.0"
     assert combo_rows[0]["required_acceptance_tolerance_sigmas_max"] == "0.0"
+    assert trial_rows[0]["check_axis_policy"] == "random"
+    assert trial_rows[0]["message_axis_policy"] == "random"
     assert trial_rows[0]["required_acceptance_tolerance_sigmas"] == "0.0"
     assert report.summary["artifacts"]["combos_csv"] == "combos.csv"
     assert report.summary["artifacts"]["trials_csv"] == "trials.csv"
