@@ -55,7 +55,7 @@ def main() -> None:
         choices=MESSAGE_AXIS_POLICIES,
         default="random",
         help=(
-            "message decoding axis policy; best_response chooses the q/p axis "
+            "message decoding axis policy; optimized chooses the q/p axis "
             "with the larger absolute response factor"
         ),
     )

@@ -41,7 +41,7 @@ srikara-benchmark --keep-going
 These flags can be combined:
 
 ```bash
-srikara-benchmark --config r_sweep --skip-existing --keep-going
+srikara-benchmark --config r_uniform_sweep --skip-existing --keep-going
 ```
 
 ## Inputs

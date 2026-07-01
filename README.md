@@ -33,7 +33,6 @@ make srikara/demo/basic
 make srikara/demo/analytic
 make srikara/demo/sf
 make srikara/demo/sf-sampled
-python demos/srikara/message.py "hello" --backend sf-sampled --message-axis-policy optimized
 ```
 
 Benchmark configs are stored with the benchmark package:
