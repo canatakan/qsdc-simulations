@@ -22,7 +22,7 @@ def main() -> None:
     parser.add_argument(
         "--config",
         action="append",
-        default=(),
+        default=None,
         help="config name or path to run; can be passed more than once",
     )
     parser.add_argument(
@@ -44,7 +44,8 @@ def main() -> None:
 
     config_dir = Path(args.config_dir)
     output_root = Path(args.output_root)
-    config_paths = _config_paths(config_dir, args.config)
+    selected_configs = tuple(args.config or ())
+    config_paths = _config_paths(config_dir, selected_configs)
     if not config_paths:
         raise SystemExit(f"No benchmark configs found in {config_dir}")
 
@@ -85,11 +86,14 @@ def _config_paths(config_dir: Path, selected_configs: tuple[str, ...]) -> list[P
     if not config_dir.exists():
         raise SystemExit(f"Config directory does not exist: {config_dir}")
     if not selected_configs:
-        return sorted(config_dir.glob("*.json"))
-    return [_resolve_config_path(config_dir, selected) for selected in selected_configs]
+        return sorted(config_dir.rglob("*.json"))
+    paths: list[Path] = []
+    for selected in selected_configs:
+        paths.extend(_resolve_config_paths(config_dir, selected))
+    return paths
 
 
-def _resolve_config_path(config_dir: Path, selected_config: str) -> Path:
+def _resolve_config_paths(config_dir: Path, selected_config: str) -> list[Path]:
     path = Path(selected_config)
     candidates = [path]
     if not path.is_absolute():
@@ -101,7 +105,19 @@ def _resolve_config_path(config_dir: Path, selected_config: str) -> Path:
 
     for candidate in candidates:
         if candidate.is_file():
-            return candidate
+            return [candidate]
+        if candidate.is_dir():
+            return sorted(candidate.rglob("*.json"))
+
+    matches: list[Path] = []
+    if not path.is_absolute() and path.suffix != ".json":
+        matches = sorted(config_dir.rglob(f"{selected_config}.json"))
+    if len(matches) == 1:
+        return matches
+    if len(matches) > 1:
+        joined = ", ".join(str(match) for match in matches)
+        raise SystemExit(f"Config name is ambiguous: {selected_config} ({joined})")
+
     tried = ", ".join(str(candidate) for candidate in candidates)
     raise SystemExit(f"Config not found: {selected_config} (tried {tried})")
 

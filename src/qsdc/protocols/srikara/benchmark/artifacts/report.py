@@ -46,7 +46,7 @@ def _render_report(
     replacements = {
         "title": _text(f"{summary.get('name')} benchmark report"),
         "name": _text(summary.get("name")),
-        "run_id": _text(summary.get("benchmark_run_id")),
+        "run_id": _text(_format_run_id(summary.get("benchmark_run_id"))),
         "run_meta": _run_meta(summary),
         "context": _context_panel(summary, combos),
         "cards": _summary_cards(summary, combos),
@@ -109,9 +109,9 @@ _RAW_COMBO_FIELDS = tuple(
 def _run_meta(summary: dict[str, Any]) -> str:
     parameters = summary.get("parameters", {})
     rows = [
-        ("Run", _format_run_id(summary.get("benchmark_run_id"))),
         ("Backend", parameters.get("backend")),
         ("Random source", parameters.get("random_source")),
+        ("Axis policies", _axis_policy_summary(parameters)),
         ("Trials", summary.get("trial_count")),
         ("Combos", summary.get("combo_count")),
     ]
@@ -145,6 +145,14 @@ def _context_panel(summary: dict[str, Any], combos: list[Combo]) -> str:
         for label, value in rows
     )
     return f'<div class="context-grid">{items}</div>'
+
+
+def _axis_policy_summary(parameters: dict[str, Any]) -> str:
+    check_policy = parameters.get("check_axis_policy", "random")
+    message_policy = parameters.get("message_axis_policy", "random")
+    if check_policy == message_policy:
+        return str(check_policy)
+    return f"check={check_policy}, message={message_policy}"
 
 
 def _summary_cards(summary: dict[str, Any], combos: list[Combo]) -> str:

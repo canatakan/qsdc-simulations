@@ -1,7 +1,7 @@
 # Srikara Benchmark
 
-This benchmark runs every JSON config in `configs/` and writes all outputs under
-a local `results/` directory.
+This benchmark runs every JSON config under `configs/` and writes all outputs
+under a local `results/` directory.
 
 ## Run
 
@@ -20,8 +20,10 @@ srikara-benchmark --config-dir configs --output-root results
 Run one config by name or path:
 
 ```bash
-srikara-benchmark --config r_sweep
-srikara-benchmark --config configs/r_sweep.json
+srikara-benchmark --config r_fixed
+srikara-benchmark --config base/r_fixed
+srikara-benchmark --config configs/base/r_fixed.json
+srikara-benchmark --config base
 ```
 
 Resume without rerunning configs that already have completed output:
@@ -39,7 +41,7 @@ srikara-benchmark --keep-going
 These flags can be combined:
 
 ```bash
-srikara-benchmark --config r_sweep --skip-existing --keep-going
+srikara-benchmark --config r_uniform_sweep --skip-existing --keep-going
 ```
 
 ## Inputs
@@ -48,22 +50,48 @@ Configs live in:
 
 ```text
 configs/
+  base/
+  axis_policy/
 ```
 
-By default, the runner executes every `*.json` file in that directory, sorted by
-filename. Use `--config` to run one or more selected configs. Each config's
-`name` controls its output folder under `results/`.
+By default, the runner executes every `*.json` file under that directory,
+including grouped subdirectories, sorted by path. Use `--config` to run one or
+more selected config files, grouped directories, or unambiguous config names.
+Each config's `name` controls its output folder under `results/`.
 
-Current case configs:
+Current base configs:
 
 ```text
-alpha_high.json
-alpha_low.json
-large.json
-r_fixed.json
-r_sweep.json
-theta_fixed.json
+base/alpha_high.json
+base/alpha_low.json
+base/large.json
+base/r_fixed.json
+base/r_uniform_sweep.json
+base/theta_fixed.json
+base/theta_uniform.json
 ```
+
+All base configs use the same `base_seed` so comparable cases share derived
+message and simulation seeds. `r_fixed.json` sweeps the fixed squeezing values
+from \(-0.5\) dB through \(-20\) dB. `r_uniform_sweep.json` uses interval bands
+around the main squeezing checkpoints, including a wide \(-0.5\) dB to
+\(-10\) dB band. Non-r-focused base configs use the fixed \(-1\), \(-3\),
+\(-5\), and \(-10\) dB checkpoints.
+
+Current axis-policy configs:
+
+```text
+axis_policy/alpha_high.json
+axis_policy/alpha_low.json
+axis_policy/large.json
+axis_policy/r_fixed.json
+axis_policy/r_uniform_sweep.json
+axis_policy/theta_fixed.json
+axis_policy/theta_uniform.json
+```
+
+The axis-policy configs mirror the base configs with `message_axis_policy` set
+to `optimized` and `check_axis_policy` set to `optimized`.
 
 ## Outputs
 
@@ -125,6 +153,11 @@ Configs are strict JSON. Important fields are:
 - `trials_per_combo`: repeated trials per parameter combo
 - `base_seed`: root seed for derived message/simulation seeds
 - `tolerance_sigmas`: control/decoy threshold in measurement-noise sigmas
+- `check_axis_policy`: control/decoy measurement axis policy, `random` by
+  default or `optimized` to choose the larger absolute coherent
+  displacement component
+- `message_axis_policy`: message decoding axis policy, `random` by default or
+  `optimized` to choose the larger absolute response factor known to Bob
 - `one_probabilities`: message bit-bias sweep
 - `r_distributions`: squeezing-`r` sweep
 - `alpha_distribution`: Bob alpha sampling

@@ -11,6 +11,7 @@ from qsdc.protocols.srikara.benchmark.config import (
     load_benchmark_config,
     parse_benchmark_config,
 )
+from qsdc.protocols.srikara.benchmark.cli import _config_paths
 from qsdc.protocols.srikara.benchmark.metrics import aggregate_trial_metrics
 from qsdc.protocols.srikara.benchmark.engine import run_benchmark
 from qsdc.protocols.srikara.benchmark.seeds import derive_seed
@@ -75,6 +76,7 @@ def test_benchmark_config_loads_json_file(tmp_path):
 
     assert config.name == "test"
     assert config.backend == "analytic"
+    assert config.check_axis_policy == "random"
     assert config.payload_bit_count == 12
     assert config.tolerance_sigmas == 1.0
     assert config.padding_bit_count == 0
@@ -201,6 +203,8 @@ def test_benchmark_runs_with_analytic_backend(tmp_path):
     assert len(trial_rows) == 12
     assert combo_rows[0]["bit_error_rate"] == "0.0"
     assert combo_rows[0]["required_acceptance_tolerance_sigmas_max"] == "0.0"
+    assert trial_rows[0]["check_axis_policy"] == "random"
+    assert trial_rows[0]["message_axis_policy"] == "random"
     assert trial_rows[0]["required_acceptance_tolerance_sigmas"] == "0.0"
     assert report.summary["artifacts"]["combos_csv"] == "combos.csv"
     assert report.summary["artifacts"]["trials_csv"] == "trials.csv"
@@ -253,6 +257,21 @@ def test_benchmark_ui_index_lists_runs(tmp_path):
     assert "accepted trials" in html
     assert "open" in html
     assert (index_path.parent / "index.css").exists()
+
+
+def test_benchmark_config_discovery_recurses_into_groups(tmp_path):
+    config_dir = tmp_path / "configs"
+    base_dir = config_dir / "base"
+    base_dir.mkdir(parents=True)
+    alpha = base_dir / "alpha_low.json"
+    fixed = base_dir / "r_fixed.json"
+    alpha.write_text("{}", encoding="utf-8")
+    fixed.write_text("{}", encoding="utf-8")
+
+    assert _config_paths(config_dir, ()) == [alpha, fixed]
+    assert _config_paths(config_dir, ("base",)) == [alpha, fixed]
+    assert _config_paths(config_dir, ("base/r_fixed",)) == [fixed]
+    assert _config_paths(config_dir, ("r_fixed",)) == [fixed]
 
 
 def test_benchmark_progress_reports_completed_trials(tmp_path):

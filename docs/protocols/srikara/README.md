@@ -44,6 +44,13 @@ Use `sf-sampled` to run actual sampled homodyne measurements:
 python demos/srikara/message.py "hello" --backend sf-sampled
 ```
 
+Use the optimized message axis policy to let Bob decode each message mode
+on the q/p quadrature with the larger known response factor:
+
+```bash
+python demos/srikara/message.py "hello" --backend sf-sampled --message-axis-policy optimized
+```
+
 Use the Strawberry Fields beam-splitter QRNG simulation for protocol choices:
 
 ```bash
@@ -65,6 +72,12 @@ If `--tolerance-sigmas` is omitted, the backend chooses the control/decoy
 sigma tolerance. `analytic` and `sf` use one numerical-precision sigma, while
 `sf-sampled` uses a 4-sigma homodyne threshold derived from Strawberry Fields'
 `hbar`.
+
+`--message-axis-policy` controls only Bob's message decoding measurement. The
+default `random` policy preserves random q/p message homodyne selection, while
+`optimized` chooses the q or p message quadrature with the larger absolute
+response factor. The demo leaves control and decoy checks on the default random
+q/p axes.
 
 ## Tests
 
