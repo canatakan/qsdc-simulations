@@ -1,0 +1,83 @@
+{
+  "name": "interval_policy/r_fixed",
+  "backend": "sf-sampled",
+  "random_source": "classical",
+  "payload_bit_count": 4096,
+  "trials_per_combo": 5,
+  "base_seed": 20260629,
+  "tolerance_sigmas": 4.0,
+  "intervals": "optimized",
+  "output_dir": "results/srikara/benchmark/interval_policy/r_fixed",
+  "one_probabilities": [
+    0.1,
+    0.5,
+    0.9
+  ],
+  "r_distributions": [
+    {
+      "kind": "fixed",
+      "value": 0.0576
+    },
+    {
+      "kind": "fixed",
+      "value": 0.115
+    },
+    {
+      "kind": "fixed",
+      "value": 0.230
+    },
+    {
+      "kind": "fixed",
+      "value": 0.345
+    },
+    {
+      "kind": "fixed",
+      "value": 0.461
+    },
+    {
+      "kind": "fixed",
+      "value": 0.576
+    },
+    {
+      "kind": "fixed",
+      "value": 0.691
+    },
+    {
+      "kind": "fixed",
+      "value": 0.806
+    },
+    {
+      "kind": "fixed",
+      "value": 0.921
+    },
+    {
+      "kind": "fixed",
+      "value": 1.036
+    },
+    {
+      "kind": "fixed",
+      "value": 1.151
+    },
+    {
+      "kind": "fixed",
+      "value": 1.382
+    },
+    {
+      "kind": "fixed",
+      "value": 1.727
+    },
+    {
+      "kind": "fixed",
+      "value": 2.303
+    }
+  ],
+  "alpha_distribution": {
+    "kind": "uniform_square",
+    "bound": 2.0
+  },
+  "theta_distribution": {
+    "kind": "uniform",
+    "lower_pi": 0.0,
+    "upper_pi": 2.0
+  }
+}
