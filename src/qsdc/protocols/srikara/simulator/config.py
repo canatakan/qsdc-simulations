@@ -12,6 +12,10 @@ from qsdc.protocols.srikara.simulator.distributions import (
     UniformSquareAlpha,
     UniformTheta,
 )
+from qsdc.protocols.srikara.simulator.encoding import (
+    DEFAULT_INTERVALS,
+    INTERVAL_STRATEGIES,
+)
 
 
 DEFAULT_N_STATES = 8
@@ -44,6 +48,7 @@ class ProtocolConfig:
     )
     theta_distribution: ThetaDistribution = field(default_factory=UniformTheta)
     tolerance_sigmas: float | None = None
+    intervals: str = DEFAULT_INTERVALS
     check_axis_policy: str = DEFAULT_CHECK_AXIS_POLICY
     message_axis_policy: str = DEFAULT_MESSAGE_AXIS_POLICY
     seed: int = DEFAULT_SEED
@@ -58,6 +63,7 @@ class ResolvedProtocolConfig:
     squeeze_r_distribution: SqueezeRDistribution
     theta_distribution: ThetaDistribution
     tolerance_sigmas: float
+    intervals: str
     check_axis_policy: str
     message_axis_policy: str
     seed: int
@@ -78,6 +84,7 @@ def resolve_config(
         squeeze_r_distribution=config.squeeze_r_distribution,
         theta_distribution=config.theta_distribution,
         tolerance_sigmas=tolerance_sigmas,
+        intervals=config.intervals,
         check_axis_policy=config.check_axis_policy,
         message_axis_policy=config.message_axis_policy,
         seed=config.seed,
@@ -95,6 +102,9 @@ def validate_config(config: ProtocolConfig, message_count: int) -> None:
         )
     if config.tolerance_sigmas is not None and config.tolerance_sigmas < 0:
         raise ValueError("tolerance_sigmas must be non-negative")
+    if config.intervals not in INTERVAL_STRATEGIES:
+        allowed = ", ".join(repr(strategy) for strategy in INTERVAL_STRATEGIES)
+        raise ValueError(f"intervals must be one of {allowed}")
     if config.check_axis_policy not in CHECK_AXIS_POLICIES:
         allowed = ", ".join(repr(policy) for policy in CHECK_AXIS_POLICIES)
         raise ValueError(f"check_axis_policy must be one of {allowed}")

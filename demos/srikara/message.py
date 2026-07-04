@@ -9,6 +9,8 @@ from qsdc.common.bits import bits_to_bytes, bytes_to_bits
 from qsdc.common.random import make_random_source
 from qsdc.protocols.srikara.simulator.backends import make_backend
 from qsdc.protocols.srikara.simulator.config import (
+    DEFAULT_INTERVALS,
+    INTERVAL_STRATEGIES,
     MESSAGE_AXIS_POLICIES,
     ProtocolConfig,
 )
@@ -51,6 +53,12 @@ def main() -> None:
         help="protocol random source for routing, basis choices, and values",
     )
     parser.add_argument(
+        "--intervals",
+        choices=INTERVAL_STRATEGIES,
+        default=DEFAULT_INTERVALS,
+        help="message interval strategy",
+    )
+    parser.add_argument(
         "--message-axis-policy",
         choices=MESSAGE_AXIS_POLICIES,
         default="random",
@@ -78,6 +86,7 @@ def main() -> None:
         n_states=4 * len(symbols),
         seed=args.seed,
         tolerance_sigmas=args.tolerance_sigmas,
+        intervals=args.intervals,
         message_axis_policy=args.message_axis_policy,
     )
     result = simulate_qsdc(
@@ -114,6 +123,7 @@ def main() -> None:
     print_header("3. Quantum channel configuration")
     print(f"Backend: {result.backend_name}")
     print(f"Protocol random source: {result.random_source_name}")
+    print(f"Intervals: {result.intervals}")
     print(f"Message axis policy: {result.message_axis_policy}")
     print(f"Random seed: {args.seed}")
     print(f"Backend measurement seed: {args.seed}")
@@ -175,7 +185,10 @@ def main() -> None:
     print_header("6. Alice encodes message modes with D(beta_A)")
     print("idx  bits  interval       m_A           beta_A")
     for message_mode in result.messages:
-        interval = interval_for_bits(message_mode.sent_bits)
+        interval = interval_for_bits(
+            message_mode.sent_bits,
+            intervals=message_mode.intervals,
+        )
         print(
             f"{message_mode.index:>3}  {message_mode.sent_bits:>4}  "
             f"{format_interval(interval.lower, interval.upper):<13} "

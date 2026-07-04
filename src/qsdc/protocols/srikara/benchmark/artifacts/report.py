@@ -127,6 +127,7 @@ def _context_panel(summary: dict[str, Any], combos: list[Combo]) -> str:
     rows = [
         ("configured sigmas", _configured_sigmas(summary, combos)),
         ("noise sigma", _noise_sigma(combos)),
+        ("intervals", parameters.get("intervals", "default")),
         ("alpha", _distribution_body(parameters.get("alpha_distribution"))),
         ("theta", _distribution_body(parameters.get("theta_distribution"))),
         ("payload bits", derived_counts.get("payload_bit_count")),

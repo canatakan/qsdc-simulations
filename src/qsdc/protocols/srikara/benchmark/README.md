@@ -153,6 +153,8 @@ Configs are strict JSON. Important fields are:
 - `trials_per_combo`: repeated trials per parameter combo
 - `base_seed`: root seed for derived message/simulation seeds
 - `tolerance_sigmas`: control/decoy threshold in measurement-noise sigmas
+- `intervals`: message interval strategy, `default` for the paper's intervals
+  or `optimized` for the equiprobable interval table
 - `check_axis_policy`: control/decoy measurement axis policy, `random` by
   default or `optimized` to choose the larger absolute coherent
   displacement component

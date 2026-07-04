@@ -76,6 +76,7 @@ def test_benchmark_config_loads_json_file(tmp_path):
 
     assert config.name == "test"
     assert config.backend == "analytic"
+    assert config.intervals == "default"
     assert config.check_axis_policy == "random"
     assert config.payload_bit_count == 12
     assert config.tolerance_sigmas == 1.0
@@ -99,6 +100,19 @@ def test_payload_bit_count_derives_padding_and_protocol_counts():
     assert config.transmitted_message_bit_count == 18
     assert config.message_symbol_count == 6
     assert config.n_states == 24
+
+
+def test_benchmark_config_parses_intervals():
+    config = parse_benchmark_config(
+        {
+            "payload_bit_count": 16,
+            "intervals": "optimized",
+            "one_probabilities": [0.5],
+            "r_distributions": [{"kind": "fixed", "value": 0.4}],
+        }
+    )
+
+    assert config.intervals == "optimized"
 
 
 def test_benchmark_config_rejects_tolerances_field():
@@ -164,6 +178,7 @@ def test_benchmark_runs_with_analytic_backend(tmp_path):
 
     assert report.summary["combo_count"] == 6
     assert report.summary["trial_count"] == 12
+    assert report.summary["parameters"]["intervals"] == "default"
     assert report.summary["accepted_rate"] == 1.0
     assert all(trial["payload_bit_count"] == 12 for trial in report.trials)
     assert all(trial["transmitted_message_bit_count"] == 12 for trial in report.trials)
@@ -203,6 +218,7 @@ def test_benchmark_runs_with_analytic_backend(tmp_path):
     assert len(trial_rows) == 12
     assert combo_rows[0]["bit_error_rate"] == "0.0"
     assert combo_rows[0]["required_acceptance_tolerance_sigmas_max"] == "0.0"
+    assert trial_rows[0]["intervals"] == "default"
     assert trial_rows[0]["check_axis_policy"] == "random"
     assert trial_rows[0]["message_axis_policy"] == "random"
     assert trial_rows[0]["required_acceptance_tolerance_sigmas"] == "0.0"

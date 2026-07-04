@@ -42,6 +42,12 @@ def test_config_validation_rejects_invalid_protocol_shape():
             message_count=1,
         )
 
+    with pytest.raises(ValueError, match="intervals"):
+        validate_config(
+            ProtocolConfig(n_states=4, intervals="bogus"),
+            message_count=1,
+        )
+
 
 def test_config_accepts_typed_squeeze_distribution():
     config = ProtocolConfig(n_states=4, squeeze_r_distribution=FixedSqueezeR(0.25))

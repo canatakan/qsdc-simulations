@@ -39,6 +39,7 @@ def summarize_messages(
         miss_distance, margin = interval_position(
             message.sent_bits,
             message.decoded_value,
+            intervals=message.intervals,
         )
         miss_distances.append(miss_distance)
         margins.append(margin)
@@ -67,8 +68,12 @@ def summarize_messages(
     }
 
 
-def interval_position(bits: str, decoded_value: float) -> tuple[float, float]:
-    interval = interval_for_bits(bits)
+def interval_position(
+    bits: str,
+    decoded_value: float,
+    intervals: str = "default",
+) -> tuple[float, float]:
+    interval = interval_for_bits(bits, intervals=intervals)
     if interval.contains(decoded_value):
         if interval.lower == float("-inf"):
             margin = interval.upper - decoded_value

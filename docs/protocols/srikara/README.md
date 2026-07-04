@@ -51,6 +51,13 @@ on the q/p quadrature with the larger known response factor:
 python demos/srikara/message.py "hello" --backend sf-sampled --message-axis-policy optimized
 ```
 
+Use optimized intervals to map 3-bit symbols onto equiprobable
+Gaussian-quantile bins ordered by Gray code:
+
+```bash
+python demos/srikara/message.py "hello" --backend sf-sampled --intervals optimized
+```
+
 Use the Strawberry Fields beam-splitter QRNG simulation for protocol choices:
 
 ```bash
@@ -78,6 +85,11 @@ default `random` policy preserves random q/p message homodyne selection, while
 `optimized` chooses the q or p message quadrature with the larger absolute
 response factor. The demo leaves control and decoy checks on the default random
 q/p axes.
+
+`--intervals` controls the real intervals used for 3-bit message symbols.
+`default` uses the paper's interval labels, while `optimized` uses
+equiprobable Gaussian-quantile intervals ordered by Gray code so adjacent
+interval slips change one bit.
 
 ## Tests
 

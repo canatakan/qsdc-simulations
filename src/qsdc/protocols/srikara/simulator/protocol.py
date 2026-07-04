@@ -54,6 +54,7 @@ class DecoyCheck:
 @dataclass(frozen=True)
 class MessageDecode:
     index: int
+    intervals: str
     sent_bits: str
     message_value: float
     alice_beta: complex
@@ -71,6 +72,7 @@ class ProtocolResult:
     backend_name: str
     random_source_name: str
     check_tolerance_sigmas: float
+    intervals: str
     check_axis_policy: str
     message_axis_policy: str
     measurement_noise_sigma: float
@@ -119,7 +121,11 @@ def simulate_qsdc(
 
     message_by_index: dict[int, tuple[str, float, complex]] = {}
     for index, bits in zip(route.message_indices, message_bits):
-        message_value = sample_message_value(bits, protocol_random)
+        message_value = sample_message_value(
+            bits,
+            protocol_random,
+            intervals=resolved_config.intervals,
+        )
         beta = beta_for_message_value(message_value)
         message_by_index[index] = (bits, message_value, beta)
 
@@ -146,6 +152,7 @@ def simulate_qsdc(
         backend_name=active_backend.name,
         random_source_name=protocol_random.name,
         check_tolerance_sigmas=resolved_config.tolerance_sigmas,
+        intervals=resolved_config.intervals,
         check_axis_policy=resolved_config.check_axis_policy,
         message_axis_policy=resolved_config.message_axis_policy,
         measurement_noise_sigma=active_backend.measurement_noise_sigma,
@@ -250,9 +257,10 @@ def _decode_message(
     )
     decoded_value = observed_delta / response_factor
     recovered_beta = complex(decoded_value, decoded_value)
-    decoded_bits = bits_for_real(decoded_value)
+    decoded_bits = bits_for_real(decoded_value, intervals=config.intervals)
     return MessageDecode(
         index=state.index,
+        intervals=config.intervals,
         sent_bits=bits,
         message_value=message_value,
         alice_beta=alice_beta,

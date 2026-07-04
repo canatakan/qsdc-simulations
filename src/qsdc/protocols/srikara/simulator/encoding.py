@@ -20,7 +20,12 @@ class EncodingInterval:
         return self.lower < value < self.upper
 
 
-INTERVALS: tuple[EncodingInterval, ...] = (
+DEFAULT_INTERVALS = "default"
+OPTIMIZED_INTERVALS = "optimized"
+INTERVAL_STRATEGIES = (DEFAULT_INTERVALS, OPTIMIZED_INTERVALS)
+
+
+_DEFAULT_INTERVALS: tuple[EncodingInterval, ...] = (
     EncodingInterval("000", -inf, -3.0),
     EncodingInterval("001", -3.0, -2.0),
     EncodingInterval("010", -2.0, -1.0),
@@ -31,26 +36,56 @@ INTERVALS: tuple[EncodingInterval, ...] = (
     EncodingInterval("111", 3.0, inf),
 )
 
+_OPTIMIZED_BOUNDS = (
+    -inf,
+    -3.25,
+    -1.91,
+    -0.90,
+    0.0,
+    0.90,
+    1.91,
+    3.25,
+    inf,
+)
+_OPTIMIZED_BITS = ("000", "001", "011", "010", "110", "100", "101", "111")
+_OPTIMIZED_INTERVALS = tuple(
+    EncodingInterval(bits, lower, upper)
+    for bits, lower, upper in zip(
+        _OPTIMIZED_BITS,
+        _OPTIMIZED_BOUNDS,
+        _OPTIMIZED_BOUNDS[1:],
+    )
+)
+
+INTERVALS = _DEFAULT_INTERVALS
+INTERVALS_BY_STRATEGY = {
+    DEFAULT_INTERVALS: _DEFAULT_INTERVALS,
+    OPTIMIZED_INTERVALS: _OPTIMIZED_INTERVALS,
+}
+
 
 def validate_bits(bits: str) -> None:
     if len(bits) != 3 or any(bit not in "01" for bit in bits):
         raise ValueError(f"expected a 3-bit string, got {bits!r}")
 
 
-def interval_for_bits(bits: str) -> EncodingInterval:
+def interval_for_bits(
+    bits: str,
+    intervals: str = DEFAULT_INTERVALS,
+) -> EncodingInterval:
     """Return the paper's real interval for one 3-bit symbol."""
 
     validate_bits(bits)
-    for interval in INTERVALS:
+    for interval in INTERVALS_BY_STRATEGY[intervals]:
         if interval.bits == bits:
             return interval
     raise ValueError(f"unknown 3-bit symbol {bits!r}")
 
 
-def bits_for_real(value: float) -> str:
+def bits_for_real(value: float, intervals: str = DEFAULT_INTERVALS) -> str:
     """Decode a real number by locating its paper interval."""
 
-    for interval in INTERVALS:
+    for interval in INTERVALS_BY_STRATEGY[intervals]:
         if interval.contains(value):
             return interval.bits
     raise ValueError(
@@ -59,11 +94,14 @@ def bits_for_real(value: float) -> str:
 
 
 def sample_message_value(
-    bits: str, random_source: RandomSource, tail_width: float = 1.0
+    bits: str,
+    random_source: RandomSource,
+    tail_width: float = 1.0,
+    intervals: str = DEFAULT_INTERVALS,
 ) -> float:
     """Choose m from the interval for bits."""
 
-    interval = interval_for_bits(bits)
+    interval = interval_for_bits(bits, intervals=intervals)
     if interval.lower == -inf:
         return random_source.uniform(interval.upper - tail_width, interval.upper)
     if interval.upper == inf:

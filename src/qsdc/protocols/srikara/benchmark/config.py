@@ -12,7 +12,9 @@ from qsdc.protocols.srikara.simulator.config import (
     CHECK_AXIS_POLICIES,
     DEFAULT_ALPHA_BOUND,
     DEFAULT_CHECK_AXIS_POLICY,
+    DEFAULT_INTERVALS,
     DEFAULT_MESSAGE_AXIS_POLICY,
+    INTERVAL_STRATEGIES,
     MESSAGE_AXIS_POLICIES,
 )
 from qsdc.protocols.srikara.simulator.distributions import (
@@ -36,6 +38,7 @@ class BenchmarkConfig:
     trials_per_combo: int
     base_seed: int
     tolerance_sigmas: float | None
+    intervals: str
     check_axis_policy: str
     message_axis_policy: str
     output_dir: str | None
@@ -53,6 +56,9 @@ class BenchmarkConfig:
             raise ValueError("trials_per_combo must be positive")
         if self.tolerance_sigmas is not None and self.tolerance_sigmas < 0:
             raise ValueError("tolerance_sigmas must be non-negative")
+        if self.intervals not in INTERVAL_STRATEGIES:
+            allowed = ", ".join(repr(strategy) for strategy in INTERVAL_STRATEGIES)
+            raise ValueError(f"intervals must be one of {allowed}")
         if self.check_axis_policy not in CHECK_AXIS_POLICIES:
             allowed = ", ".join(repr(policy) for policy in CHECK_AXIS_POLICIES)
             raise ValueError(f"check_axis_policy must be one of {allowed}")
@@ -95,6 +101,7 @@ class BenchmarkConfig:
             "trials_per_combo": self.trials_per_combo,
             "base_seed": self.base_seed,
             "tolerance_sigmas": self.tolerance_sigmas,
+            "intervals": self.intervals,
             "check_axis_policy": self.check_axis_policy,
             "message_axis_policy": self.message_axis_policy,
             "output_dir": self.output_dir,
@@ -127,6 +134,7 @@ def parse_benchmark_config(raw: dict[str, Any]) -> BenchmarkConfig:
             "trials_per_combo",
             "base_seed",
             "tolerance_sigmas",
+            "intervals",
             "check_axis_policy",
             "message_axis_policy",
             "output_dir",
@@ -145,6 +153,7 @@ def parse_benchmark_config(raw: dict[str, Any]) -> BenchmarkConfig:
         trials_per_combo=int(raw.get("trials_per_combo", 1)),
         base_seed=int(raw.get("base_seed", 0)),
         tolerance_sigmas=_optional_float(raw.get("tolerance_sigmas")),
+        intervals=str(raw.get("intervals", DEFAULT_INTERVALS)),
         check_axis_policy=str(raw.get("check_axis_policy", DEFAULT_CHECK_AXIS_POLICY)),
         message_axis_policy=str(
             raw.get("message_axis_policy", DEFAULT_MESSAGE_AXIS_POLICY)
