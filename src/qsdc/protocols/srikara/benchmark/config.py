@@ -159,9 +159,9 @@ def parse_benchmark_config(raw: dict[str, Any]) -> BenchmarkConfig:
             raw.get("message_axis_policy", DEFAULT_MESSAGE_AXIS_POLICY)
         ),
         output_dir=_optional_str(raw.get("output_dir")),
-        one_probabilities=_float_tuple(raw["one_probabilities"]),
+        one_probabilities=_float_tuple(raw.get("one_probabilities") or ()),
         r_distributions=tuple(
-            _parse_r_distribution(item) for item in raw["r_distributions"]
+            _parse_r_distribution(item) for item in (raw.get("r_distributions") or ())
         ),
         alpha_distribution=_parse_alpha_distribution(
             raw.get(
