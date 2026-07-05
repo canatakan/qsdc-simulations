@@ -8,8 +8,8 @@ from qsdc.protocols.srikara.benchmark.artifacts.tables import (
 )
 from qsdc.protocols.srikara.benchmark.artifacts.ui.index import write_benchmark_index
 from qsdc.protocols.srikara.benchmark.config import (
+    load_benchmark_json
     load_benchmark_config,
-    parse_benchmark_config,
 )
 from qsdc.protocols.srikara.benchmark.cli import _config_paths
 from qsdc.protocols.srikara.benchmark.metrics import aggregate_trial_metrics
@@ -60,7 +60,7 @@ def _write_test_benchmark_config(tmp_path: Path) -> Path:
 
 
 def _test_benchmark_config():
-    return parse_benchmark_config(TEST_BENCHMARK_CONFIG)
+    return BenchmarkConfig.from_options(**TEST_BENCHMARK_CONFIG)
 
 
 def test_seed_derivation_is_stable():
@@ -72,7 +72,7 @@ def test_seed_derivation_is_stable():
 
 
 def test_benchmark_config_loads_json_file(tmp_path):
-    config = load_benchmark_config(_write_test_benchmark_config(tmp_path))
+    config = load_benchmark_json(_write_test_benchmark_config(tmp_path))
 
     assert config.name == "test"
     assert config.backend == "analytic"
@@ -87,12 +87,10 @@ def test_benchmark_config_loads_json_file(tmp_path):
 
 
 def test_payload_bit_count_derives_padding_and_protocol_counts():
-    config = parse_benchmark_config(
-        {
-            "payload_bit_count": 16,
-            "one_probabilities": [0.5],
-            "r_distributions": [{"kind": "fixed", "value": 0.4}],
-        }
+    config = BenchmarkConfig.from_options(
+        payload_bit_count=16,
+        one_probabilities=[0.5],
+        r_distributions=[{"kind": "fixed", "value": 0.4}],
     )
 
     assert config.payload_bit_count == 16
@@ -103,13 +101,11 @@ def test_payload_bit_count_derives_padding_and_protocol_counts():
 
 
 def test_benchmark_config_parses_intervals():
-    config = parse_benchmark_config(
-        {
-            "payload_bit_count": 16,
-            "intervals": "optimized",
-            "one_probabilities": [0.5],
-            "r_distributions": [{"kind": "fixed", "value": 0.4}],
-        }
+    config = BenchmarkConfig.from_options(
+        payload_bit_count=16,
+        intervals="optimized",
+        one_probabilities=[0.5],
+        r_distributions=[{"kind": "fixed", "value": 0.4}],
     )
 
     assert config.intervals == "optimized"
@@ -117,16 +113,14 @@ def test_benchmark_config_parses_intervals():
 
 def test_benchmark_config_rejects_tolerances_field():
     try:
-        parse_benchmark_config(
-            {
-                "payload_bit_count": 16,
-                "one_probabilities": [0.5],
-                "tolerances": {"kind": "explicit", "values": [0.01]},
-                "r_distributions": [{"kind": "fixed", "value": 0.4}],
-            }
+        BenchmarkConfig.from_options(
+            payload_bit_count=16,
+            one_probabilities=[0.5],
+            tolerances={"kind": "explicit", "values": [0.01]},
+            r_distributions=[{"kind": "fixed", "value": 0.4}],
         )
     except ValueError as error:
-        assert "unknown benchmark config field(s): 'tolerances'" in str(error)
+        assert "unknown option 'tolerances'" in str(error)
     else:
         raise AssertionError("expected tolerances to be rejected")
 

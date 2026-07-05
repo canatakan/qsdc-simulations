@@ -1,6 +1,5 @@
 from qsdc.common.random.classical import ClassicalRandomSource
 from qsdc.protocols.srikara.simulator.encoding import (
-    INTERVALS_BY_STRATEGY,
     bits_for_real,
     interval_for_bits,
     sample_message_value,
@@ -14,8 +13,21 @@ def test_interval_round_trip_samples():
         assert bits_for_real(value) == bits
 
 
+def test_boundaries_decode_to_right_interval():
+    assert bits_for_real(-3.0) == "001"
+    assert bits_for_real(-2.0) == "010"
+    assert bits_for_real(-1.0) == "011"
+    assert bits_for_real(0.0) == "100"
+    assert bits_for_real(1.0) == "101"
+    assert bits_for_real(2.0) == "110"
+    assert bits_for_real(3.0) == "111"
+
+
 def test_optimized_intervals_match_table_values():
-    intervals = INTERVALS_BY_STRATEGY["optimized"]
+    intervals = [
+        interval_for_bits(bits, intervals="optimized")
+        for bits in ("000", "001", "011", "010", "110", "100", "101", "111")
+    ]
 
     assert [interval.bits for interval in intervals] == [
         "000",

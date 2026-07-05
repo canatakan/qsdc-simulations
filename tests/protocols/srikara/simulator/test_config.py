@@ -1,59 +1,39 @@
 import pytest
 
-from qsdc.protocols.srikara.simulator.backends.analytic.ideal import AnalyticBackend
-from qsdc.protocols.srikara.simulator.config import (
-    ProtocolConfig,
-    resolve_config,
-    validate_config,
-)
+from qsdc.protocols.srikara.simulator.config import ProtocolConfig
 from qsdc.protocols.srikara.simulator.distributions import FixedSqueezeR, UniformSqueezeR
 
 
-def test_resolve_config_uses_backend_default_tolerance_sigmas():
-    resolved = resolve_config(
-        ProtocolConfig(n_states=4, tolerance_sigmas=None),
-        AnalyticBackend(),
-        message_count=1,
-    )
+def test_protocol_config_from_options_uses_option_defaults():
+    config = ProtocolConfig.from_options(n_states=4)
 
-    assert resolved.tolerance_sigmas == AnalyticBackend.default_tolerance_sigmas
-
-
-def test_resolve_config_keeps_explicit_tolerance_sigmas():
-    resolved = resolve_config(
-        ProtocolConfig(n_states=4, tolerance_sigmas=0.25),
-        AnalyticBackend(),
-        message_count=1,
-    )
-
-    assert resolved.tolerance_sigmas == 0.25
+    assert config.tolerance_sigmas == 1.0
+    assert config.intervals == "default"
+    assert config.check_axis_policy == "random"
+    assert config.message_axis_policy == "random"
 
 
-def test_config_validation_rejects_invalid_protocol_shape():
-    with pytest.raises(ValueError, match="divisible by 4"):
-        validate_config(ProtocolConfig(n_states=6), message_count=1)
+def test_protocol_config_from_options_keeps_explicit_tolerance_sigmas():
+    config = ProtocolConfig.from_options(n_states=4, tolerance_sigmas=0.25)
 
-    with pytest.raises(ValueError, match="expected 2"):
-        validate_config(ProtocolConfig(n_states=8), message_count=1)
+    assert config.tolerance_sigmas == 0.25
 
+
+def test_protocol_config_from_options_rejects_invalid_values():
     with pytest.raises(ValueError, match="tolerance_sigmas"):
-        validate_config(
-            ProtocolConfig(n_states=4, tolerance_sigmas=-1.0),
-            message_count=1,
-        )
+        ProtocolConfig.from_options(n_states=4, tolerance_sigmas=-1.0)
 
     with pytest.raises(ValueError, match="intervals"):
-        validate_config(
-            ProtocolConfig(n_states=4, intervals="bogus"),
-            message_count=1,
-        )
+        ProtocolConfig.from_options(n_states=4, intervals="bogus")
 
 
 def test_config_accepts_typed_squeeze_distribution():
-    config = ProtocolConfig(n_states=4, squeeze_r_distribution=FixedSqueezeR(0.25))
-    resolved = resolve_config(config, AnalyticBackend(), message_count=1)
+    config = ProtocolConfig.from_options(
+        n_states=4,
+        squeeze_r_distribution=FixedSqueezeR(0.25),
+    )
 
-    assert resolved.squeeze_r_distribution == FixedSqueezeR(0.25)
+    assert config.squeeze_r_distribution == FixedSqueezeR(0.25)
 
 
 def test_squeeze_distribution_validation_rejects_invalid_ranges():

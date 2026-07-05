@@ -1,3 +1,5 @@
+import pytest
+
 from qsdc.protocols.srikara.simulator.backends.analytic.ideal import AnalyticBackend
 from qsdc.protocols.srikara.simulator.config import ProtocolConfig
 from qsdc.protocols.srikara.simulator.protocol import simulate_qsdc
@@ -7,7 +9,7 @@ def test_qsdc_protocol_round_trips_messages():
     messages = ("000", "011", "101")
     result = simulate_qsdc(
         messages,
-        config=ProtocolConfig(n_states=12, seed=4),
+        config=ProtocolConfig.from_options(n_states=12, seed=4),
         backend=AnalyticBackend(),
     )
 
@@ -24,7 +26,11 @@ def test_check_axis_policy_uses_larger_displacement_component():
     messages = ("000", "011", "101")
     result = simulate_qsdc(
         messages,
-        config=ProtocolConfig(n_states=12, seed=4, check_axis_policy="optimized"),
+        config=ProtocolConfig.from_options(
+            n_states=12,
+            seed=4,
+            check_axis_policy="optimized",
+        ),
         backend=AnalyticBackend(),
     )
     state_by_index = {state.index: state for state in result.prepared_states}
@@ -33,3 +39,19 @@ def test_check_axis_policy_uses_larger_displacement_component():
         state = state_by_index[check.index]
         expected_axis = "q" if abs(state.alpha.real) >= abs(state.alpha.imag) else "p"
         assert check.axis == expected_axis
+
+
+def test_qsdc_protocol_rejects_mismatched_shape():
+    with pytest.raises(ValueError, match="divisible by 4"):
+        simulate_qsdc(
+            ("000",),
+            config=ProtocolConfig.from_options(n_states=6),
+            backend=AnalyticBackend(),
+        )
+
+    with pytest.raises(ValueError, match="message count"):
+        simulate_qsdc(
+            ("000",),
+            config=ProtocolConfig.from_options(n_states=8),
+            backend=AnalyticBackend(),
+        )

@@ -15,7 +15,6 @@ from qsdc.protocols.srikara.simulator.backends.strawberryfields.calculations imp
     mean_component,
     message_unit_beta,
 )
-from qsdc.protocols.srikara.simulator.config import DEFAULT_SAMPLED_TOLERANCE_SIGMAS
 
 
 @dataclass(frozen=True)
@@ -23,7 +22,6 @@ class SFSampledBackend(QSDCBackend):
     """SF Gaussian circuits with sampled homodyne readout."""
 
     name: str = "sf-sampled"
-    default_tolerance_sigmas: float = DEFAULT_SAMPLED_TOLERANCE_SIGMAS
     measurement_noise_sigma: float = homodyne_component_std()
 
     def begin_run(self, seed: int) -> None:
