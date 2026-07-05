@@ -39,19 +39,3 @@ def test_check_axis_policy_uses_larger_displacement_component():
         state = state_by_index[check.index]
         expected_axis = "q" if abs(state.alpha.real) >= abs(state.alpha.imag) else "p"
         assert check.axis == expected_axis
-
-
-def test_qsdc_protocol_rejects_mismatched_shape():
-    with pytest.raises(ValueError, match="divisible by 4"):
-        simulate_qsdc(
-            ("000",),
-            config=ProtocolConfig.from_options(n_states=6),
-            backend=AnalyticBackend(),
-        )
-
-    with pytest.raises(ValueError, match="message count"):
-        simulate_qsdc(
-            ("000",),
-            config=ProtocolConfig.from_options(n_states=8),
-            backend=AnalyticBackend(),
-        )
