@@ -8,8 +8,8 @@ import textwrap
 from qsdc.common.bits import bits_to_bytes, bytes_to_bits
 from qsdc.common.random import make_random_source
 from qsdc.protocols.srikara.configuration import (
-    BENCHMARK_PARAMETERS,
     OPTIMIZATION_PARAMETERS,
+    RUN_PARAMETERS,
     SIMULATOR_PARAMETERS,
 )
 from qsdc.protocols.srikara.simulator.backends import make_backend
@@ -27,8 +27,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--backend",
-        choices=BENCHMARK_PARAMETERS.choices("backend"),
-        default=BENCHMARK_PARAMETERS.default("backend"),
+        choices=RUN_PARAMETERS.choices("backend"),
+        default=RUN_PARAMETERS.default("backend"),
         help="simulation backend",
     )
     parser.add_argument("--seed", type=int, default=SIMULATOR_PARAMETERS.default("seed"))
@@ -41,8 +41,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--random-source",
-        choices=BENCHMARK_PARAMETERS.choices("random_source"),
-        default=BENCHMARK_PARAMETERS.default("random_source"),
+        choices=RUN_PARAMETERS.choices("random_source"),
+        default=RUN_PARAMETERS.default("random_source"),
         help="protocol random source for routing, basis choices, and values",
     )
     parser.add_argument(

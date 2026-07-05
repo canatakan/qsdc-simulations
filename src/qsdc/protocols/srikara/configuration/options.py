@@ -161,12 +161,7 @@ SIMULATOR_PARAMETERS = ParameterSet([
 ])
 
 
-BENCHMARK_PARAMETERS = ParameterSet([
-    Parameter(
-        name="name",
-        default="benchmark",
-        validator=Validators.nonempty_string,
-    ),
+RUN_PARAMETERS = ParameterSet([
     Parameter(
         name="backend",
         default="sf-sampled",
@@ -178,6 +173,15 @@ BENCHMARK_PARAMETERS = ParameterSet([
         default="classical",
         choices=["classical", "sf-bs-qrng"],
         validator=Validators.string,
+    ),
+])
+
+
+BENCHMARK_PARAMETERS = ParameterSet([
+    Parameter(
+        name="name",
+        default="benchmark",
+        validator=Validators.nonempty_string,
     ),
     Parameter(
         name="payload_bit_count",
@@ -217,6 +221,7 @@ BENCHMARK_PARAMETERS = ParameterSet([
 PARAMETERS = ParameterSet([
     *SIMULATOR_PARAMETERS,
     *OPTIMIZATION_PARAMETERS,
+    *RUN_PARAMETERS,
     *BENCHMARK_PARAMETERS,
 ])
 
