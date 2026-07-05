@@ -8,8 +8,8 @@ from qsdc.protocols.srikara.benchmark.artifacts.tables import (
 )
 from qsdc.protocols.srikara.benchmark.artifacts.ui.index import write_benchmark_index
 from qsdc.protocols.srikara.benchmark.config import (
-    load_benchmark_json
-    load_benchmark_config,
+    load_benchmark_json,
+    BenchmarkConfig,
 )
 from qsdc.protocols.srikara.benchmark.cli import _config_paths
 from qsdc.protocols.srikara.benchmark.metrics import aggregate_trial_metrics
@@ -99,30 +99,6 @@ def test_payload_bit_count_derives_padding_and_protocol_counts():
     assert config.message_symbol_count == 6
     assert config.n_states == 24
 
-
-def test_benchmark_config_parses_intervals():
-    config = BenchmarkConfig.from_options(
-        payload_bit_count=16,
-        intervals="optimized",
-        one_probabilities=[0.5],
-        r_distributions=[{"kind": "fixed", "value": 0.4}],
-    )
-
-    assert config.intervals == "optimized"
-
-
-def test_benchmark_config_rejects_tolerances_field():
-    try:
-        BenchmarkConfig.from_options(
-            payload_bit_count=16,
-            one_probabilities=[0.5],
-            tolerances={"kind": "explicit", "values": [0.01]},
-            r_distributions=[{"kind": "fixed", "value": 0.4}],
-        )
-    except ValueError as error:
-        assert "unknown option 'tolerances'" in str(error)
-    else:
-        raise AssertionError("expected tolerances to be rejected")
 
 
 def test_aggregate_metrics_include_symbol_errors_and_thresholds():

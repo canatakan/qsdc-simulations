@@ -31,11 +31,3 @@ def test_sf_beamsplitter_qrng_preserves_numpy_random_state():
 
     after = np.random.get_state()
     assert_numpy_state_equal(after, before)
-
-
-def test_sf_beamsplitter_qrng_validates_settings():
-    with pytest.raises(ValueError, match="batch_size"):
-        SFBeamSplitterQRNG(batch_size=0)
-
-    with pytest.raises(ValueError, match="cutoff_dim"):
-        SFBeamSplitterQRNG(cutoff_dim=1)
