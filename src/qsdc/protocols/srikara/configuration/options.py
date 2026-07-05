@@ -106,7 +106,7 @@ OPTIMIZATION_PARAMETERS = ParameterSet([
     Parameter(
         name="intervals",
         default="default",
-        choices=["default", "optimized"],
+        choices=["default", "optimized_v4", "optimized_v8", "optimized_v12"],
         validator=Validators.string,
     ),
     Parameter(

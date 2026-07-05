@@ -2,45 +2,35 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from math import inf
 
 from qsdc.common.random.base import RandomSource
 
+from qsdc.common.gaussian import (
+    EncodingInterval,
+    GaussianEncoding,
+    get_gaussian_encoding,
+)
 
-@dataclass(frozen=True)
-class EncodingInterval:
-    """A real-line interval assigned to a 3-bit symbol."""
+GRAY_CODED_BITS = ["000", "001", "011", "010", "110", "100", "101", "111"]
 
-    bits: str
-    lower: float
-    upper: float
-
-    def contains(self, value: float) -> bool:
-        return self.lower <= value < self.upper
-
-
-ENCODING_INTERVALS = {
-    "default": (
-        EncodingInterval("000", -inf, -3.0),
-        EncodingInterval("001", -3.0, -2.0),
-        EncodingInterval("010", -2.0, -1.0),
-        EncodingInterval("011", -1.0, 0.0),
-        EncodingInterval("100", 0.0, 1.0),
-        EncodingInterval("101", 1.0, 2.0),
-        EncodingInterval("110", 2.0, 3.0),
-        EncodingInterval("111", 3.0, inf),
+ENCODING_INTERVALS: dict[str, GaussianEncoding] = {
+    "default": GaussianEncoding(
+        intervals=(
+            EncodingInterval("000", -inf, -3.0),
+            EncodingInterval("001", -3.0, -2.0),
+            EncodingInterval("010", -2.0, -1.0),
+            EncodingInterval("011", -1.0, 0.0),
+            EncodingInterval("100", 0.0, 1.0),
+            EncodingInterval("101", 1.0, 2.0),
+            EncodingInterval("110", 2.0, 3.0),
+            EncodingInterval("111", 3.0, inf),
+        ),
+        tail_width=1.0,
     ),
-    "optimized": (
-        EncodingInterval("000", -inf, -3.25),
-        EncodingInterval("001", -3.25, -1.91),
-        EncodingInterval("011", -1.91, -0.90),
-        EncodingInterval("010", -0.90, 0.0),
-        EncodingInterval("110", 0.0, 0.90),
-        EncodingInterval("100", 0.90, 1.91),
-        EncodingInterval("101", 1.91, 3.25),
-        EncodingInterval("111", 3.25, inf),
-    ),
+    "optimized_v4": get_gaussian_encoding(GRAY_CODED_BITS, variance=4.0),
+    "optimized_v8": get_gaussian_encoding(GRAY_CODED_BITS, variance=8.0),
+    "optimized_v12": get_gaussian_encoding(GRAY_CODED_BITS, variance=12.0),
 }
 
 
@@ -56,7 +46,7 @@ def interval_for_bits(
     """Return the paper's real interval for one 3-bit symbol."""
 
     validate_bits(bits)
-    for interval in ENCODING_INTERVALS[intervals]:
+    for interval in ENCODING_INTERVALS[intervals].intervals:
         if interval.bits == bits:
             return interval
     raise ValueError(f"unknown 3-bit symbol {bits!r}")
@@ -65,7 +55,7 @@ def interval_for_bits(
 def bits_for_real(value: float, intervals: str = "default") -> str:
     """Decode a real number by locating its paper interval."""
 
-    for interval in ENCODING_INTERVALS[intervals]:
+    for interval in ENCODING_INTERVALS[intervals].intervals:
         if interval.contains(value):
             return interval.bits
     raise ValueError(
@@ -77,11 +67,11 @@ def bits_for_real(value: float, intervals: str = "default") -> str:
 def sample_message_value(
     bits: str,
     random_source: RandomSource,
-    tail_width: float = 1.0,
     intervals: str = "default",
 ) -> float:
     """Choose m from the interval for bits."""
 
+    tail_width = ENCODING_INTERVALS[intervals].tail_width
     interval = interval_for_bits(bits, intervals=intervals)
     if interval.lower == -inf:
         return random_source.uniform(interval.upper - tail_width, interval.upper)
