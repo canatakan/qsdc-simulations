@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 
 from qsdc.common.random.sf_beamsplitter import SFBeamSplitterQRNG
 
