@@ -59,10 +59,10 @@ ERROR_PLOT_SPECS: tuple[ErrorPlotSpec, ...] = (
 THRESHOLD_CURVE_FILENAME = "derived_acceptance_tolerance_sigmas_curve.png"
 DEFAULT_INTERVAL_LABEL = "default"
 INTERVAL_COLORS = {
-    "default": "#4f46e5",
-    "optimized_v4": "#0891b2",
-    "optimized_v8": "#16a34a",
-    "optimized_v12": "#d97706",
+    "default": "#d8d8d8",
+    "optimized_v4": "#fc8d59",
+    "optimized_v8": "#91bfdb",
+    "optimized_v12": "#998ec3",
 }
 
 
@@ -166,7 +166,7 @@ def _write_interval_metric_plot(
     figure.suptitle(
         f"{spec.title} by Interval Policy",
         fontweight="bold",
-        y=1.12,
+        y=1.18,
     )
     _legend_for_intervals(figure, axes[0], intervals)
     figure.savefig(path, dpi=160, bbox_inches="tight")
@@ -253,7 +253,7 @@ def _write_interval_delta_plot(
     figure.suptitle(
         f"{spec.title}: Improvement vs Default",
         fontweight="bold",
-        y=1.12,
+        y=1.18,
     )
     _legend_for_intervals(figure, axes[0], intervals)
     figure.savefig(path, dpi=160, bbox_inches="tight")
@@ -395,7 +395,7 @@ def _legend_for_intervals(figure, axis, intervals: Sequence[str]) -> None:
         by_label.values(),
         by_label.keys(),
         loc="upper center",
-        bbox_to_anchor=(0.5, 1.03),
+        bbox_to_anchor=(0.5, 1.09),
         ncol=max(1, min(4, len(by_label))),
         frameon=False,
     )
