@@ -1,0 +1,34 @@
+{
+  "name": "quick/test/analytic",
+  "backend": "analytic",
+  "random_source": "classical",
+  "payload_bit_count": 96,
+  "trials_per_combo": 1,
+  "base_seed": 20260629,
+  "tolerance_sigmas": 4.0,
+  "interval_policies": [
+    "default",
+    "optimized_v4",
+    "optimized_v8",
+    "optimized_v12"
+  ],
+  "output_dir": "results/srikara/benchmark/quick/test/analytic",
+  "one_probabilities": [
+    0.5
+  ],
+  "r_distributions": [
+    {
+      "kind": "fixed",
+      "value": 0.345
+    }
+  ],
+  "alpha_distribution": {
+    "kind": "uniform_square",
+    "bound": 2.0
+  },
+  "theta_distribution": {
+    "kind": "uniform",
+    "lower_pi": 0.0,
+    "upper_pi": 2.0
+  }
+}
