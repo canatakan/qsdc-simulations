@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
+from typing import Any
 
 from qsdc.common.random import make_random_source
 from qsdc.protocols.srikara.benchmark.artifacts.ui.index import write_benchmark_index
@@ -40,6 +42,12 @@ def main() -> None:
         action="store_true",
         help="continue running remaining configs if one config fails",
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="number of benchmark configs to run at once",
+    )
     args = parser.parse_args()
 
     config_dir = Path(args.config_dir)
@@ -50,12 +58,46 @@ def main() -> None:
         raise SystemExit(f"No benchmark configs found in {config_dir}")
 
     output_root.mkdir(parents=True, exist_ok=True)
+    if args.workers < 1:
+        raise SystemExit("--workers must be at least 1")
+
+    if args.workers == 1:
+        failures = _run_sequential(
+            config_paths,
+            output_root,
+            skip_existing=args.skip_existing,
+            keep_going=args.keep_going,
+        )
+    else:
+        failures = _run_parallel(
+            config_paths,
+            output_root,
+            workers=args.workers,
+            skip_existing=args.skip_existing,
+            keep_going=args.keep_going,
+        )
+
+    index_path = write_benchmark_index(output_root)
+    print(f"Generated benchmark index at {index_path}")
+    if failures:
+        print(f"{len(failures)} config(s) failed:")
+        for config_path, error in failures:
+            print(f"- {config_path}: {error}")
+        raise SystemExit(1)
+
+
+def _run_sequential(
+    config_paths: list[Path],
+    output_root: Path,
+    skip_existing: bool,
+    keep_going: bool,
+) -> list[tuple[Path, BaseException]]:
     failures = []
     for index, config_path in enumerate(config_paths, start=1):
         config = load_benchmark_json(config_path)
         config_output_dir = output_root / config.name
         print(f"[{index}/{len(config_paths)}] {config.name}: {config_path}")
-        if args.skip_existing and _has_existing_run(config_output_dir):
+        if skip_existing and _has_existing_run(config_output_dir):
             print(f"Skipping existing results in {config_output_dir}")
             continue
         try:
@@ -66,20 +108,78 @@ def main() -> None:
                 random_source_factory=make_random_source,
             )
         except Exception as error:
-            if not args.keep_going:
+            if not keep_going:
                 raise
             failures.append((config_path, error))
             print(f"Failed {config_path}: {error}")
             continue
         print(f"Artifacts written to {report.output_dir}")
+    return failures
 
-    index_path = write_benchmark_index(output_root)
-    print(f"Generated benchmark index at {index_path}")
-    if failures:
-        print(f"{len(failures)} config(s) failed:")
-        for config_path, error in failures:
-            print(f"- {config_path}: {error}")
-        raise SystemExit(1)
+
+def _run_parallel(
+    config_paths: list[Path],
+    output_root: Path,
+    workers: int,
+    skip_existing: bool,
+    keep_going: bool,
+) -> list[tuple[Path, BaseException]]:
+    failures = []
+    print(f"Running {len(config_paths)} config(s) with {workers} worker(s)")
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        futures = {
+            executor.submit(
+                _run_config_path,
+                config_path,
+                output_root,
+                skip_existing,
+            ): (index, config_path)
+            for index, config_path in enumerate(config_paths, start=1)
+        }
+        for future in as_completed(futures):
+            index, config_path = futures[future]
+            try:
+                result = future.result()
+            except Exception as error:
+                if not keep_going:
+                    raise
+                failures.append((config_path, error))
+                print(f"[{index}/{len(config_paths)}] Failed {config_path}: {error}")
+                continue
+
+            action = "Skipped" if result["skipped"] else "Artifacts written to"
+            print(
+                f"[{index}/{len(config_paths)}] {result['name']}: "
+                f"{action} {result['output_dir']}"
+            )
+    return failures
+
+
+def _run_config_path(
+    config_path: Path,
+    output_root: Path,
+    skip_existing: bool,
+) -> dict[str, Any]:
+    config = load_benchmark_json(config_path)
+    config_output_dir = output_root / config.name
+    if skip_existing and _has_existing_run(config_output_dir):
+        return {
+            "name": config.name,
+            "output_dir": str(config_output_dir),
+            "skipped": True,
+        }
+
+    report = run_benchmark(
+        config.with_output_dir(str(config_output_dir)),
+        progress=False,
+        backend_factory=make_backend,
+        random_source_factory=make_random_source,
+    )
+    return {
+        "name": config.name,
+        "output_dir": report.output_dir,
+        "skipped": False,
+    }
 
 
 def _config_paths(config_dir: Path, selected_configs: tuple[str, ...]) -> list[Path]:
