@@ -36,6 +36,8 @@ RandomSourceFactory = Callable[[str, int], RandomSource]
 @dataclass(frozen=True)
 class BenchmarkCombo:
     combo_index: int
+    seed_index: int
+    intervals: str
     one_probability: float
     r_distribution: SqueezeRDistribution
 
@@ -102,7 +104,7 @@ def run_benchmark(
             "backend": effective_config.backend,
             "random_source": effective_config.random_source,
             "tolerance_sigmas": effective_config.tolerance_sigmas,
-            "intervals": effective_config.intervals,
+            "interval_policies": list(effective_config.interval_policies),
             "check_axis_policy": effective_config.check_axis_policy,
             "message_axis_policy": effective_config.message_axis_policy,
             "one_probabilities": list(effective_config.one_probabilities),
@@ -202,19 +204,22 @@ class _ProgressReporter:
 
 def _expand_combos(config: BenchmarkConfig) -> list[BenchmarkCombo]:
     combos: list[BenchmarkCombo] = []
-    for combo_index, (one_probability, r_distribution) in enumerate(
-        product(
-            config.one_probabilities,
-            config.r_distributions,
-        )
-    ):
-        combos.append(
-            BenchmarkCombo(
-                combo_index=combo_index,
-                one_probability=one_probability,
-                r_distribution=r_distribution,
+    for intervals in config.interval_policies:
+        for seed_index, (one_probability, r_distribution) in enumerate(
+            product(
+                config.one_probabilities,
+                config.r_distributions,
             )
-        )
+        ):
+            combos.append(
+                BenchmarkCombo(
+                    combo_index=len(combos),
+                    seed_index=seed_index,
+                    intervals=intervals,
+                    one_probability=one_probability,
+                    r_distribution=r_distribution,
+                )
+            )
     return combos
 
 
@@ -225,7 +230,7 @@ def _run_trial(
     backend_factory: BackendFactory,
     random_source_factory: RandomSourceFactory,
 ) -> dict[str, object]:
-    trial_seed = derive_seed(config.base_seed, combo.combo_index, trial_index)
+    trial_seed = derive_seed(config.base_seed, combo.seed_index, trial_index)
     message_seed = derive_seed(trial_seed, "message")
     simulation_seed = derive_seed(trial_seed, "simulation")
     bits = weighted_random_bits(
@@ -242,7 +247,7 @@ def _run_trial(
             squeeze_r_distribution=combo.r_distribution,
             theta_distribution=config.theta_distribution,
             tolerance_sigmas=config.tolerance_sigmas,
-            intervals=config.intervals,
+            intervals=combo.intervals,
             check_axis_policy=config.check_axis_policy,
             message_axis_policy=config.message_axis_policy,
             seed=simulation_seed,
@@ -338,6 +343,7 @@ def _aggregate_combo(
         "alpha_distribution_config": config.alpha_distribution.to_dict(),
         "theta_distribution": config.theta_distribution.summary(),
         "theta_distribution_config": config.theta_distribution.to_dict(),
+        "intervals": combo.intervals,
         "trial_count": trial_count,
         "accepted_count": accepted_count,
         "accepted_rate": accepted_count / trial_count if trial_count else 0.0,

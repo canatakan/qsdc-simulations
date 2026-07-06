@@ -7,6 +7,7 @@ from typing import Any, Optional
 
 from qsdc.protocols.srikara.configuration.parsers import Parsers
 from qsdc.protocols.srikara.configuration.validators import Validators
+from qsdc.protocols.srikara.simulator.encoding import ENCODING_INTERVALS
 
 
 ValidatorFunction = Callable[[object], bool]
@@ -82,31 +83,16 @@ class ParameterSet(list[Parameter]):
 
     def to_dict(self, source: object) -> dict[str, object]:
         return {
-            parameter.name: serializable_value(getattr(source, parameter.name))
+            parameter.name: Parsers.serializable_value(getattr(source, parameter.name))
             for parameter in self
         }
-
-
-def serializable_value(value: object) -> object:
-    if hasattr(value, "to_dict") and callable(value.to_dict):
-        return value.to_dict()
-    if isinstance(value, list):
-        return [serializable_value(item) for item in value]
-    if isinstance(value, tuple):
-        return [serializable_value(item) for item in value]
-    if isinstance(value, dict):
-        return {
-            key: serializable_value(item)
-            for key, item in value.items()
-        }
-    return value
 
 
 OPTIMIZATION_PARAMETERS = ParameterSet([
     Parameter(
         name="intervals",
         default="default",
-        choices=["default", "optimized_v4", "optimized_v8", "optimized_v12"],
+        choices=list(ENCODING_INTERVALS),
         validator=Validators.string,
     ),
     Parameter(
@@ -202,6 +188,11 @@ BENCHMARK_PARAMETERS = ParameterSet([
         name="output_dir",
         default=None,
         validator=Validators.optional_string,
+    ),
+    Parameter(
+        name="interval_policies",
+        default=["default"],
+        validator=Validators.string_sequence,
     ),
     Parameter(
         name="one_probabilities",

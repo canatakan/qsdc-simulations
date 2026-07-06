@@ -25,6 +25,12 @@ class Validators:
         return value is None or isinstance(value, str)
 
     @staticmethod
+    def string_sequence(value: object) -> bool:
+        if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+            return False
+        return bool(value) and all(isinstance(item, str) for item in value)
+
+    @staticmethod
     def int(value: object) -> bool:
         return isinstance(value, int) and not isinstance(value, bool)
 
