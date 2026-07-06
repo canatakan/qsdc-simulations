@@ -69,3 +69,19 @@ class Parsers:
         if kind == "fixed":
             return FixedTheta(value=float(value["value_pi"]) * pi)
         raise ValueError(f"unknown theta distribution kind {kind!r}")
+
+    @staticmethod
+    def serializable_value(value: object) -> object:
+        if hasattr(value, "to_dict") and callable(value.to_dict):
+            return value.to_dict()
+        if isinstance(value, list):
+            return [Parsers.serializable_value(item) for item in value]
+        if isinstance(value, tuple):
+            return [Parsers.serializable_value(item) for item in value]
+        if isinstance(value, dict):
+            return {
+                key: Parsers.serializable_value(item)
+                for key, item in value.items()
+            }
+        return value
+

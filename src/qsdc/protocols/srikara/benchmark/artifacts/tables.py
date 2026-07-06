@@ -12,6 +12,7 @@ Trial = dict[str, Any]
 
 COMBO_FIELDS = (
     "combo_index",
+    "intervals",
     "one_probability",
     "r_distribution",
     "trial_count",
@@ -95,6 +96,7 @@ def _combo_row(combo: Combo) -> dict[str, object]:
     thresholds = metrics["required_acceptance_tolerance_sigmas"]
     return {
         "combo_index": combo["combo_index"],
+        "intervals": combo["intervals"],
         "one_probability": combo["one_probability"],
         "r_distribution": combo["r_distribution"],
         "trial_count": combo["trial_count"],

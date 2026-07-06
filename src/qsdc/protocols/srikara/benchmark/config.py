@@ -7,8 +7,11 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from qsdc.protocols.srikara.configuration import (
+    BENCHMARK_PARAMETERS,
+    OPTIMIZATION_PARAMETERS,
     ParameterSet,
-    PARAMETERS,
+    RUN_PARAMETERS,
+    SIMULATOR_PARAMETERS,
 )
 from qsdc.protocols.srikara.simulator.distributions import (
     AlphaDistribution,
@@ -26,7 +29,7 @@ class BenchmarkConfig:
     trials_per_combo: int
     base_seed: int
     tolerance_sigmas: float
-    intervals: str
+    interval_policies: list[str]
     check_axis_policy: str
     message_axis_policy: str
     output_dir: str | None
@@ -40,7 +43,15 @@ class BenchmarkConfig:
 
     @classmethod
     def parameters(cls) -> ParameterSet:
-        return PARAMETERS.for_fields(cls)
+        return ParameterSet([
+            *BENCHMARK_PARAMETERS,
+            *RUN_PARAMETERS,
+            OPTIMIZATION_PARAMETERS.parameter("check_axis_policy"),
+            OPTIMIZATION_PARAMETERS.parameter("message_axis_policy"),
+            SIMULATOR_PARAMETERS.parameter("tolerance_sigmas"),
+            SIMULATOR_PARAMETERS.parameter("alpha_distribution"),
+            SIMULATOR_PARAMETERS.parameter("theta_distribution"),
+        ])
 
     @classmethod
     def from_options(cls, **overrides: object) -> "BenchmarkConfig":
