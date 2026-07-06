@@ -75,15 +75,19 @@ def _render_report(
 
 _COMBO_OUTCOME_FIELDS = (
     "combo_index",
+    "intervals",
     "one_probability",
     "r_distribution",
     "accepted_count",
+    "accepted_rate",
     "bit_error_rate",
     "symbol_error_rate",
+    "mean_abs_value_error",
 )
 
 _CHECK_FAILURE_FIELDS = (
     "combo_index",
+    "intervals",
     "one_probability",
     "r_distribution",
     "control_failed_check_count",
@@ -94,8 +98,10 @@ _CHECK_FAILURE_FIELDS = (
 
 _TOLERANCE_THRESHOLD_FIELDS = (
     "combo_index",
+    "intervals",
     "one_probability",
     "r_distribution",
+    "required_acceptance_tolerance_sigmas_p95",
     "required_acceptance_tolerance_sigmas_max",
 )
 
@@ -335,10 +341,7 @@ def _format_run_id(value: object) -> str:
 
 
 def _distribution_body(value: object) -> object:
-    if not isinstance(value, str):
-        return value
-    _, separator, body = value.partition("=")
-    return body if separator else value
+    return value
 
 
 def _text(value: object) -> str:
