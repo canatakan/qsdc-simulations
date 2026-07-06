@@ -66,6 +66,8 @@ def _run_row(
     artifacts = summary.get("artifacts", {})
     report_path = run_dir / str(artifacts.get("html_report", "report.html"))
     interval_rows = _interval_rows(combos)
+    balanced_combos = _balanced_combos(combos)
+    balanced_interval_rows = _interval_rows(balanced_combos)
     return {
         "name": summary.get("name"),
         "run_id": summary.get("benchmark_run_id"),
@@ -82,16 +84,19 @@ def _run_row(
             if combo.get("one_probability") not in ("", None)
         ),
         "interval_rows": interval_rows,
-        "best_accepted": _best_interval_row(interval_rows, "accepted_rate", max),
-        "best_symbol": _best_interval_row(interval_rows, "symbol_error_rate", min),
-        "best_numeric": _best_interval_row(interval_rows, "mean_abs_value_error", min),
-        "best_required_sigmas": _best_interval_row(
-            interval_rows,
-            "required_acceptance_tolerance_sigmas_p95",
+        "best_mean_bit": _best_interval_row(
+            balanced_interval_rows,
+            "bit_error_rate",
             min,
         ),
-        "symbol_error_delta": _metric_delta_against_default(
-            interval_rows,
+        "best_mean_symbol": _best_interval_row(
+            balanced_interval_rows,
+            "symbol_error_rate",
+            min,
+        ),
+        "best_combo_bit": _best_combo_row(balanced_combos, "bit_error_rate", min),
+        "best_combo_symbol": _best_combo_row(
+            balanced_combos,
             "symbol_error_rate",
             min,
         ),
@@ -129,19 +134,28 @@ def _render_index(root: Path, runs: list[dict[str, Any]]) -> str:
 
 def _cards(runs: list[dict[str, Any]]) -> str:
     groups = _run_groups(runs)
+    comparable_runs = _non_quick_runs(runs)
     return "\n".join(
         [
             _card("Runs", len(runs), "benchmark reports found"),
             _card("Families", len(groups), "comparable benchmark groups"),
             _card(
-                "Best accepted trials",
-                _best_rate(runs, "accepted_rate"),
-                "highest accepted-trial rate",
+                "Best mean bit error",
+                _best_run_card_rate(
+                    comparable_runs,
+                    "best_mean_bit",
+                    "bit_error_rate",
+                ),
+                "for p=0.5, excluding quick benchmarks",
             ),
             _card(
-                "Best interval delta",
-                _best_symbol_delta(runs),
-                "largest symbol-error drop from default",
+                "Best mean symbol error",
+                _best_run_card_rate(
+                    comparable_runs,
+                    "best_mean_symbol",
+                    "symbol_error_rate",
+                ),
+                "for p=0.5, excluding quick benchmarks",
             ),
         ]
     )
@@ -174,13 +188,43 @@ def _run_groups(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(groups, key=lambda group: str(group["name"]))
 
 
+def _non_quick_runs(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [run for run in runs if not str(run["name"]).startswith("quick/")]
+
+
 def _group_nav(groups: list[dict[str, Any]]) -> str:
     if not groups:
         return '<p class="muted">No benchmark groups found.</p>'
-    return "\n".join(
-        f'<a href="#{escape(_group_id(group["name"]))}">{_text(group["name"])}</a>'
-        for group in groups
-    )
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for group in groups:
+        parent, _ = _split_group_name(str(group["name"]))
+        grouped.setdefault(parent, []).append(group)
+
+    nav_groups = []
+    for parent, child_groups in grouped.items():
+        links = "\n".join(
+            (
+                f'<a class="sidebar-child" href="#{escape(_group_id(group["name"]))}">'
+                f'{_text(_split_group_name(str(group["name"]))[1])}</a>'
+            )
+            for group in child_groups
+        )
+        nav_groups.append(
+            f"""
+          <div class="sidebar-group">
+            <div class="sidebar-parent">{_text(parent)}</div>
+            {links}
+          </div>
+        """
+        )
+    return "\n".join(nav_groups)
+
+
+def _split_group_name(name: str) -> tuple[str, str]:
+    if "/" not in name:
+        return name, name
+    parent, child = name.split("/", 1)
+    return parent, child
 
 
 def _group_sections(groups: list[dict[str, Any]]) -> str:
@@ -193,17 +237,25 @@ def _group_section(group: dict[str, Any]) -> str:
     run = group["latest"]
     score_cards = "\n".join(
         [
-            _score_card("best symbol error", run["best_symbol"], "symbol_error_rate"),
             _score_card(
-                "best numeric error",
-                run["best_numeric"],
-                "mean_abs_value_error",
+                "LOWEST MEAN BIT ERROR (P=0.5)",
+                run["best_mean_bit"],
+                "bit_error_rate",
             ),
-            _score_card("highest accepted", run["best_accepted"], "accepted_rate"),
             _score_card(
-                "best p95 sigmas",
-                run["best_required_sigmas"],
-                "required_acceptance_tolerance_sigmas_p95",
+                "LOWEST MEAN SYMBOL ERROR (P=0.5)",
+                run["best_mean_symbol"],
+                "symbol_error_rate",
+            ),
+            _combo_score_card(
+                "LOWEST COMBO BIT ERROR (P=0.5)",
+                run["best_combo_bit"],
+                "bit_error_rate",
+            ),
+            _combo_score_card(
+                "LOWEST COMBO SYMBOL ERROR (P=0.5)",
+                run["best_combo_symbol"],
+                "symbol_error_rate",
             ),
         ]
     )
@@ -258,31 +310,65 @@ def _score_card(title: str, row: dict[str, Any] | None, metric: str) -> str:
     """
 
 
+def _combo_score_card(title: str, row: dict[str, Any] | None, metric: str) -> str:
+    if row is None:
+        value = "n/a"
+        detail = "n/a"
+    else:
+        value = _format_metric(metric, row.get(metric))
+        detail = _combo_detail(row)
+    return f"""
+      <article>
+        <span>{escape(title)}</span>
+        <strong>{_text(value)}</strong>
+        <em>{_text(detail)}</em>
+      </article>
+    """
+
+
+def _combo_detail(row: dict[str, Any]) -> str:
+    pieces = [str(row.get("intervals", "n/a"))]
+    if row.get("r_distribution") not in ("", None):
+        pieces.append(f"r={_compact_distribution_label(row['r_distribution'])}")
+    return ", ".join(pieces)
+
+
+def _compact_distribution_label(value: object) -> str:
+    label = str(value)
+    if label.lower().startswith("r="):
+        label = label[2:]
+    if label.startswith("fixed(value=") and label.endswith(")"):
+        return f"fixed[{label.removeprefix('fixed(value=').removesuffix(')')}]"
+    if label.startswith("uniform(lower=") and label.endswith(")"):
+        body = label.removeprefix("uniform(lower=").removesuffix(")")
+        body = body.replace(", upper=", ", ")
+        return f"uniform[{body}]"
+    return label
+
+
 def _interval_table(run: dict[str, Any]) -> str:
     headers = [
         "intervals",
-        "accepted",
-        "symbol error",
-        "numeric error",
+        "bit error (p=0.5)",
+        "symbol error (p=0.5)",
         "required sigmas p95",
-        "symbol delta",
     ]
     rows = []
     for row in run["interval_rows"]:
         rows.append(
             [
                 f'<strong>{_text(row["intervals"])}</strong>',
-                _format_rate(row.get("accepted_rate")),
-                _format_rate(row.get("symbol_error_rate")),
-                _format_number(row.get("mean_abs_value_error")),
-                _format_number(row.get("required_acceptance_tolerance_sigmas_p95")),
-                _format_signed_rate(
-                    _delta_from_default(
-                        row,
-                        run["interval_rows"],
-                        "symbol_error_rate",
-                    )
+                _rate_with_error_delta(
+                    row,
+                    run["interval_rows"],
+                    "balanced_bit_error_rate",
                 ),
+                _rate_with_error_delta(
+                    row,
+                    run["interval_rows"],
+                    "balanced_symbol_error_rate",
+                ),
+                _format_number(row.get("required_acceptance_tolerance_sigmas_p95")),
             ]
         )
     return _table(headers, rows, "comparison-table")
@@ -352,7 +438,7 @@ def _table(headers: list[str], rows: list[list[object]], class_name: str) -> str
 
 def _html_cell(value: object) -> str:
     text = str(value)
-    if text.startswith("<a ") or text.startswith("<strong>"):
+    if text.startswith("<"):
         return text
     return _text(value)
 
@@ -368,10 +454,30 @@ def _interval_rows(combos: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _interval_row(intervals: str, combos: list[dict[str, Any]]) -> dict[str, Any]:
+    balanced_combos = _balanced_combos(combos)
     return {
         "intervals": intervals,
         "accepted_rate": _weighted_average(combos, "accepted_rate"),
+        "bit_error_rate": _weighted_average(combos, "bit_error_rate"),
         "symbol_error_rate": _weighted_average(combos, "symbol_error_rate"),
+        "balanced_bit_error_rate": _weighted_average(
+            balanced_combos,
+            "bit_error_rate",
+        ),
+        "balanced_symbol_error_rate": _weighted_average(
+            balanced_combos,
+            "symbol_error_rate",
+        ),
+        "control_check_count": _sum_combo_field(combos, "control_check_count"),
+        "control_failed_check_count": _sum_combo_field(
+            combos,
+            "control_failed_check_count",
+        ),
+        "decoy_check_count": _sum_combo_field(combos, "decoy_check_count"),
+        "decoy_failed_check_count": _sum_combo_field(
+            combos,
+            "decoy_failed_check_count",
+        ),
         "mean_abs_value_error": _weighted_average(combos, "mean_abs_value_error"),
         "required_acceptance_tolerance_sigmas_p95": _max_combo_metric(
             combos,
@@ -392,6 +498,23 @@ def _weighted_average(combos: list[dict[str, Any]], field: str) -> float | None:
     return weighted_total / total_weight if total_weight else None
 
 
+def _sum_combo_field(combos: list[dict[str, Any]], field: str) -> int:
+    return sum(
+        int(float(combo[field]))
+        for combo in combos
+        if combo.get(field) not in ("", None)
+    )
+
+
+def _balanced_combos(combos: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        combo
+        for combo in combos
+        if combo.get("one_probability") not in ("", None)
+        and float(combo["one_probability"]) == 0.5
+    ]
+
+
 def _best_interval_row(
     rows: list[dict[str, Any]],
     field: str,
@@ -407,18 +530,19 @@ def _best_interval_row(
     return None
 
 
-def _metric_delta_against_default(
-    rows: list[dict[str, Any]],
+def _best_combo_row(
+    combos: list[dict[str, Any]],
     field: str,
     selector,
-) -> float | None:
-    default_row = _default_interval_row(rows)
-    best_row = _best_interval_row(rows, field, selector)
-    if default_row is None or best_row is None:
+) -> dict[str, Any] | None:
+    values = [combo for combo in combos if combo.get(field) not in ("", None)]
+    if not values:
         return None
-    if default_row.get(field) is None or best_row.get(field) is None:
-        return None
-    return float(default_row[field]) - float(best_row[field])
+    selected_value = selector(float(combo[field]) for combo in values)
+    for combo in values:
+        if float(combo[field]) == selected_value:
+            return combo
+    return None
 
 
 def _delta_from_default(
@@ -451,22 +575,19 @@ def _max_combo_metric(
     return max(values) if values else None
 
 
-def _best_rate(runs: list[dict[str, Any]], field: str) -> str:
-    values = [float(run[field]) for run in runs if run.get(field) is not None]
-    if not values:
-        return "n/a"
-    return _format_rate(max(values))
-
-
-def _best_symbol_delta(runs: list[dict[str, Any]]) -> str:
+def _best_run_card_rate(
+    runs: list[dict[str, Any]],
+    row_key: str,
+    field: str,
+) -> str:
     values = [
-        float(run["symbol_error_delta"])
+        float(run[row_key][field])
         for run in runs
-        if run.get("symbol_error_delta") is not None
+        if run.get(row_key) is not None and run[row_key].get(field) is not None
     ]
     if not values:
         return "n/a"
-    return _format_rate(max(values))
+    return _format_rate(min(values))
 
 
 def _format_metric(metric: str, value: object) -> str:
@@ -492,24 +613,29 @@ def _format_number(value: object) -> str:
     return f"{number:.6g}"
 
 
-def _format_signed_number(value: object) -> str:
-    if value is None:
-        return "n/a"
-    number = float(value)
-    if number == 0.0:
-        return "0"
-    sign = "+" if number > 0 else ""
-    return f"{sign}{_format_number(number)}"
+def _rate_with_error_delta(
+    row: dict[str, Any],
+    rows: list[dict[str, Any]],
+    field: str,
+) -> str:
+    value = row.get(field)
+    base = _format_rate(value)
+    delta = _delta_from_default(row, rows, field)
+    if delta is None or delta == 0.0:
+        return f'<span class="metric-rate">{escape(base)}</span>'
 
-
-def _format_signed_rate(value: object) -> str:
-    if value is None:
-        return "n/a"
-    number = float(value)
-    if number == 0.0:
-        return "0"
-    sign = "+" if number > 0 else ""
-    return f"{sign}{_format_rate(number)}"
+    if delta > 0:
+        class_name = "delta delta-good"
+        marker = "▼"
+        rendered_delta = _format_rate(delta)
+    else:
+        class_name = "delta delta-bad"
+        marker = "▲"
+        rendered_delta = _format_rate(abs(delta))
+    return (
+        f'<span class="metric-rate">{escape(base)}</span> '
+        f'<span class="{class_name}">{marker} {escape(rendered_delta)}</span>'
+    )
 
 
 def _format_run_id(value: object) -> str:
