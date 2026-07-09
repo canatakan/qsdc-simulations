@@ -122,7 +122,7 @@ def aggregate_trial_metrics(
             "mean_abs_value_error": None,
             "mean_interval_miss_distance": None,
             "mean_interval_margin": None,
-            "required_acceptance_tolerance_sigmas": {
+            "check_sigma_deviations": {
                 "min": None,
                 "mean": None,
                 "median": None,
@@ -148,9 +148,8 @@ def aggregate_trial_metrics(
             "mean_interval_miss_distance",
         ),
         "mean_interval_margin": _mean_trial_field(selected, "mean_interval_margin"),
-        "required_acceptance_tolerance_sigmas": _threshold_summary(
-            float(trial["required_acceptance_tolerance_sigmas"])
-            for trial in selected
+        "check_sigma_deviations": _threshold_summary(
+            _check_sigma_deviations(selected)
         ),
     }
 
@@ -162,6 +161,17 @@ def _mean_trial_field(trials: Sequence[dict[str, object]], field: str) -> float:
 def _mean_or_zero(values: Iterable[float]) -> float:
     values = tuple(values)
     return mean(values) if values else 0.0
+
+
+def _check_sigma_deviations(
+    trials: Sequence[dict[str, object]],
+) -> list[float]:
+    values: list[float] = []
+    for trial in trials:
+        check_values = trial.get("check_sigma_deviations")
+        if isinstance(check_values, (list, tuple)):
+            values.extend(float(value) for value in check_values)
+    return values
 
 
 def _threshold_summary(values: Iterable[float]) -> dict[str, float | None]:

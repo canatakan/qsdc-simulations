@@ -36,11 +36,11 @@ COMBO_FIELDS = (
     "decoy_failed_check_rate",
     "decoy_mean_failed_check_count_per_trial",
     "decoy_max_failed_check_count_per_trial",
-    "required_acceptance_tolerance_sigmas_min",
-    "required_acceptance_tolerance_sigmas_median",
-    "required_acceptance_tolerance_sigmas_mean",
-    "required_acceptance_tolerance_sigmas_p95",
-    "required_acceptance_tolerance_sigmas_max",
+    "check_sigma_deviation_min",
+    "check_sigma_deviation_median",
+    "check_sigma_deviation_mean",
+    "check_sigma_deviation_p95",
+    "check_sigma_deviation_max",
 )
 
 TRIAL_FIELDS = (
@@ -57,9 +57,6 @@ TRIAL_FIELDS = (
     "decoy_passed",
     "control_failed_check_count",
     "decoy_failed_check_count",
-    "required_control_tolerance_sigmas",
-    "required_decoy_tolerance_sigmas",
-    "required_acceptance_tolerance_sigmas",
     "bit_error_rate",
     "symbol_error_rate",
     "mean_abs_value_error",
@@ -93,7 +90,7 @@ def read_trial_csv(path: Path) -> list[Trial]:
 
 def _combo_row(combo: Combo) -> dict[str, object]:
     metrics = combo["all"]
-    thresholds = metrics["required_acceptance_tolerance_sigmas"]
+    sigma_deviations = metrics["check_sigma_deviations"]
     return {
         "combo_index": combo["combo_index"],
         "intervals": combo["intervals"],
@@ -128,11 +125,11 @@ def _combo_row(combo: Combo) -> dict[str, object]:
         "decoy_max_failed_check_count_per_trial": combo[
             "decoy_max_failed_check_count_per_trial"
         ],
-        "required_acceptance_tolerance_sigmas_min": thresholds["min"],
-        "required_acceptance_tolerance_sigmas_median": thresholds["median"],
-        "required_acceptance_tolerance_sigmas_mean": thresholds["mean"],
-        "required_acceptance_tolerance_sigmas_p95": thresholds["p95"],
-        "required_acceptance_tolerance_sigmas_max": thresholds["max"],
+        "check_sigma_deviation_min": sigma_deviations["min"],
+        "check_sigma_deviation_median": sigma_deviations["median"],
+        "check_sigma_deviation_mean": sigma_deviations["mean"],
+        "check_sigma_deviation_p95": sigma_deviations["p95"],
+        "check_sigma_deviation_max": sigma_deviations["max"],
     }
 
 
@@ -151,13 +148,6 @@ def _trial_row(trial: Trial) -> dict[str, object]:
         "decoy_passed": trial["decoy_passed"],
         "control_failed_check_count": trial["control_failed_check_count"],
         "decoy_failed_check_count": trial["decoy_failed_check_count"],
-        "required_control_tolerance_sigmas": trial[
-            "required_control_tolerance_sigmas"
-        ],
-        "required_decoy_tolerance_sigmas": trial["required_decoy_tolerance_sigmas"],
-        "required_acceptance_tolerance_sigmas": trial[
-            "required_acceptance_tolerance_sigmas"
-        ],
         "bit_error_rate": trial["bit_error_rate"],
         "symbol_error_rate": trial["symbol_error_rate"],
         "mean_abs_value_error": trial["mean_abs_value_error"],
