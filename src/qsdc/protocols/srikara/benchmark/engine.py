@@ -261,15 +261,9 @@ def _run_trial(
     )
     control_metrics = summarize_checks(result.controls)
     decoy_metrics = summarize_checks(result.decoys)
-    required_control_tolerance_sigmas = (
-        float(control_metrics["max_abs_deviation"]) / result.measurement_noise_sigma
-    )
-    required_decoy_tolerance_sigmas = (
-        float(decoy_metrics["max_abs_deviation"]) / result.measurement_noise_sigma
-    )
-    required_acceptance_tolerance_sigmas = max(
-        required_control_tolerance_sigmas,
-        required_decoy_tolerance_sigmas,
+    check_sigma_deviations = _check_sigma_deviations(
+        (*result.controls, *result.decoys),
+        result.measurement_noise_sigma,
     )
     return {
         "combo_index": combo.combo_index,
@@ -302,14 +296,22 @@ def _run_trial(
         "control_failed_check_count": control_metrics["failed_check_count"],
         "control_mean_abs_deviation": control_metrics["mean_abs_deviation"],
         "control_max_abs_deviation": control_metrics["max_abs_deviation"],
-        "required_control_tolerance_sigmas": required_control_tolerance_sigmas,
         "decoy_check_count": decoy_metrics["check_count"],
         "decoy_failed_check_count": decoy_metrics["failed_check_count"],
         "decoy_mean_abs_deviation": decoy_metrics["mean_abs_deviation"],
         "decoy_max_abs_deviation": decoy_metrics["max_abs_deviation"],
-        "required_decoy_tolerance_sigmas": required_decoy_tolerance_sigmas,
-        "required_acceptance_tolerance_sigmas": required_acceptance_tolerance_sigmas,
+        "check_sigma_deviations": check_sigma_deviations,
     }
+
+
+def _check_sigma_deviations(
+    checks: Any,
+    measurement_noise_sigma: float,
+) -> tuple[float, ...]:
+    return tuple(
+        abs(check.measured - check.expected) / measurement_noise_sigma
+        for check in checks
+    )
 
 
 def _aggregate_combo(

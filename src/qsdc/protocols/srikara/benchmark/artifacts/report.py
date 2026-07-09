@@ -101,8 +101,9 @@ _TOLERANCE_THRESHOLD_FIELDS = (
     "intervals",
     "one_probability",
     "r_distribution",
-    "required_acceptance_tolerance_sigmas_p95",
-    "required_acceptance_tolerance_sigmas_max",
+    "check_sigma_deviation_mean",
+    "check_sigma_deviation_p95",
+    "check_sigma_deviation_max",
 )
 
 _RAW_COMBO_FIELDS = tuple(
@@ -355,9 +356,9 @@ def _human_header(header: str) -> str:
         "r_distribution": "r",
         "one_probability": "one probability",
         "mean_abs_value_error": "mean absolute numeric error",
-        "required_acceptance_tolerance_sigmas_max": (
-            "required acceptance tolerance sigmas"
-        ),
+        "check_sigma_deviation_mean": "check sigma deviation mean",
+        "check_sigma_deviation_p95": "check sigma deviation p95",
+        "check_sigma_deviation_max": "check sigma deviation max",
     }
     return replacements.get(header, header.replace("_", " "))
 

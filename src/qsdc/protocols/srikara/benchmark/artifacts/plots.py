@@ -7,6 +7,7 @@ import json
 from dataclasses import dataclass
 from math import ceil
 from pathlib import Path
+from statistics import mean
 from typing import Any, Optional, Sequence, Union
 
 import matplotlib
@@ -262,38 +263,52 @@ def _write_interval_delta_plot(
 
 
 def _write_threshold_curve(path: Path, trials: list[Trial]) -> None:
-    intervals = _unique_ordered(str(trial["intervals"]) for trial in trials)
-    series_by_interval = _threshold_series_by_interval(trials)
-    figure, axes = _interval_axes(intervals)
-    for axis, intervals_label in zip(axes, intervals):
-        series = series_by_interval.get(intervals_label, {})
-        colors = _threshold_colors(len(series))
-        for (label, thresholds), color in zip(series.items(), colors):
-            x_values, y_values = _acceptance_curve(thresholds)
-            axis.step(
-                x_values,
-                y_values,
-                where="post",
-                linewidth=1.8,
-                color=color,
-                label=label,
-            )
-        axis.set_title(intervals_label)
-        axis.set_xlabel("candidate tolerance sigmas")
-        axis.set_ylabel("fraction accepted")
-        axis.set_ylim(0.0, 1.0)
-        axis.grid(True, alpha=0.3)
-        if 0 < len(series) <= 8:
-            axis.legend(fontsize="x-small", frameon=False)
+    thresholds = _all_check_sigma_deviations(trials)
+    x_values, y_values = _pass_curve(thresholds)
+    figure, axis = plt.subplots(figsize=(7.2, 4.6), constrained_layout=True)
+    axis.step(
+        x_values,
+        y_values,
+        where="post",
+        linewidth=2.4,
+        color="#3f6f9f",
+    )
+    if thresholds:
+        mean_value = mean(thresholds)
+        mean_fraction = _accepted_fraction(thresholds, mean_value)
+        axis.axvline(
+            mean_value,
+            color="#1f2937",
+            linestyle=":",
+            linewidth=1.4,
+        )
+        axis.scatter(
+            [mean_value],
+            [mean_fraction],
+            color="#1f2937",
+            s=28,
+            zorder=3,
+        )
+        axis.annotate(
+            f"mean = {mean_value:.3g}",
+            xy=(mean_value, mean_fraction),
+            xytext=(8, -14),
+            textcoords="offset points",
+            fontsize=9,
+            color="#1f2937",
+        )
 
-    _hide_unused_axes(axes, len(intervals))
-    figure.suptitle("Derived Acceptance Tolerance Sigmas by Interval Policy", fontweight="bold")
+    axis.set_title("Check Passing Fraction by Sigma Deviation", fontweight="bold")
+    axis.set_xlabel("candidate sigma deviation")
+    axis.set_ylabel("fraction of all checks passing")
+    axis.set_ylim(0.0, 1.0)
+    axis.grid(True, alpha=0.3)
     figure.savefig(path, dpi=160, bbox_inches="tight")
     plt.close(figure)
 
 
-def _threshold_series_by_interval(trials: list[Trial]) -> dict[str, dict[str, list[float]]]:
-    series: dict[str, dict[str, list[float]]] = {}
+def _all_check_sigma_deviations(trials: list[Trial]) -> list[float]:
+    values: list[float] = []
     sorted_trials = sorted(
         trials,
         key=lambda trial: (
@@ -304,25 +319,18 @@ def _threshold_series_by_interval(trials: list[Trial]) -> dict[str, dict[str, li
         ),
     )
     for trial in sorted_trials:
-        intervals_label = str(trial["intervals"])
-        label = f"p={float(trial['one_probability']):g}, {trial['r_distribution']}"
-        series.setdefault(intervals_label, {}).setdefault(label, []).append(
-            float(trial["required_acceptance_tolerance_sigmas"])
-        )
-    return series
+        values.extend(_check_sigma_deviations(trial))
+    return values
 
 
-def _threshold_colors(series_count: int) -> list:
-    if series_count <= 0:
-        return []
-    if series_count <= 20:
-        colormap = plt.get_cmap("tab20")
-        return [colormap(index) for index in range(series_count)]
-    colormap = plt.get_cmap("nipy_spectral")
-    return [colormap((index + 0.5) / series_count) for index in range(series_count)]
+def _check_sigma_deviations(trial: Trial) -> list[float]:
+    values = trial.get("check_sigma_deviations")
+    if isinstance(values, (list, tuple)):
+        return [float(value) for value in values]
+    return []
 
 
-def _acceptance_curve(thresholds: list[float]) -> tuple[list[float], list[float]]:
+def _pass_curve(thresholds: list[float]) -> tuple[list[float], list[float]]:
     if not thresholds:
         return [0.0], [0.0]
     candidates = sorted(set(thresholds))
@@ -355,12 +363,6 @@ def _unique_ordered(values) -> list:
 def _probability_axes(probabilities: Sequence[float]):
     column_count = min(3, max(len(probabilities), 1))
     row_count = ceil(max(len(probabilities), 1) / column_count)
-    return _subplots(row_count, column_count)
-
-
-def _interval_axes(intervals: Sequence[str]):
-    column_count = min(2, max(len(intervals), 1))
-    row_count = ceil(max(len(intervals), 1) / column_count)
     return _subplots(row_count, column_count)
 
 
