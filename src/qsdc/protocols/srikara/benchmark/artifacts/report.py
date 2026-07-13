@@ -59,13 +59,6 @@ def _render_report(
             _CHECK_FAILURE_FIELDS,
             _select_table_fields(_combo_table_rows(combos), _CHECK_FAILURE_FIELDS),
         ),
-        "tolerance_thresholds": _table(
-            _TOLERANCE_THRESHOLD_FIELDS,
-            _select_table_fields(
-                _combo_table_rows(combos),
-                _TOLERANCE_THRESHOLD_FIELDS,
-            ),
-        ),
         "combo_table": _table(_RAW_COMBO_FIELDS, _combo_table_rows(combos)),
         "trial_table": _table(TRIAL_FIELDS, _trial_table_rows(trials)),
         "artifact_links": _artifact_links(summary),
@@ -96,21 +89,7 @@ _CHECK_FAILURE_FIELDS = (
     "decoy_failed_check_rate",
 )
 
-_TOLERANCE_THRESHOLD_FIELDS = (
-    "combo_index",
-    "intervals",
-    "one_probability",
-    "r_distribution",
-    "check_sigma_deviation_mean",
-    "check_sigma_deviation_p95",
-    "check_sigma_deviation_max",
-)
-
-_RAW_COMBO_FIELDS = tuple(
-    field
-    for field in COMBO_FIELDS
-    if field not in {"check_tolerance_sigmas", "measurement_noise_sigma"}
-)
+_RAW_COMBO_FIELDS = COMBO_FIELDS
 
 
 def _run_meta(summary: dict[str, Any]) -> str:
@@ -132,8 +111,6 @@ def _context_panel(summary: dict[str, Any], combos: list[Combo]) -> str:
     parameters = summary.get("parameters", {})
     derived_counts = summary.get("derived_counts", {})
     rows = [
-        ("configured sigmas", _configured_sigmas(summary, combos)),
-        ("noise sigma", _noise_sigma(combos)),
         ("interval policies", parameters.get("interval_policies", ["default"])),
         ("alpha", _distribution_body(parameters.get("alpha_distribution"))),
         ("theta", _distribution_body(parameters.get("theta_distribution"))),
@@ -294,27 +271,6 @@ def _select_table_fields(
     return [{field: row.get(field) for field in fields} for row in rows]
 
 
-def _configured_sigmas(summary: dict[str, Any], combos: list[Combo]) -> object:
-    parameters = summary.get("parameters", {})
-    if parameters.get("tolerance_sigmas") is not None:
-        return parameters.get("tolerance_sigmas")
-    return _single_combo_value(combos, "check_tolerance_sigmas")
-
-
-def _noise_sigma(combos: list[Combo]) -> object:
-    return _single_combo_value(combos, "measurement_noise_sigma")
-
-
-def _single_combo_value(combos: list[Combo], field: str) -> object:
-    rows = _combo_table_rows(combos)
-    values = {str(row.get(field)) for row in rows if row.get(field) is not None}
-    if not values:
-        return None
-    if len(values) == 1:
-        return values.pop()
-    return "varies"
-
-
 def _format_rate(value: object) -> str:
     if value is None:
         return "n/a"
@@ -356,9 +312,6 @@ def _human_header(header: str) -> str:
         "r_distribution": "r",
         "one_probability": "one probability",
         "mean_abs_value_error": "mean absolute numeric error",
-        "check_sigma_deviation_mean": "check sigma deviation mean",
-        "check_sigma_deviation_p95": "check sigma deviation p95",
-        "check_sigma_deviation_max": "check sigma deviation max",
     }
     return replacements.get(header, header.replace("_", " "))
 

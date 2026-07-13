@@ -1,3 +1,4 @@
+from qsdc.common.bits import chunk_bits
 from qsdc.common.random.classical import ClassicalRandomSource
 from qsdc.protocols.srikara.simulator.encoding import (
     bits_for_real,
@@ -11,6 +12,15 @@ def test_interval_round_trip_samples():
     for bits in ("000", "001", "010", "011", "100", "101", "110", "111"):
         value = sample_message_value(bits, rng)
         assert bits_for_real(value) == bits
+
+
+def test_default_intervals_round_trip_padded_bitstream():
+    rng = ClassicalRandomSource(2)
+    symbols = chunk_bits("0100111001", 3)
+    values = [sample_message_value(bits, rng) for bits in symbols]
+
+    assert symbols == ("010", "011", "100", "100")
+    assert "".join(bits_for_real(value) for value in values) == "010011100100"
 
 
 def test_boundaries_decode_to_right_interval():

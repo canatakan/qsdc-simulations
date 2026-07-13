@@ -195,6 +195,11 @@ BENCHMARK_PARAMETERS = ParameterSet([
         validator=Validators.string_sequence,
     ),
     Parameter(
+        name="sigma_diagnostics",
+        default=False,
+        validator=Validators.bool,
+    ),
+    Parameter(
         name="one_probabilities",
         default=[0.5],
         validator=Validators.probability_sequence,

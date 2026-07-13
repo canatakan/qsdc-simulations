@@ -30,6 +30,7 @@ class BenchmarkConfig:
     base_seed: int
     tolerance_sigmas: float
     interval_policies: list[str]
+    sigma_diagnostics: bool
     check_axis_policy: str
     message_axis_policy: str
     output_dir: str | None
