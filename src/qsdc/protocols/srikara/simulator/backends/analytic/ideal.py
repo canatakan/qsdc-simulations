@@ -8,10 +8,6 @@ from qsdc.protocols.srikara.simulator.backends.analytic.calculations import (
     displacement_after_unsqueeze,
 )
 from qsdc.protocols.srikara.simulator.backends.base import QSDCBackend
-from qsdc.protocols.srikara.simulator.config import (
-    DEFAULT_EXACT_MEASUREMENT_NOISE_SIGMA,
-    DEFAULT_EXACT_TOLERANCE_SIGMAS,
-)
 from qsdc.protocols.srikara.simulator.encoding import beta_for_message_value
 
 
@@ -20,8 +16,7 @@ class AnalyticBackend(QSDCBackend):
     """Formula-only backend following the paper's ideal algebra."""
 
     name: str = "analytic"
-    default_tolerance_sigmas: float = DEFAULT_EXACT_TOLERANCE_SIGMAS
-    measurement_noise_sigma: float = DEFAULT_EXACT_MEASUREMENT_NOISE_SIGMA
+    measurement_noise_sigma: float = 1e-7
 
     def begin_run(self, seed: int) -> None:
         pass

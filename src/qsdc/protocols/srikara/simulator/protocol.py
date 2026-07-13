@@ -5,11 +5,7 @@ from qsdc.common.random.base import RandomSource
 from qsdc.common.random.classical import ClassicalRandomSource
 from qsdc.protocols.srikara.simulator.backends.analytic.ideal import AnalyticBackend
 from qsdc.protocols.srikara.simulator.backends.base import QSDCBackend
-from qsdc.protocols.srikara.simulator.config import (
-    ProtocolConfig,
-    ResolvedProtocolConfig,
-    resolve_config,
-)
+from qsdc.protocols.srikara.simulator.config import ProtocolConfig
 from qsdc.protocols.srikara.simulator.encoding import (
     beta_for_message_value,
     bits_for_real,
@@ -25,8 +21,6 @@ from qsdc.protocols.srikara.simulator.flow import (
 
 @dataclass(frozen=True)
 class BobPreparedState:
-    """Bob's private state parameters for one time slot."""
-
     index: int
     alpha: complex
     squeeze_r: float
@@ -99,21 +93,24 @@ def simulate_qsdc(
     backend: QSDCBackend | None = None,
     random_source: RandomSource | None = None,
 ) -> ProtocolResult:
-    config = config or ProtocolConfig(n_states=4 * len(message_bits))
+    config = config or ProtocolConfig.from_options(n_states=4 * len(message_bits))
     active_backend: QSDCBackend = backend if backend is not None else AnalyticBackend()
-    resolved_config = resolve_config(config, active_backend, len(message_bits))
-    protocol_random = random_source or ClassicalRandomSource(resolved_config.seed)
+    if config.n_states % 4 != 0:
+        raise ValueError("n_states must be divisible by 4")
+    if len(message_bits) != config.n_states // 4:
+        raise ValueError("message count does not match n_states")
+    protocol_random = random_source or ClassicalRandomSource(config.seed)
 
     # Backend seeding is only for backend-owned sampling, such as SF homodyne draws.
-    active_backend.begin_run(resolved_config.seed)
+    active_backend.begin_run(config.seed)
 
-    prepared_states = _bob_prepare_states(resolved_config, protocol_random)
-    route = OpticalSwitch(protocol_random).route(resolved_config.n_states)
+    prepared_states = _bob_prepare_states(config, protocol_random)
+    route = OpticalSwitch(protocol_random).route(config.n_states)
     transcript = build_transcript(route, protocol_random)
 
     controls = tuple(
         _check_control(
-            prepared_states[index], active_backend, resolved_config, protocol_random
+            prepared_states[index], active_backend, config, protocol_random
         )
         for index in route.control_indices
     )
@@ -124,14 +121,14 @@ def simulate_qsdc(
         message_value = sample_message_value(
             bits,
             protocol_random,
-            intervals=resolved_config.intervals,
+            intervals=config.intervals,
         )
         beta = beta_for_message_value(message_value)
         message_by_index[index] = (bits, message_value, beta)
 
     decoys = tuple(
         _check_decoy(
-            prepared_states[index], active_backend, resolved_config, protocol_random
+            prepared_states[index], active_backend, config, protocol_random
         )
         for index in route.decoy_indices
     )
@@ -142,7 +139,7 @@ def simulate_qsdc(
             prepared_states[index],
             message_by_index[index],
             active_backend,
-            resolved_config,
+            config,
             protocol_random,
         )
         for index in route.message_indices
@@ -151,10 +148,10 @@ def simulate_qsdc(
     return ProtocolResult(
         backend_name=active_backend.name,
         random_source_name=protocol_random.name,
-        check_tolerance_sigmas=resolved_config.tolerance_sigmas,
-        intervals=resolved_config.intervals,
-        check_axis_policy=resolved_config.check_axis_policy,
-        message_axis_policy=resolved_config.message_axis_policy,
+        check_tolerance_sigmas=config.tolerance_sigmas,
+        intervals=config.intervals,
+        check_axis_policy=config.check_axis_policy,
+        message_axis_policy=config.message_axis_policy,
         measurement_noise_sigma=active_backend.measurement_noise_sigma,
         control_passed=control_passed,
         decoy_passed=decoy_passed,
@@ -171,7 +168,7 @@ def simulate_qsdc(
 
 
 def _bob_prepare_states(
-    config: ResolvedProtocolConfig, random_source: RandomSource
+    config: ProtocolConfig, random_source: RandomSource
 ) -> list[BobPreparedState]:
     states: list[BobPreparedState] = []
     for index in range(config.n_states):
@@ -185,7 +182,7 @@ def _bob_prepare_states(
 def _check_control(
     state: BobPreparedState,
     backend: QSDCBackend,
-    config: ResolvedProtocolConfig,
+    config: ProtocolConfig,
     random_source: RandomSource,
 ) -> ControlCheck:
     axis = _check_axis(state, config, random_source)
@@ -207,7 +204,7 @@ def _check_control(
 def _check_decoy(
     state: BobPreparedState,
     backend: QSDCBackend,
-    config: ResolvedProtocolConfig,
+    config: ProtocolConfig,
     random_source: RandomSource,
 ) -> DecoyCheck:
     axis = _check_axis(state, config, random_source)
@@ -228,7 +225,7 @@ def _check_decoy(
 
 def _check_axis(
     state: BobPreparedState,
-    config: ResolvedProtocolConfig,
+    config: ProtocolConfig,
     random_source: RandomSource,
 ) -> str:
     if config.check_axis_policy == "random":
@@ -242,7 +239,7 @@ def _decode_message(
     state: BobPreparedState,
     message: tuple[str, float, complex],
     backend: QSDCBackend,
-    config: ResolvedProtocolConfig,
+    config: ProtocolConfig,
     random_source: RandomSource,
 ) -> MessageDecode:
     bits, message_value, alice_beta = message
@@ -277,7 +274,7 @@ def _decode_message(
 def _message_axis(
     state: BobPreparedState,
     backend: QSDCBackend,
-    config: ResolvedProtocolConfig,
+    config: ProtocolConfig,
     random_source: RandomSource,
 ) -> str:
     if config.message_axis_policy == "random":

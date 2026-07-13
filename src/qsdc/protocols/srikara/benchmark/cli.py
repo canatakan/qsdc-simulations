@@ -7,7 +7,7 @@ from pathlib import Path
 
 from qsdc.common.random import make_random_source
 from qsdc.protocols.srikara.benchmark.artifacts.ui.index import write_benchmark_index
-from qsdc.protocols.srikara.benchmark.config import load_benchmark_config
+from qsdc.protocols.srikara.benchmark.config import load_benchmark_json
 from qsdc.protocols.srikara.benchmark.engine import run_benchmark
 from qsdc.protocols.srikara.simulator.backends import make_backend
 
@@ -52,7 +52,7 @@ def main() -> None:
     output_root.mkdir(parents=True, exist_ok=True)
     failures = []
     for index, config_path in enumerate(config_paths, start=1):
-        config = load_benchmark_config(config_path)
+        config = load_benchmark_json(config_path)
         config_output_dir = output_root / config.name
         print(f"[{index}/{len(config_paths)}] {config.name}: {config_path}")
         if args.skip_existing and _has_existing_run(config_output_dir):

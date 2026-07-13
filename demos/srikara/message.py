@@ -7,19 +7,15 @@ import textwrap
 
 from qsdc.common.bits import bits_to_bytes, bytes_to_bits
 from qsdc.common.random import make_random_source
-from qsdc.protocols.srikara.simulator.backends import make_backend
-from qsdc.protocols.srikara.simulator.config import (
-    DEFAULT_INTERVALS,
-    INTERVAL_STRATEGIES,
-    MESSAGE_AXIS_POLICIES,
-    ProtocolConfig,
+from qsdc.protocols.srikara.configuration import (
+    OPTIMIZATION_PARAMETERS,
+    RUN_PARAMETERS,
+    SIMULATOR_PARAMETERS,
 )
+from qsdc.protocols.srikara.simulator.backends import make_backend
+from qsdc.protocols.srikara.simulator.config import ProtocolConfig
 from qsdc.protocols.srikara.simulator.encoding import interval_for_bits
 from qsdc.protocols.srikara.simulator.protocol import simulate_qsdc
-
-
-BACKEND_CHOICES = ("analytic", "sf", "sf-sampled")
-RANDOM_SOURCE_CHOICES = ("classical", "sf-bs-qrng")
 
 
 def main() -> None:
@@ -31,37 +27,34 @@ def main() -> None:
     )
     parser.add_argument(
         "--backend",
-        choices=BACKEND_CHOICES,
-        default="sf",
+        choices=RUN_PARAMETERS.choices("backend"),
+        default=RUN_PARAMETERS.default("backend"),
         help="simulation backend",
     )
-    parser.add_argument("--seed", type=int, default=11)
+    parser.add_argument("--seed", type=int, default=SIMULATOR_PARAMETERS.default("seed"))
     parser.add_argument("--encoding", default="utf-8")
     parser.add_argument(
         "--tolerance-sigmas",
         type=float,
         default=None,
-        help=(
-            "override control/decoy measurement-noise-sigma tolerance; defaults "
-            "to the backend value"
-        ),
+        help="control/decoy measurement-noise-sigma tolerance",
     )
     parser.add_argument(
         "--random-source",
-        choices=RANDOM_SOURCE_CHOICES,
-        default="classical",
+        choices=RUN_PARAMETERS.choices("random_source"),
+        default=RUN_PARAMETERS.default("random_source"),
         help="protocol random source for routing, basis choices, and values",
     )
     parser.add_argument(
         "--intervals",
-        choices=INTERVAL_STRATEGIES,
-        default=DEFAULT_INTERVALS,
+        choices=OPTIMIZATION_PARAMETERS.choices("intervals"),
+        default=OPTIMIZATION_PARAMETERS.default("intervals"),
         help="message interval strategy",
     )
     parser.add_argument(
         "--message-axis-policy",
-        choices=MESSAGE_AXIS_POLICIES,
-        default="random",
+        choices=OPTIMIZATION_PARAMETERS.choices("message_axis_policy"),
+        default=OPTIMIZATION_PARAMETERS.default("message_axis_policy"),
         help=(
             "message decoding axis policy; optimized chooses the q/p axis "
             "with the larger absolute response factor"
@@ -82,13 +75,15 @@ def main() -> None:
         for index in range(0, len(padded_bitstream), 3)
     )
 
-    config = ProtocolConfig(
-        n_states=4 * len(symbols),
-        seed=args.seed,
-        tolerance_sigmas=args.tolerance_sigmas,
-        intervals=args.intervals,
-        message_axis_policy=args.message_axis_policy,
-    )
+    config_overrides = {
+        "n_states": 4 * len(symbols),
+        "seed": args.seed,
+        "intervals": args.intervals,
+        "message_axis_policy": args.message_axis_policy,
+    }
+    if args.tolerance_sigmas is not None:
+        config_overrides["tolerance_sigmas"] = args.tolerance_sigmas
+    config = ProtocolConfig.from_options(**config_overrides)
     result = simulate_qsdc(
         symbols,
         config=config,

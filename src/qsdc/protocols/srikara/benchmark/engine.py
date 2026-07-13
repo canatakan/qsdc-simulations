@@ -236,7 +236,7 @@ def _run_trial(
     symbols = chunk_bits(bits, 3)
     result = simulate_qsdc(
         symbols,
-        config=ProtocolConfig(
+        config=ProtocolConfig.from_options(
             n_states=config.n_states,
             alpha_distribution=config.alpha_distribution,
             squeeze_r_distribution=combo.r_distribution,

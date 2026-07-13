@@ -9,7 +9,6 @@ This project contains separate simulators for different QSDC papers.
   and artifact writers.
 - `demos/<paper>/`: runnable demos that show the protocol flow.
 - `tests/protocols/<paper>/`: tests for that paper's simulator.
-- `docs/protocols/<paper>/`: paper notes, method PDFs, and supporting documentation.
 
 New papers should follow the same shape: keep the paper-specific simulator in
 its own directory, share only genuinely reusable helpers through

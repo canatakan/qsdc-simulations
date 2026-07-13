@@ -9,7 +9,6 @@ class QSDCBackend(ABC):
     """Minimal backend contract needed by the QSDC protocol."""
 
     name: str
-    default_tolerance_sigmas: float
     measurement_noise_sigma: float
 
     @abstractmethod
