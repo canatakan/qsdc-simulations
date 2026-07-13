@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from math import pi
 
+from qsdc.common.configuration.parsers import Parsers as CommonParsers
 from qsdc.protocols.srikara.simulator.distributions import (
     FixedSqueezeR,
     FixedTheta,
@@ -12,13 +13,7 @@ from qsdc.protocols.srikara.simulator.distributions import (
 )
 
 
-class Parsers:
-    @staticmethod
-    def probability_sequence(value: object) -> object:
-        if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
-            return value
-        return [float(item) for item in value]
-
+class Parsers(CommonParsers):
     @staticmethod
     def alpha_distribution(value: object) -> object:
         if isinstance(value, UniformSquareAlpha):
@@ -69,19 +64,3 @@ class Parsers:
         if kind == "fixed":
             return FixedTheta(value=float(value["value_pi"]) * pi)
         raise ValueError(f"unknown theta distribution kind {kind!r}")
-
-    @staticmethod
-    def serializable_value(value: object) -> object:
-        if hasattr(value, "to_dict") and callable(value.to_dict):
-            return value.to_dict()
-        if isinstance(value, list):
-            return [Parsers.serializable_value(item) for item in value]
-        if isinstance(value, tuple):
-            return [Parsers.serializable_value(item) for item in value]
-        if isinstance(value, dict):
-            return {
-                key: Parsers.serializable_value(item)
-                for key, item in value.items()
-            }
-        return value
-

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from qsdc.common.bits import bytes_to_bits, chunk_bits
+from qsdc.common.gaussian import EncodingInterval
 from qsdc.common.random.base import RandomSource
 from qsdc.common.random.classical import ClassicalRandomSource
 from qsdc.protocols.cao.simulator.backends.analytic.ideal import AnalyticBackend
@@ -13,18 +14,15 @@ from qsdc.protocols.cao.simulator.backends.base import (
     GaussianMappingBackend,
     VacuumQuadratures,
 )
-from qsdc.protocols.cao.simulator.config import MappingConfig, validate_config
+from qsdc.protocols.cao.simulator.config import MappingConfig
 from qsdc.protocols.cao.simulator.encoding import (
+    bits_for_real,
+    gaussian_encoding,
+    interval_for_bits,
+    sample_gaussian,
+    sample_gaussian_from_interval,
     uniformize_block_bits,
     uniformize_message_bits,
-)
-from qsdc.protocols.cao.simulator.gaussian import (
-    GaussianInterval,
-    equal_probability_intervals,
-    interval_for_symbol,
-    sample_from_interval,
-    sample_gaussian,
-    symbol_for_value,
 )
 
 
@@ -40,7 +38,7 @@ class SecurityCheck:
 class MappedBox:
     index: int
     bits: str
-    interval: GaussianInterval
+    interval: EncodingInterval
     x_value: float
     p_value: float
     correlation_delta_x: float
@@ -83,8 +81,7 @@ def simulate_mapping(
     backend: GaussianMappingBackend | None = None,
     random_source: RandomSource | None = None,
 ) -> MappingResult:
-    config = config or MappingConfig()
-    validate_config(config)
+    config = config or MappingConfig.from_options()
 
     active_backend = backend if backend is not None else AnalyticBackend()
     active_random = random_source or ClassicalRandomSource(config.seed)
@@ -93,10 +90,7 @@ def simulate_mapping(
     message_uniformized = uniformize_message_bits(raw_bits, active_random)
     block_uniformized = uniformize_block_bits(message_uniformized, active_random)
     box_bits = chunk_bits(block_uniformized, config.box_bit_length)
-    intervals = equal_probability_intervals(
-        config.box_bit_length,
-        config.gaussian_variance,
-    )
+    mapping = gaussian_encoding(config.box_bit_length, config.gaussian_variance)
 
     channel_checks = _run_security_checks(
         active_backend,
@@ -117,8 +111,8 @@ def simulate_mapping(
 
     boxes: list[MappedBox] = []
     for index, bits in enumerate(box_bits):
-        interval = interval_for_symbol(bits, intervals)
-        x_value = sample_from_interval(
+        interval = interval_for_bits(bits, mapping)
+        x_value = sample_gaussian_from_interval(
             interval,
             config.gaussian_variance,
             active_random,
@@ -131,9 +125,9 @@ def simulate_mapping(
         noise = active_backend.correlation_noise(beams)
         modulated = active_backend.modulate(beams, x_value, p_value)
         measurement = active_backend.measure_message(modulated)
-        recovered_bits = symbol_for_value(
+        recovered_bits = bits_for_real(
             measurement.x_message - noise.delta_x,
-            intervals,
+            mapping,
         )
         boxes.append(
             MappedBox(

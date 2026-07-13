@@ -10,19 +10,20 @@ from qsdc.protocols.cao.simulator.protocol import simulate_mapping
 
 
 def main() -> None:
+    defaults = MappingConfig.from_options()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("message", nargs="?", default="hello")
-    parser.add_argument("--seed", type=int, default=11)
-    parser.add_argument("--variance", type=float, default=4.0)
-    parser.add_argument("--box-bits", type=int, default=3)
-    parser.add_argument("--squeeze-r", type=float, default=0.7)
-    parser.add_argument("--encoding", default="utf-8")
+    parser.add_argument("--seed", type=int, default=defaults.seed)
+    parser.add_argument("--variance", type=float, default=defaults.gaussian_variance)
+    parser.add_argument("--box-bits", type=int, default=defaults.box_bit_length)
+    parser.add_argument("--squeeze-r", type=float, default=defaults.squeeze_r)
+    parser.add_argument("--encoding", default=defaults.encoding)
     parser.add_argument("--backend", choices=("analytic",), default="analytic")
     args = parser.parse_args()
 
     result = simulate_mapping(
         args.message,
-        config=MappingConfig(
+        config=MappingConfig.from_options(
             gaussian_variance=args.variance,
             box_bit_length=args.box_bits,
             squeeze_r=args.squeeze_r,

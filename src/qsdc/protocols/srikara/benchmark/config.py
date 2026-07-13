@@ -6,10 +6,10 @@ import json
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from qsdc.common.configuration import ParameterSet
 from qsdc.protocols.srikara.configuration import (
     BENCHMARK_PARAMETERS,
     OPTIMIZATION_PARAMETERS,
-    ParameterSet,
     RUN_PARAMETERS,
     SIMULATOR_PARAMETERS,
 )

@@ -5,7 +5,7 @@ from statistics import NormalDist
 
 @dataclass(frozen=True)
 class EncodingInterval:
-    """A real-line interval assigned to a 3-bit symbol."""
+    """A real-line interval assigned to a bit symbol."""
 
     bits: str
     lower: float
@@ -21,7 +21,11 @@ class GaussianEncoding:
     tail_width: float
 
 
-def get_gaussian_encoding(bits: list[str], variance: float, mean: float = 0.0) -> GaussianEncoding:
+def get_gaussian_encoding(
+    bits: list[str],
+    variance: float,
+    mean: float = 0.0,
+) -> GaussianEncoding:
     return GaussianEncoding(
         intervals=_gaussian_intervals_for_bits(bits, variance=variance, mean=mean),
         tail_width=_gaussian_tail_width(variance=variance),
@@ -90,6 +94,4 @@ def _gaussian_tail_width(
     #   with variance 8 and extended to other variances.
     # - Cao et al., arXiv:2406.11322 (2024):
     #   explicitly uses the finite intervals [-7, -3.25], ..., [3.25, 7].
-    return reference_tail_width * sqrt(
-        variance / reference_variance
-    )
+    return reference_tail_width * sqrt(variance / reference_variance)

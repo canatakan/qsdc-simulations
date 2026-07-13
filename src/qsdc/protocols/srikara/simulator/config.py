@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from qsdc.protocols.srikara.configuration import PARAMETERS, ParameterSet
+from qsdc.common.configuration import ParameterSet
+from qsdc.protocols.srikara.configuration import PARAMETERS
 from qsdc.protocols.srikara.simulator.distributions import (
     AlphaDistribution,
     SqueezeRDistribution,

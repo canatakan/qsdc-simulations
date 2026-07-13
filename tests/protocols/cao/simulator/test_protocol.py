@@ -5,7 +5,11 @@ from qsdc.protocols.cao.simulator.protocol import simulate_mapping
 def test_mapping_protocol_round_trips_boxes():
     result = simulate_mapping(
         "A",
-        config=MappingConfig(seed=7, gaussian_variance=4.0, box_bit_length=3),
+        config=MappingConfig.from_options(
+            seed=7,
+            gaussian_variance=4.0,
+            box_bit_length=3,
+        ),
     )
 
     assert result.backend_name == "analytic"
