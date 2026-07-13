@@ -20,7 +20,6 @@ from qsdc.protocols.srikara.benchmark.artifacts.report import (
 )
 from qsdc.protocols.srikara.benchmark.artifacts.tables import (
     read_combo_csv,
-    read_trial_csv,
 )
 
 
@@ -57,8 +56,9 @@ ERROR_PLOT_SPECS: tuple[ErrorPlotSpec, ...] = (
     ),
 )
 
-THRESHOLD_CURVE_FILENAME = "derived_acceptance_tolerance_sigmas_curve.png"
 DEFAULT_INTERVAL_LABEL = "default"
+SIGMA_DIAGNOSTIC_CURVE_FILENAME = "check_sigma_pass_curve.png"
+MAX_SIGMA_CURVE_POINTS = 800
 INTERVAL_COLORS = {
     "default": "#d8d8d8",
     "optimized_v4": "#fc8d59",
@@ -79,8 +79,7 @@ def main() -> None:
 def write_plots_from_artifacts(output_dir: str | Path) -> list[str]:
     output_path = Path(output_dir)
     combos = read_combo_csv(output_path / "combos.csv")
-    trials = read_trial_csv(output_path / "trials.csv")
-    plots = write_benchmark_plots(output_path, combos, trials)
+    plots = write_benchmark_plots(output_path, combos)
     benchmark_path = output_path / "benchmark.json"
     if benchmark_path.exists():
         with benchmark_path.open("r", encoding="utf-8") as handle:
@@ -102,7 +101,7 @@ def write_plots_from_artifacts(output_dir: str | Path) -> list[str]:
 def write_benchmark_plots(
     output_dir: str | Path,
     combos: list[Combo],
-    trials: list[Trial],
+    trials: list[Trial] | None = None,
 ) -> list[str]:
     plots_dir = Path(output_dir) / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
@@ -117,9 +116,11 @@ def write_benchmark_plots(
         if _write_interval_delta_plot(delta_path, combos, spec):
             plots.append(str(Path("plots") / delta_path.name))
 
-    threshold_path = plots_dir / THRESHOLD_CURVE_FILENAME
-    _write_threshold_curve(threshold_path, trials)
-    plots.append(str(Path("plots") / THRESHOLD_CURVE_FILENAME))
+    if trials and _has_sigma_diagnostics(trials):
+        sigma_path = plots_dir / SIGMA_DIAGNOSTIC_CURVE_FILENAME
+        _write_sigma_diagnostic_curve(sigma_path, trials)
+        plots.append(str(Path("plots") / sigma_path.name))
+
     return plots
 
 
@@ -262,7 +263,14 @@ def _write_interval_delta_plot(
     return True
 
 
-def _write_threshold_curve(path: Path, trials: list[Trial]) -> None:
+def _has_sigma_diagnostics(trials: list[Trial]) -> bool:
+    return any(
+        isinstance(trial.get("check_sigma_deviations"), (list, tuple))
+        for trial in trials
+    )
+
+
+def _write_sigma_diagnostic_curve(path: Path, trials: list[Trial]) -> None:
     thresholds = _all_check_sigma_deviations(trials)
     x_values, y_values = _pass_curve(thresholds)
     figure, axis = plt.subplots(figsize=(7.2, 4.6), constrained_layout=True)
@@ -309,43 +317,52 @@ def _write_threshold_curve(path: Path, trials: list[Trial]) -> None:
 
 def _all_check_sigma_deviations(trials: list[Trial]) -> list[float]:
     values: list[float] = []
-    sorted_trials = sorted(
-        trials,
-        key=lambda trial: (
-            str(trial["intervals"]),
-            float(trial["one_probability"]),
-            str(trial["r_distribution"]),
-            int(trial["trial_index"]),
-        ),
-    )
-    for trial in sorted_trials:
-        values.extend(_check_sigma_deviations(trial))
+    for trial in trials:
+        check_values = trial.get("check_sigma_deviations")
+        if isinstance(check_values, (list, tuple)):
+            values.extend(float(value) for value in check_values)
     return values
-
-
-def _check_sigma_deviations(trial: Trial) -> list[float]:
-    values = trial.get("check_sigma_deviations")
-    if isinstance(values, (list, tuple)):
-        return [float(value) for value in values]
-    return []
 
 
 def _pass_curve(thresholds: list[float]) -> tuple[list[float], list[float]]:
     if not thresholds:
         return [0.0], [0.0]
-    candidates = sorted(set(thresholds))
+
+    sorted_thresholds = sorted(thresholds)
     x_values = [0.0]
-    y_values = [_accepted_fraction(thresholds, 0.0)]
-    for candidate in candidates:
+    y_values = [0.0]
+    index = 0
+    total = len(sorted_thresholds)
+    while index < total:
+        candidate = sorted_thresholds[index]
+        while index < total and sorted_thresholds[index] == candidate:
+            index += 1
         x_values.append(candidate)
-        y_values.append(_accepted_fraction(thresholds, candidate))
-    return x_values, y_values
+        y_values.append(index / total)
+
+    return _plot_curve_points(x_values, y_values)
+
+
+def _plot_curve_points(
+    x_values: list[float],
+    y_values: list[float],
+) -> tuple[list[float], list[float]]:
+    if len(x_values) <= MAX_SIGMA_CURVE_POINTS:
+        return x_values, y_values
+
+    last_index = len(x_values) - 1
+    indices = [
+        round(point * last_index / (MAX_SIGMA_CURVE_POINTS - 1))
+        for point in range(MAX_SIGMA_CURVE_POINTS)
+    ]
+    return (
+        [x_values[index] for index in indices],
+        [y_values[index] for index in indices],
+    )
 
 
 def _accepted_fraction(thresholds: list[float], candidate: float) -> float:
-    return sum(1 for threshold in thresholds if threshold <= candidate) / len(
-        thresholds
-    )
+    return sum(threshold <= candidate for threshold in thresholds) / len(thresholds)
 
 
 def _unique_sorted(values) -> list:

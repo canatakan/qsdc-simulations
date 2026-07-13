@@ -105,10 +105,6 @@ def _run_row(
         "combo_count": summary.get("combo_count"),
         "max_symbol_error_rate": _max_combo_metric(combos, "symbol_error_rate"),
         "max_mean_abs_value_error": _max_combo_metric(combos, "mean_abs_value_error"),
-        "max_check_sigma_deviation": _max_combo_metric(
-            combos,
-            "check_sigma_deviation_max",
-        ),
         "max_check_failure_rate": max(
             _max_combo_metric(combos, "control_failed_check_rate") or 0.0,
             _max_combo_metric(combos, "decoy_failed_check_rate") or 0.0,
@@ -351,8 +347,6 @@ def _interval_table(run: dict[str, Any]) -> str:
         "intervals",
         "bit error (p=0.5)",
         "symbol error (p=0.5)",
-        "sigma mean",
-        "sigma p95",
     ]
     rows = []
     for row in run["interval_rows"]:
@@ -369,8 +363,6 @@ def _interval_table(run: dict[str, Any]) -> str:
                     run["interval_rows"],
                     "balanced_symbol_error_rate",
                 ),
-                _format_number(row.get("check_sigma_deviation_mean")),
-                _format_number(row.get("check_sigma_deviation_p95")),
             ]
         )
     return _table(headers, rows, "comparison-table")
@@ -392,7 +384,6 @@ def _run_table(runs: list[dict[str, Any]]) -> str:
         "accepted trials",
         "max symbol error",
         "max numeric error",
-        "max sigma deviation",
         "max check fail",
     ]
     rows = []
@@ -413,7 +404,6 @@ def _run_table(runs: list[dict[str, Any]]) -> str:
                 _format_rate(run["accepted_rate"]),
                 _format_rate(run["max_symbol_error_rate"]),
                 _format_number(run["max_mean_abs_value_error"]),
-                _format_number(run["max_check_sigma_deviation"]),
                 _format_rate(run["max_check_failure_rate"]),
             ]
         )
@@ -481,14 +471,6 @@ def _interval_row(intervals: str, combos: list[dict[str, Any]]) -> dict[str, Any
             "decoy_failed_check_count",
         ),
         "mean_abs_value_error": _weighted_average(combos, "mean_abs_value_error"),
-        "check_sigma_deviation_mean": _weighted_average(
-            combos,
-            "check_sigma_deviation_mean",
-        ),
-        "check_sigma_deviation_p95": _max_combo_metric(
-            combos,
-            "check_sigma_deviation_p95",
-        ),
     }
 
 

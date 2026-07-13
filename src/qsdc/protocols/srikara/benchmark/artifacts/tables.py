@@ -24,8 +24,6 @@ COMBO_FIELDS = (
     "symbol_error_rate",
     "mean_abs_value_error",
     "mean_interval_margin",
-    "check_tolerance_sigmas",
-    "measurement_noise_sigma",
     "control_check_count",
     "control_failed_check_count",
     "control_failed_check_rate",
@@ -36,11 +34,6 @@ COMBO_FIELDS = (
     "decoy_failed_check_rate",
     "decoy_mean_failed_check_count_per_trial",
     "decoy_max_failed_check_count_per_trial",
-    "check_sigma_deviation_min",
-    "check_sigma_deviation_median",
-    "check_sigma_deviation_mean",
-    "check_sigma_deviation_p95",
-    "check_sigma_deviation_max",
 )
 
 TRIAL_FIELDS = (
@@ -90,7 +83,6 @@ def read_trial_csv(path: Path) -> list[Trial]:
 
 def _combo_row(combo: Combo) -> dict[str, object]:
     metrics = combo["all"]
-    sigma_deviations = metrics["check_sigma_deviations"]
     return {
         "combo_index": combo["combo_index"],
         "intervals": combo["intervals"],
@@ -105,8 +97,6 @@ def _combo_row(combo: Combo) -> dict[str, object]:
         "symbol_error_rate": metrics["symbol_error_rate"],
         "mean_abs_value_error": metrics["mean_abs_value_error"],
         "mean_interval_margin": metrics["mean_interval_margin"],
-        "check_tolerance_sigmas": combo["check_tolerance_sigmas"],
-        "measurement_noise_sigma": combo["measurement_noise_sigma"],
         "control_check_count": combo["control_check_count"],
         "control_failed_check_count": combo["control_failed_check_count"],
         "control_failed_check_rate": combo["control_failed_check_rate"],
@@ -125,11 +115,6 @@ def _combo_row(combo: Combo) -> dict[str, object]:
         "decoy_max_failed_check_count_per_trial": combo[
             "decoy_max_failed_check_count_per_trial"
         ],
-        "check_sigma_deviation_min": sigma_deviations["min"],
-        "check_sigma_deviation_median": sigma_deviations["median"],
-        "check_sigma_deviation_mean": sigma_deviations["mean"],
-        "check_sigma_deviation_p95": sigma_deviations["p95"],
-        "check_sigma_deviation_max": sigma_deviations["max"],
     }
 
 

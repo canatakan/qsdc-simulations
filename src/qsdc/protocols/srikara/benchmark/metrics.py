@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from math import ceil
 from statistics import mean
 from typing import Iterable, Sequence
 
@@ -122,13 +121,6 @@ def aggregate_trial_metrics(
             "mean_abs_value_error": None,
             "mean_interval_miss_distance": None,
             "mean_interval_margin": None,
-            "check_sigma_deviations": {
-                "min": None,
-                "mean": None,
-                "median": None,
-                "p95": None,
-                "max": None,
-            },
         }
 
     bit_errors = sum(int(trial["message_bit_error_count"]) for trial in selected)
@@ -148,9 +140,6 @@ def aggregate_trial_metrics(
             "mean_interval_miss_distance",
         ),
         "mean_interval_margin": _mean_trial_field(selected, "mean_interval_margin"),
-        "check_sigma_deviations": _threshold_summary(
-            _check_sigma_deviations(selected)
-        ),
     }
 
 
@@ -162,38 +151,3 @@ def _mean_or_zero(values: Iterable[float]) -> float:
     values = tuple(values)
     return mean(values) if values else 0.0
 
-
-def _check_sigma_deviations(
-    trials: Sequence[dict[str, object]],
-) -> list[float]:
-    values: list[float] = []
-    for trial in trials:
-        check_values = trial.get("check_sigma_deviations")
-        if isinstance(check_values, (list, tuple)):
-            values.extend(float(value) for value in check_values)
-    return values
-
-
-def _threshold_summary(values: Iterable[float]) -> dict[str, float | None]:
-    sorted_values = sorted(values)
-    if not sorted_values:
-        return {
-            "min": None,
-            "mean": None,
-            "median": None,
-            "p95": None,
-            "max": None,
-        }
-    middle = len(sorted_values) // 2
-    if len(sorted_values) % 2:
-        median = sorted_values[middle]
-    else:
-        median = (sorted_values[middle - 1] + sorted_values[middle]) / 2
-    p95_index = max(ceil(0.95 * len(sorted_values)) - 1, 0)
-    return {
-        "min": sorted_values[0],
-        "mean": mean(sorted_values),
-        "median": median,
-        "p95": sorted_values[p95_index],
-        "max": sorted_values[-1],
-    }

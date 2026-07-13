@@ -105,6 +105,7 @@ def run_benchmark(
             "random_source": effective_config.random_source,
             "tolerance_sigmas": effective_config.tolerance_sigmas,
             "interval_policies": list(effective_config.interval_policies),
+            "sigma_diagnostics": effective_config.sigma_diagnostics,
             "check_axis_policy": effective_config.check_axis_policy,
             "message_axis_policy": effective_config.message_axis_policy,
             "one_probabilities": list(effective_config.one_probabilities),
@@ -261,11 +262,7 @@ def _run_trial(
     )
     control_metrics = summarize_checks(result.controls)
     decoy_metrics = summarize_checks(result.decoys)
-    check_sigma_deviations = _check_sigma_deviations(
-        (*result.controls, *result.decoys),
-        result.measurement_noise_sigma,
-    )
-    return {
+    trial = {
         "combo_index": combo.combo_index,
         "trial_index": trial_index,
         "trial_seed": trial_seed,
@@ -277,8 +274,6 @@ def _run_trial(
         "check_axis_policy": result.check_axis_policy,
         "message_axis_policy": result.message_axis_policy,
         "one_probability": combo.one_probability,
-        "check_tolerance_sigmas": result.check_tolerance_sigmas,
-        "measurement_noise_sigma": result.measurement_noise_sigma,
         "r_distribution": combo.r_distribution.summary(),
         "r_distribution_config": combo.r_distribution.to_dict(),
         "alpha_distribution": config.alpha_distribution.summary(),
@@ -300,8 +295,13 @@ def _run_trial(
         "decoy_failed_check_count": decoy_metrics["failed_check_count"],
         "decoy_mean_abs_deviation": decoy_metrics["mean_abs_deviation"],
         "decoy_max_abs_deviation": decoy_metrics["max_abs_deviation"],
-        "check_sigma_deviations": check_sigma_deviations,
     }
+    if config.sigma_diagnostics:
+        trial["check_sigma_deviations"] = _check_sigma_deviations(
+            (*result.controls, *result.decoys),
+            result.measurement_noise_sigma,
+        )
+    return trial
 
 
 def _check_sigma_deviations(
@@ -334,8 +334,6 @@ def _aggregate_combo(
     accepted_metrics = aggregate_trial_metrics(trials, accepted=True)
     rejected_metrics = aggregate_trial_metrics(trials, accepted=False)
     trial_count = len(trials)
-    check_tolerance_sigmas = _single_trial_float(trials, "check_tolerance_sigmas")
-    measurement_noise_sigma = _single_trial_float(trials, "measurement_noise_sigma")
     return {
         "combo_index": combo.combo_index,
         "one_probability": combo.one_probability,
@@ -351,8 +349,6 @@ def _aggregate_combo(
         "accepted_rate": accepted_count / trial_count if trial_count else 0.0,
         "control_pass_rate": control_pass_count / trial_count if trial_count else 0.0,
         "decoy_pass_rate": decoy_pass_count / trial_count if trial_count else 0.0,
-        "check_tolerance_sigmas": check_tolerance_sigmas,
-        "measurement_noise_sigma": measurement_noise_sigma,
         "control_check_count": control_check_count,
         "control_failed_check_count": control_failed_check_count,
         "control_failed_check_rate": (
@@ -385,15 +381,3 @@ def _aggregate_combo(
         "accepted": accepted_metrics,
         "rejected": rejected_metrics,
     }
-
-
-def _single_trial_float(
-    trials: list[dict[str, object]],
-    field: str,
-) -> float | None:
-    values = {float(trial[field]) for trial in trials}
-    if not values:
-        return None
-    if len(values) != 1:
-        raise ValueError(f"expected one {field} value per combo, got {values!r}")
-    return next(iter(values))
