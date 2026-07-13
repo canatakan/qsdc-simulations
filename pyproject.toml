@@ -20,6 +20,7 @@ dev = [
 ]
 
 [project.scripts]
+cao-demo = "qsdc.protocols.cao.cli.mapping_demo:main"
 srikara-benchmark = "qsdc.protocols.srikara.benchmark.cli:main"
 
 [tool.hatch.build.targets.wheel]
