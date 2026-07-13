@@ -1,13 +1,18 @@
 {
-  "name": "optimized/theta_fixed",
+  "name": "quick/compare/r_fixed_short",
   "backend": "sf-sampled",
   "random_source": "classical",
-  "payload_bit_count": 4096,
-  "trials_per_combo": 5,
+  "payload_bit_count": 384,
+  "trials_per_combo": 2,
   "base_seed": 20260629,
   "tolerance_sigmas": 4.0,
-  "intervals": "optimized",
-  "output_dir": "results/srikara/benchmark/optimized/theta_fixed",
+  "interval_policies": [
+    "default",
+    "optimized_v4",
+    "optimized_v8",
+    "optimized_v12"
+  ],
+  "output_dir": "results/srikara/benchmark/quick/compare/r_fixed_short",
   "one_probabilities": [
     0.1,
     0.5,
@@ -17,10 +22,6 @@
     {
       "kind": "fixed",
       "value": 0.115
-    },
-    {
-      "kind": "fixed",
-      "value": 0.345
     },
     {
       "kind": "fixed",
@@ -36,9 +37,8 @@
     "bound": 2.0
   },
   "theta_distribution": {
-    "kind": "fixed",
-    "value_pi": 0.0
-  },
-  "check_axis_policy": "optimized",
-  "message_axis_policy": "optimized"
+    "kind": "uniform",
+    "lower_pi": 0.0,
+    "upper_pi": 2.0
+  }
 }

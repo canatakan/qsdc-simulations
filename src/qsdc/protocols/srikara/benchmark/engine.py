@@ -36,6 +36,8 @@ RandomSourceFactory = Callable[[str, int], RandomSource]
 @dataclass(frozen=True)
 class BenchmarkCombo:
     combo_index: int
+    seed_index: int
+    intervals: str
     one_probability: float
     r_distribution: SqueezeRDistribution
 
@@ -102,7 +104,8 @@ def run_benchmark(
             "backend": effective_config.backend,
             "random_source": effective_config.random_source,
             "tolerance_sigmas": effective_config.tolerance_sigmas,
-            "intervals": effective_config.intervals,
+            "interval_policies": list(effective_config.interval_policies),
+            "sigma_diagnostics": effective_config.sigma_diagnostics,
             "check_axis_policy": effective_config.check_axis_policy,
             "message_axis_policy": effective_config.message_axis_policy,
             "one_probabilities": list(effective_config.one_probabilities),
@@ -202,19 +205,22 @@ class _ProgressReporter:
 
 def _expand_combos(config: BenchmarkConfig) -> list[BenchmarkCombo]:
     combos: list[BenchmarkCombo] = []
-    for combo_index, (one_probability, r_distribution) in enumerate(
-        product(
-            config.one_probabilities,
-            config.r_distributions,
-        )
-    ):
-        combos.append(
-            BenchmarkCombo(
-                combo_index=combo_index,
-                one_probability=one_probability,
-                r_distribution=r_distribution,
+    for intervals in config.interval_policies:
+        for seed_index, (one_probability, r_distribution) in enumerate(
+            product(
+                config.one_probabilities,
+                config.r_distributions,
             )
-        )
+        ):
+            combos.append(
+                BenchmarkCombo(
+                    combo_index=len(combos),
+                    seed_index=seed_index,
+                    intervals=intervals,
+                    one_probability=one_probability,
+                    r_distribution=r_distribution,
+                )
+            )
     return combos
 
 
@@ -225,7 +231,7 @@ def _run_trial(
     backend_factory: BackendFactory,
     random_source_factory: RandomSourceFactory,
 ) -> dict[str, object]:
-    trial_seed = derive_seed(config.base_seed, combo.combo_index, trial_index)
+    trial_seed = derive_seed(config.base_seed, combo.seed_index, trial_index)
     message_seed = derive_seed(trial_seed, "message")
     simulation_seed = derive_seed(trial_seed, "simulation")
     bits = weighted_random_bits(
@@ -242,7 +248,7 @@ def _run_trial(
             squeeze_r_distribution=combo.r_distribution,
             theta_distribution=config.theta_distribution,
             tolerance_sigmas=config.tolerance_sigmas,
-            intervals=config.intervals,
+            intervals=combo.intervals,
             check_axis_policy=config.check_axis_policy,
             message_axis_policy=config.message_axis_policy,
             seed=simulation_seed,
@@ -256,17 +262,7 @@ def _run_trial(
     )
     control_metrics = summarize_checks(result.controls)
     decoy_metrics = summarize_checks(result.decoys)
-    required_control_tolerance_sigmas = (
-        float(control_metrics["max_abs_deviation"]) / result.measurement_noise_sigma
-    )
-    required_decoy_tolerance_sigmas = (
-        float(decoy_metrics["max_abs_deviation"]) / result.measurement_noise_sigma
-    )
-    required_acceptance_tolerance_sigmas = max(
-        required_control_tolerance_sigmas,
-        required_decoy_tolerance_sigmas,
-    )
-    return {
+    trial = {
         "combo_index": combo.combo_index,
         "trial_index": trial_index,
         "trial_seed": trial_seed,
@@ -278,8 +274,6 @@ def _run_trial(
         "check_axis_policy": result.check_axis_policy,
         "message_axis_policy": result.message_axis_policy,
         "one_probability": combo.one_probability,
-        "check_tolerance_sigmas": result.check_tolerance_sigmas,
-        "measurement_noise_sigma": result.measurement_noise_sigma,
         "r_distribution": combo.r_distribution.summary(),
         "r_distribution_config": combo.r_distribution.to_dict(),
         "alpha_distribution": config.alpha_distribution.summary(),
@@ -297,14 +291,27 @@ def _run_trial(
         "control_failed_check_count": control_metrics["failed_check_count"],
         "control_mean_abs_deviation": control_metrics["mean_abs_deviation"],
         "control_max_abs_deviation": control_metrics["max_abs_deviation"],
-        "required_control_tolerance_sigmas": required_control_tolerance_sigmas,
         "decoy_check_count": decoy_metrics["check_count"],
         "decoy_failed_check_count": decoy_metrics["failed_check_count"],
         "decoy_mean_abs_deviation": decoy_metrics["mean_abs_deviation"],
         "decoy_max_abs_deviation": decoy_metrics["max_abs_deviation"],
-        "required_decoy_tolerance_sigmas": required_decoy_tolerance_sigmas,
-        "required_acceptance_tolerance_sigmas": required_acceptance_tolerance_sigmas,
     }
+    if config.sigma_diagnostics:
+        trial["check_sigma_deviations"] = _check_sigma_deviations(
+            (*result.controls, *result.decoys),
+            result.measurement_noise_sigma,
+        )
+    return trial
+
+
+def _check_sigma_deviations(
+    checks: Any,
+    measurement_noise_sigma: float,
+) -> tuple[float, ...]:
+    return tuple(
+        abs(check.measured - check.expected) / measurement_noise_sigma
+        for check in checks
+    )
 
 
 def _aggregate_combo(
@@ -327,8 +334,6 @@ def _aggregate_combo(
     accepted_metrics = aggregate_trial_metrics(trials, accepted=True)
     rejected_metrics = aggregate_trial_metrics(trials, accepted=False)
     trial_count = len(trials)
-    check_tolerance_sigmas = _single_trial_float(trials, "check_tolerance_sigmas")
-    measurement_noise_sigma = _single_trial_float(trials, "measurement_noise_sigma")
     return {
         "combo_index": combo.combo_index,
         "one_probability": combo.one_probability,
@@ -338,13 +343,12 @@ def _aggregate_combo(
         "alpha_distribution_config": config.alpha_distribution.to_dict(),
         "theta_distribution": config.theta_distribution.summary(),
         "theta_distribution_config": config.theta_distribution.to_dict(),
+        "intervals": combo.intervals,
         "trial_count": trial_count,
         "accepted_count": accepted_count,
         "accepted_rate": accepted_count / trial_count if trial_count else 0.0,
         "control_pass_rate": control_pass_count / trial_count if trial_count else 0.0,
         "decoy_pass_rate": decoy_pass_count / trial_count if trial_count else 0.0,
-        "check_tolerance_sigmas": check_tolerance_sigmas,
-        "measurement_noise_sigma": measurement_noise_sigma,
         "control_check_count": control_check_count,
         "control_failed_check_count": control_failed_check_count,
         "control_failed_check_rate": (
@@ -377,15 +381,3 @@ def _aggregate_combo(
         "accepted": accepted_metrics,
         "rejected": rejected_metrics,
     }
-
-
-def _single_trial_float(
-    trials: list[dict[str, object]],
-    field: str,
-) -> float | None:
-    values = {float(trial[field]) for trial in trials}
-    if not values:
-        return None
-    if len(values) != 1:
-        raise ValueError(f"expected one {field} value per combo, got {values!r}")
-    return next(iter(values))

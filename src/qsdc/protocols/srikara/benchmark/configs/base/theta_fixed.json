@@ -6,6 +6,12 @@
   "trials_per_combo": 5,
   "base_seed": 20260629,
   "tolerance_sigmas": 4.0,
+  "interval_policies": [
+    "default",
+    "optimized_v4",
+    "optimized_v8",
+    "optimized_v12"
+  ],
   "output_dir": "results/srikara/benchmark/base/theta_fixed",
   "one_probabilities": [
     0.1,

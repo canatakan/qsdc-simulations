@@ -1,13 +1,18 @@
 {
-  "name": "optimized/r_uniform_sweep",
+  "name": "quick/compare/r_uniform_short",
   "backend": "sf-sampled",
   "random_source": "classical",
-  "payload_bit_count": 4096,
-  "trials_per_combo": 5,
+  "payload_bit_count": 384,
+  "trials_per_combo": 2,
   "base_seed": 20260629,
   "tolerance_sigmas": 4.0,
-  "intervals": "optimized",
-  "output_dir": "results/srikara/benchmark/optimized/r_uniform_sweep",
+  "interval_policies": [
+    "default",
+    "optimized_v4",
+    "optimized_v8",
+    "optimized_v12"
+  ],
+  "output_dir": "results/srikara/benchmark/quick/compare/r_uniform_short",
   "one_probabilities": [
     0.1,
     0.5,
@@ -21,32 +26,12 @@
     },
     {
       "kind": "uniform",
-      "lower": 0.115,
-      "upper": 0.345
-    },
-    {
-      "kind": "uniform",
       "lower": 0.345,
       "upper": 0.576
     },
     {
       "kind": "uniform",
       "lower": 0.576,
-      "upper": 1.151
-    },
-    {
-      "kind": "uniform",
-      "lower": 1.151,
-      "upper": 1.727
-    },
-    {
-      "kind": "uniform",
-      "lower": 1.727,
-      "upper": 2.303
-    },
-    {
-      "kind": "uniform",
-      "lower": 0.0576,
       "upper": 1.151
     }
   ],
@@ -58,7 +43,5 @@
     "kind": "uniform",
     "lower_pi": 0.0,
     "upper_pi": 2.0
-  },
-  "check_axis_policy": "optimized",
-  "message_axis_policy": "optimized"
+  }
 }

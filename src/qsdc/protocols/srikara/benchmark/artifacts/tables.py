@@ -12,6 +12,7 @@ Trial = dict[str, Any]
 
 COMBO_FIELDS = (
     "combo_index",
+    "intervals",
     "one_probability",
     "r_distribution",
     "trial_count",
@@ -23,8 +24,6 @@ COMBO_FIELDS = (
     "symbol_error_rate",
     "mean_abs_value_error",
     "mean_interval_margin",
-    "check_tolerance_sigmas",
-    "measurement_noise_sigma",
     "control_check_count",
     "control_failed_check_count",
     "control_failed_check_rate",
@@ -35,11 +34,6 @@ COMBO_FIELDS = (
     "decoy_failed_check_rate",
     "decoy_mean_failed_check_count_per_trial",
     "decoy_max_failed_check_count_per_trial",
-    "required_acceptance_tolerance_sigmas_min",
-    "required_acceptance_tolerance_sigmas_median",
-    "required_acceptance_tolerance_sigmas_mean",
-    "required_acceptance_tolerance_sigmas_p95",
-    "required_acceptance_tolerance_sigmas_max",
 )
 
 TRIAL_FIELDS = (
@@ -56,9 +50,6 @@ TRIAL_FIELDS = (
     "decoy_passed",
     "control_failed_check_count",
     "decoy_failed_check_count",
-    "required_control_tolerance_sigmas",
-    "required_decoy_tolerance_sigmas",
-    "required_acceptance_tolerance_sigmas",
     "bit_error_rate",
     "symbol_error_rate",
     "mean_abs_value_error",
@@ -92,9 +83,9 @@ def read_trial_csv(path: Path) -> list[Trial]:
 
 def _combo_row(combo: Combo) -> dict[str, object]:
     metrics = combo["all"]
-    thresholds = metrics["required_acceptance_tolerance_sigmas"]
     return {
         "combo_index": combo["combo_index"],
+        "intervals": combo["intervals"],
         "one_probability": combo["one_probability"],
         "r_distribution": combo["r_distribution"],
         "trial_count": combo["trial_count"],
@@ -106,8 +97,6 @@ def _combo_row(combo: Combo) -> dict[str, object]:
         "symbol_error_rate": metrics["symbol_error_rate"],
         "mean_abs_value_error": metrics["mean_abs_value_error"],
         "mean_interval_margin": metrics["mean_interval_margin"],
-        "check_tolerance_sigmas": combo["check_tolerance_sigmas"],
-        "measurement_noise_sigma": combo["measurement_noise_sigma"],
         "control_check_count": combo["control_check_count"],
         "control_failed_check_count": combo["control_failed_check_count"],
         "control_failed_check_rate": combo["control_failed_check_rate"],
@@ -126,11 +115,6 @@ def _combo_row(combo: Combo) -> dict[str, object]:
         "decoy_max_failed_check_count_per_trial": combo[
             "decoy_max_failed_check_count_per_trial"
         ],
-        "required_acceptance_tolerance_sigmas_min": thresholds["min"],
-        "required_acceptance_tolerance_sigmas_median": thresholds["median"],
-        "required_acceptance_tolerance_sigmas_mean": thresholds["mean"],
-        "required_acceptance_tolerance_sigmas_p95": thresholds["p95"],
-        "required_acceptance_tolerance_sigmas_max": thresholds["max"],
     }
 
 
@@ -149,13 +133,6 @@ def _trial_row(trial: Trial) -> dict[str, object]:
         "decoy_passed": trial["decoy_passed"],
         "control_failed_check_count": trial["control_failed_check_count"],
         "decoy_failed_check_count": trial["decoy_failed_check_count"],
-        "required_control_tolerance_sigmas": trial[
-            "required_control_tolerance_sigmas"
-        ],
-        "required_decoy_tolerance_sigmas": trial["required_decoy_tolerance_sigmas"],
-        "required_acceptance_tolerance_sigmas": trial[
-            "required_acceptance_tolerance_sigmas"
-        ],
         "bit_error_rate": trial["bit_error_rate"],
         "symbol_error_rate": trial["symbol_error_rate"],
         "mean_abs_value_error": trial["mean_abs_value_error"],

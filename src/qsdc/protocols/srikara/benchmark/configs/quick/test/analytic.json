@@ -1,12 +1,18 @@
 {
-  "name": "base/large",
-  "backend": "sf-sampled",
+  "name": "quick/test/analytic",
+  "backend": "analytic",
   "random_source": "classical",
-  "payload_bit_count": 1000000,
+  "payload_bit_count": 96,
   "trials_per_combo": 1,
   "base_seed": 20260629,
   "tolerance_sigmas": 4.0,
-  "output_dir": "results/srikara/benchmark/base/large",
+  "interval_policies": [
+    "default",
+    "optimized_v4",
+    "optimized_v8",
+    "optimized_v12"
+  ],
+  "output_dir": "results/srikara/benchmark/quick/test/analytic",
   "one_probabilities": [
     0.5
   ],

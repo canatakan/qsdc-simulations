@@ -5,9 +5,10 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import dataclass
-from itertools import cycle
+from math import ceil
 from pathlib import Path
-from typing import Any, Optional, Union
+from statistics import mean
+from typing import Any, Optional, Sequence, Union
 
 import matplotlib
 
@@ -19,7 +20,6 @@ from qsdc.protocols.srikara.benchmark.artifacts.report import (
 )
 from qsdc.protocols.srikara.benchmark.artifacts.tables import (
     read_combo_csv,
-    read_trial_csv,
 )
 
 
@@ -56,8 +56,15 @@ ERROR_PLOT_SPECS: tuple[ErrorPlotSpec, ...] = (
     ),
 )
 
-THRESHOLD_CURVE_FILENAME = "derived_acceptance_tolerance_sigmas_curve.png"
-THRESHOLD_MARKERS = ("o", "s", "^", "D", "v", "P", "X", "*", "<", ">")
+DEFAULT_INTERVAL_LABEL = "default"
+SIGMA_DIAGNOSTIC_CURVE_FILENAME = "check_sigma_pass_curve.png"
+MAX_SIGMA_CURVE_POINTS = 800
+INTERVAL_COLORS = {
+    "default": "#d8d8d8",
+    "optimized_v4": "#fc8d59",
+    "optimized_v8": "#91bfdb",
+    "optimized_v12": "#998ec3",
+}
 
 
 def main() -> None:
@@ -72,8 +79,7 @@ def main() -> None:
 def write_plots_from_artifacts(output_dir: str | Path) -> list[str]:
     output_path = Path(output_dir)
     combos = read_combo_csv(output_path / "combos.csv")
-    trials = read_trial_csv(output_path / "trials.csv")
-    plots = write_benchmark_plots(output_path, combos, trials)
+    plots = write_benchmark_plots(output_path, combos)
     benchmark_path = output_path / "benchmark.json"
     if benchmark_path.exists():
         with benchmark_path.open("r", encoding="utf-8") as handle:
@@ -95,73 +101,94 @@ def write_plots_from_artifacts(output_dir: str | Path) -> list[str]:
 def write_benchmark_plots(
     output_dir: str | Path,
     combos: list[Combo],
-    trials: list[Trial],
+    trials: list[Trial] | None = None,
 ) -> list[str]:
     plots_dir = Path(output_dir) / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
 
     plots: list[str] = []
     for spec in ERROR_PLOT_SPECS:
-        path = plots_dir / spec.filename
-        _write_error_bar_plot(path, combos, spec)
-        plots.append(str(Path("plots") / spec.filename))
+        interval_path = plots_dir / _interval_metric_filename(spec.filename)
+        _write_interval_metric_plot(interval_path, combos, spec)
+        plots.append(str(Path("plots") / interval_path.name))
 
-    threshold_path = plots_dir / THRESHOLD_CURVE_FILENAME
-    _write_threshold_curve(threshold_path, trials)
-    plots.append(str(Path("plots") / THRESHOLD_CURVE_FILENAME))
+        delta_path = plots_dir / _delta_metric_filename(spec.filename)
+        if _write_interval_delta_plot(delta_path, combos, spec):
+            plots.append(str(Path("plots") / delta_path.name))
+
+    if trials and _has_sigma_diagnostics(trials):
+        sigma_path = plots_dir / SIGMA_DIAGNOSTIC_CURVE_FILENAME
+        _write_sigma_diagnostic_curve(sigma_path, trials)
+        plots.append(str(Path("plots") / sigma_path.name))
+
     return plots
 
 
-def _write_error_bar_plot(
+def _interval_metric_filename(filename: str) -> str:
+    stem = Path(filename).stem
+    return f"{stem}_by_interval.png"
+
+
+def _delta_metric_filename(filename: str) -> str:
+    stem = Path(filename).stem
+    return f"{stem}_delta_vs_default.png"
+
+
+def _write_interval_metric_plot(
     path: Path,
     combos: list[Combo],
     spec: ErrorPlotSpec,
 ) -> None:
-    r_labels = _unique_sorted(combo["r_distribution"] for combo in combos)
+    r_labels = _unique_sorted(str(combo["r_distribution"]) for combo in combos)
     probabilities = _unique_sorted(float(combo["one_probability"]) for combo in combos)
+    intervals = _unique_ordered(str(combo["intervals"]) for combo in combos)
     values = _combo_metric_table(combos, spec.metric_field)
 
-    figure, axis = plt.subplots(figsize=(9.5, 5.5), constrained_layout=True)
+    figure, axes = _probability_axes(probabilities)
     positions = list(range(len(r_labels)))
-    bar_width = 0.8 / max(len(probabilities), 1)
-    for probability_index, probability in enumerate(probabilities):
-        offset = (probability_index - (len(probabilities) - 1) / 2) * bar_width
-        x_values = [position + offset for position in positions]
-        y_values = [
-            values.get((r_label, probability), 0.0) for r_label in r_labels
-        ]
-        axis.bar(
-            x_values,
-            y_values,
-            width=bar_width,
-            label=f"p={probability:g}",
-        )
+    bar_width = 0.8 / max(len(intervals), 1)
+    for axis, probability in zip(axes, probabilities):
+        for interval_index, intervals_label in enumerate(intervals):
+            offset = (interval_index - (len(intervals) - 1) / 2) * bar_width
+            x_values = [position + offset for position in positions]
+            y_values = [
+                values.get((intervals_label, probability, r_label), 0.0)
+                for r_label in r_labels
+            ]
+            axis.bar(
+                x_values,
+                y_values,
+                width=bar_width,
+                color=_interval_color(intervals_label),
+                label=intervals_label,
+            )
+        _style_metric_axis(axis, r_labels, f"p={probability:g}", spec.y_label)
 
-    axis.set_title(spec.title)
-    axis.set_xlabel("r distribution")
-    axis.set_ylabel(spec.y_label)
-    axis.set_xticks(positions)
-    axis.set_xticklabels(r_labels, rotation=20, ha="right")
-    axis.set_ylim(bottom=0.0)
-    axis.grid(True, axis="y", alpha=0.3)
-    axis.legend(frameon=False)
-    figure.savefig(path, dpi=160)
+    _hide_unused_axes(axes, len(probabilities))
+    figure.suptitle(
+        f"{spec.title} by Interval Policy",
+        fontweight="bold",
+        y=1.18,
+    )
+    _legend_for_intervals(figure, axes[0], intervals)
+    figure.savefig(path, dpi=160, bbox_inches="tight")
     plt.close(figure)
 
 
 def _combo_metric_table(
     combos: list[Combo],
     metric_field: str,
-) -> dict[tuple[str, float], float]:
-    values: dict[tuple[str, float], float] = {}
+) -> dict[tuple[str, float, str], float]:
+    values: dict[tuple[str, float, str], float] = {}
     for combo in combos:
         y_value = _combo_metric(combo, metric_field)
         if y_value is None:
             continue
         values[
             (
-                str(combo["r_distribution"]),
+                str(combo["intervals"]),
                 float(combo["one_probability"]),
+                str(combo["r_distribution"]),
             )
         ] = float(y_value)
     return values
@@ -178,95 +205,231 @@ def _combo_metric(
     return None
 
 
-def _write_threshold_curve(path: Path, trials: list[Trial]) -> None:
-    series = _threshold_series(trials)
-    figure_height = max(5.5, min(12.0, 4.5 + 0.18 * len(series)))
-    figure, axis = plt.subplots(figsize=(10.5, figure_height), constrained_layout=True)
-    colors = _threshold_colors(len(series))
-    markers = cycle(THRESHOLD_MARKERS)
-    for (label, thresholds), color in zip(series.items(), colors):
-        x_values, y_values = _acceptance_curve(thresholds)
-        marker = next(markers)
-        axis.step(
-            x_values,
-            y_values,
-            where="post",
-            linewidth=2,
-            color=color,
-            label=label,
+def _write_interval_delta_plot(
+    path: Path,
+    combos: list[Combo],
+    spec: ErrorPlotSpec,
+) -> bool:
+    r_labels = _unique_sorted(str(combo["r_distribution"]) for combo in combos)
+    probabilities = _unique_sorted(float(combo["one_probability"]) for combo in combos)
+    intervals = [
+        intervals_label
+        for intervals_label in _unique_ordered(str(combo["intervals"]) for combo in combos)
+        if intervals_label != DEFAULT_INTERVAL_LABEL
+    ]
+    if not intervals:
+        return False
+    values = _combo_metric_table(combos, spec.metric_field)
+    if not any(
+        (DEFAULT_INTERVAL_LABEL, probability, r_label) in values
+        for probability in probabilities
+        for r_label in r_labels
+    ):
+        return False
+
+    figure, axes = _probability_axes(probabilities)
+    positions = list(range(len(r_labels)))
+    bar_width = 0.8 / max(len(intervals), 1)
+    for axis, probability in zip(axes, probabilities):
+        for interval_index, intervals_label in enumerate(intervals):
+            offset = (interval_index - (len(intervals) - 1) / 2) * bar_width
+            x_values = [position + offset for position in positions]
+            y_values = []
+            for r_label in r_labels:
+                baseline = values.get((DEFAULT_INTERVAL_LABEL, probability, r_label))
+                candidate = values.get((intervals_label, probability, r_label))
+                y_values.append(
+                    0.0 if baseline is None or candidate is None else baseline - candidate
+                )
+            axis.bar(
+                x_values,
+                y_values,
+                width=bar_width,
+                color=_interval_color(intervals_label),
+                label=intervals_label,
+            )
+        axis.axhline(0.0, color="#172033", linewidth=0.8)
+        _style_metric_axis(axis, r_labels, f"p={probability:g}", f"default - {spec.y_label}")
+
+    _hide_unused_axes(axes, len(probabilities))
+    figure.suptitle(
+        f"{spec.title}: Improvement vs Default",
+        fontweight="bold",
+        y=1.18,
+    )
+    _legend_for_intervals(figure, axes[0], intervals)
+    figure.savefig(path, dpi=160, bbox_inches="tight")
+    plt.close(figure)
+    return True
+
+
+def _has_sigma_diagnostics(trials: list[Trial]) -> bool:
+    return any(
+        isinstance(trial.get("check_sigma_deviations"), (list, tuple))
+        for trial in trials
+    )
+
+
+def _write_sigma_diagnostic_curve(path: Path, trials: list[Trial]) -> None:
+    thresholds = _all_check_sigma_deviations(trials)
+    x_values, y_values = _pass_curve(thresholds)
+    figure, axis = plt.subplots(figsize=(7.2, 4.6), constrained_layout=True)
+    axis.step(
+        x_values,
+        y_values,
+        where="post",
+        linewidth=2.4,
+        color="#3f6f9f",
+    )
+    if thresholds:
+        mean_value = mean(thresholds)
+        mean_fraction = _accepted_fraction(thresholds, mean_value)
+        axis.axvline(
+            mean_value,
+            color="#1f2937",
+            linestyle=":",
+            linewidth=1.4,
         )
-        axis.plot(
-            x_values,
-            y_values,
-            marker=marker,
-            color=color,
-            linestyle="none",
-            markersize=3,
+        axis.scatter(
+            [mean_value],
+            [mean_fraction],
+            color="#1f2937",
+            s=28,
+            zorder=3,
+        )
+        axis.annotate(
+            f"mean = {mean_value:.3g}",
+            xy=(mean_value, mean_fraction),
+            xytext=(8, -14),
+            textcoords="offset points",
+            fontsize=9,
+            color="#1f2937",
         )
 
-    axis.set_title("Derived Acceptance Tolerance Sigmas Curve")
-    axis.set_xlabel("candidate tolerance sigmas")
-    axis.set_ylabel("fraction of trials accepted")
+    axis.set_title("Check Passing Fraction by Sigma Deviation", fontweight="bold")
+    axis.set_xlabel("candidate sigma deviation")
+    axis.set_ylabel("fraction of all checks passing")
     axis.set_ylim(0.0, 1.0)
     axis.grid(True, alpha=0.3)
-    axis.legend(
-        loc="center left",
-        bbox_to_anchor=(1.0, 0.5),
-        fontsize="small",
-        frameon=False,
-    )
-    figure.savefig(path, dpi=160)
+    figure.savefig(path, dpi=160, bbox_inches="tight")
     plt.close(figure)
 
 
-def _threshold_series(trials: list[Trial]) -> dict[str, list[float]]:
-    series: dict[str, list[float]] = {}
-    sorted_trials = sorted(
-        trials,
-        key=lambda trial: (
-            str(trial["r_distribution"]),
-            float(trial["one_probability"]),
-            int(trial["trial_index"]),
-        ),
-    )
-    for trial in sorted_trials:
-        label = f"p={float(trial['one_probability']):g}, {trial['r_distribution']}"
-        series.setdefault(label, []).append(
-            float(trial["required_acceptance_tolerance_sigmas"])
-        )
-    return series
+def _all_check_sigma_deviations(trials: list[Trial]) -> list[float]:
+    values: list[float] = []
+    for trial in trials:
+        check_values = trial.get("check_sigma_deviations")
+        if isinstance(check_values, (list, tuple)):
+            values.extend(float(value) for value in check_values)
+    return values
 
 
-def _threshold_colors(series_count: int) -> list:
-    if series_count <= 0:
-        return []
-    if series_count <= 20:
-        colormap = plt.get_cmap("tab20")
-        return [colormap(index) for index in range(series_count)]
-    colormap = plt.get_cmap("nipy_spectral")
-    return [colormap((index + 0.5) / series_count) for index in range(series_count)]
-
-
-def _acceptance_curve(thresholds: list[float]) -> tuple[list[float], list[float]]:
+def _pass_curve(thresholds: list[float]) -> tuple[list[float], list[float]]:
     if not thresholds:
         return [0.0], [0.0]
-    candidates = sorted(set(thresholds))
+
+    sorted_thresholds = sorted(thresholds)
     x_values = [0.0]
-    y_values = [_accepted_fraction(thresholds, 0.0)]
-    for candidate in candidates:
+    y_values = [0.0]
+    index = 0
+    total = len(sorted_thresholds)
+    while index < total:
+        candidate = sorted_thresholds[index]
+        while index < total and sorted_thresholds[index] == candidate:
+            index += 1
         x_values.append(candidate)
-        y_values.append(_accepted_fraction(thresholds, candidate))
-    return x_values, y_values
+        y_values.append(index / total)
+
+    return _plot_curve_points(x_values, y_values)
+
+
+def _plot_curve_points(
+    x_values: list[float],
+    y_values: list[float],
+) -> tuple[list[float], list[float]]:
+    if len(x_values) <= MAX_SIGMA_CURVE_POINTS:
+        return x_values, y_values
+
+    last_index = len(x_values) - 1
+    indices = [
+        round(point * last_index / (MAX_SIGMA_CURVE_POINTS - 1))
+        for point in range(MAX_SIGMA_CURVE_POINTS)
+    ]
+    return (
+        [x_values[index] for index in indices],
+        [y_values[index] for index in indices],
+    )
 
 
 def _accepted_fraction(thresholds: list[float], candidate: float) -> float:
-    return sum(1 for threshold in thresholds if threshold <= candidate) / len(
-        thresholds
-    )
+    return sum(threshold <= candidate for threshold in thresholds) / len(thresholds)
 
 
 def _unique_sorted(values) -> list:
     return sorted(set(values))
+
+
+def _unique_ordered(values) -> list:
+    ordered = []
+    for value in values:
+        if value not in ordered:
+            ordered.append(value)
+    return ordered
+
+
+def _probability_axes(probabilities: Sequence[float]):
+    column_count = min(3, max(len(probabilities), 1))
+    row_count = ceil(max(len(probabilities), 1) / column_count)
+    return _subplots(row_count, column_count)
+
+
+def _subplots(row_count: int, column_count: int):
+    figure, axes = plt.subplots(
+        row_count,
+        column_count,
+        figsize=(5.2 * column_count, 4.2 * row_count),
+        constrained_layout=True,
+        squeeze=False,
+    )
+    return figure, [axis for row in axes for axis in row]
+
+
+def _style_metric_axis(axis, r_labels: list[str], title: str, y_label: str) -> None:
+    axis.set_title(title)
+    axis.set_xlabel("r distribution")
+    axis.set_ylabel(y_label)
+    axis.set_xticks(list(range(len(r_labels))))
+    axis.set_xticklabels(r_labels, rotation=25, ha="right")
+    axis.grid(True, axis="y", alpha=0.3)
+
+
+def _legend_for_intervals(figure, axis, intervals: Sequence[str]) -> None:
+    handles, labels = axis.get_legend_handles_labels()
+    by_label = {
+        label: handle
+        for handle, label in zip(handles, labels)
+        if label in intervals
+    }
+    figure.legend(
+        by_label.values(),
+        by_label.keys(),
+        loc="upper center",
+        bbox_to_anchor=(0.5, 1.09),
+        ncol=max(1, min(4, len(by_label))),
+        frameon=False,
+    )
+
+
+def _hide_unused_axes(axes, used_count: int) -> None:
+    for axis in axes[used_count:]:
+        axis.set_visible(False)
+
+
+def _interval_color(intervals_label: str) -> str:
+    if intervals_label in INTERVAL_COLORS:
+        return INTERVAL_COLORS[intervals_label]
+    colormap = plt.get_cmap("tab20")
+    return colormap(abs(hash(intervals_label)) % 20)
 
 
 if __name__ == "__main__":

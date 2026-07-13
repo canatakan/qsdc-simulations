@@ -76,7 +76,8 @@ def test_benchmark_config_loads_json_file(tmp_path):
 
     assert config.name == "test"
     assert config.backend == "analytic"
-    assert config.intervals == "default"
+    assert config.interval_policies == ["default"]
+    assert config.sigma_diagnostics is False
     assert config.check_axis_policy == "random"
     assert config.payload_bit_count == 12
     assert config.tolerance_sigmas == 1.0
@@ -101,7 +102,7 @@ def test_payload_bit_count_derives_padding_and_protocol_counts():
 
 
 
-def test_aggregate_metrics_include_symbol_errors_and_thresholds():
+def test_aggregate_metrics_include_symbol_errors():
     metrics = aggregate_trial_metrics(
         [
             {
@@ -113,7 +114,6 @@ def test_aggregate_metrics_include_symbol_errors_and_thresholds():
                 "mean_abs_value_error": 0.4,
                 "mean_interval_miss_distance": 0.2,
                 "mean_interval_margin": -0.2,
-                "required_acceptance_tolerance_sigmas": 0.8,
             },
             {
                 "accepted": False,
@@ -124,7 +124,6 @@ def test_aggregate_metrics_include_symbol_errors_and_thresholds():
                 "mean_abs_value_error": 0.6,
                 "mean_interval_miss_distance": 0.4,
                 "mean_interval_margin": -0.4,
-                "required_acceptance_tolerance_sigmas": 1.2,
             },
         ]
     )
@@ -132,13 +131,6 @@ def test_aggregate_metrics_include_symbol_errors_and_thresholds():
     assert metrics["bit_error_rate"] == 0.15
     assert metrics["symbol_error_rate"] == 0.3
     assert abs(float(metrics["mean_interval_miss_distance"]) - 0.3) < 1e-12
-    assert metrics["required_acceptance_tolerance_sigmas"] == {
-        "min": 0.8,
-        "mean": 1.0,
-        "median": 1.0,
-        "p95": 1.2,
-        "max": 1.2,
-    }
 
 
 def test_benchmark_runs_with_analytic_backend(tmp_path):
@@ -148,32 +140,22 @@ def test_benchmark_runs_with_analytic_backend(tmp_path):
 
     assert report.summary["combo_count"] == 6
     assert report.summary["trial_count"] == 12
-    assert report.summary["parameters"]["intervals"] == "default"
+    assert report.summary["parameters"]["interval_policies"] == ["default"]
     assert report.summary["accepted_rate"] == 1.0
     assert all(trial["payload_bit_count"] == 12 for trial in report.trials)
     assert all(trial["transmitted_message_bit_count"] == 12 for trial in report.trials)
-    assert all(
-        trial["required_acceptance_tolerance_sigmas"] == 0.0
-        for trial in report.trials
-    )
     assert all(combo["all"]["bit_error_rate"] == 0.0 for combo in report.combos)
     assert all(combo["all"]["symbol_error_rate"] == 0.0 for combo in report.combos)
-    assert all(combo["check_tolerance_sigmas"] == 1.0 for combo in report.combos)
-    assert all(combo["measurement_noise_sigma"] == 1e-7 for combo in report.combos)
-    assert all(trial["check_tolerance_sigmas"] == 1.0 for trial in report.trials)
-    assert all(trial["measurement_noise_sigma"] == 1e-7 for trial in report.trials)
     assert all("control_max_sigma_deviation" not in trial for trial in report.trials)
     assert all("decoy_max_sigma_deviation" not in trial for trial in report.trials)
+    assert all("check_sigma_deviations" not in trial for trial in report.trials)
     assert all(combo["control_check_count"] > 0 for combo in report.combos)
     assert all(combo["control_failed_check_count"] == 0 for combo in report.combos)
     assert all(combo["decoy_check_count"] > 0 for combo in report.combos)
     assert all(combo["decoy_failed_check_count"] == 0 for combo in report.combos)
     assert all("interval_miss_rate" not in combo["all"] for combo in report.combos)
     assert all("interval_miss_count" not in trial for trial in report.trials)
-    assert all(
-        combo["all"]["required_acceptance_tolerance_sigmas"]["max"] == 0.0
-        for combo in report.combos
-    )
+    assert all("check_sigma_deviations" not in combo["all"] for combo in report.combos)
     assert all("all_bit_error_rate" not in combo for combo in report.combos)
     assert Path(report.output_dir).parent == tmp_path / "test"
     assert (Path(report.output_dir) / "combos.csv").exists()
@@ -187,11 +169,11 @@ def test_benchmark_runs_with_analytic_backend(tmp_path):
     assert len(combo_rows) == 6
     assert len(trial_rows) == 12
     assert combo_rows[0]["bit_error_rate"] == "0.0"
-    assert combo_rows[0]["required_acceptance_tolerance_sigmas_max"] == "0.0"
+    assert "check_sigma_deviation_max" not in combo_rows[0]
     assert trial_rows[0]["intervals"] == "default"
     assert trial_rows[0]["check_axis_policy"] == "random"
     assert trial_rows[0]["message_axis_policy"] == "random"
-    assert trial_rows[0]["required_acceptance_tolerance_sigmas"] == "0.0"
+    assert "required_acceptance_tolerance_sigmas" not in trial_rows[0]
     assert report.summary["artifacts"]["combos_csv"] == "combos.csv"
     assert report.summary["artifacts"]["trials_csv"] == "trials.csv"
     assert report.summary["artifacts"]["html_report"] == "report.html"
@@ -201,10 +183,9 @@ def test_benchmark_runs_with_analytic_backend(tmp_path):
     assert (Path(report.output_dir) / "report.html").exists()
     assert (Path(report.output_dir) / "report.css").exists()
     assert report.summary["artifacts"]["plots"] == [
-        "plots/bit_error_by_r.png",
-        "plots/symbol_error_by_r.png",
-        "plots/value_error_by_r.png",
-        "plots/derived_acceptance_tolerance_sigmas_curve.png",
+        "plots/bit_error_by_r_by_interval.png",
+        "plots/symbol_error_by_r_by_interval.png",
+        "plots/value_error_by_r_by_interval.png",
     ]
     for plot_path in report.summary["artifacts"]["plots"]:
         assert (Path(report.output_dir) / plot_path).exists()
@@ -219,7 +200,6 @@ def test_benchmark_report_contains_core_sections(tmp_path):
     assert "Run Setup" in html
     assert "Combo Outcomes" in html
     assert "Check Failures" in html
-    assert "Tolerance Thresholds" in html
     assert "Raw Tables" in html
     assert "combos.csv" in html
     assert "trials.csv" in html
