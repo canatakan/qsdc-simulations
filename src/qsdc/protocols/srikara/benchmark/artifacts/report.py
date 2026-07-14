@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from html import escape
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from qsdc.protocols.srikara.benchmark.artifacts.tables import (
     COMBO_FIELDS,
@@ -141,6 +141,8 @@ def _axis_policy_summary(parameters: dict[str, Any]) -> str:
 
 
 def _summary_cards(summary: dict[str, Any], combos: list[Combo]) -> str:
+    balanced_combos = _balanced_combos(combos)
+    balanced_detail = _balanced_metric_detail(balanced_combos)
     cards = [
         (
             "Accepted trials",
@@ -148,19 +150,23 @@ def _summary_cards(summary: dict[str, Any], combos: list[Combo]) -> str:
             f"{summary.get('accepted_count')} accepted",
         ),
         (
-            "Best numeric recovery",
-            _combo_metric(combos, "mean_abs_value_error", min),
-            "lowest mean absolute value error",
+            "Mean bit error",
+            _format_rate(_weighted_combo_metric(balanced_combos, "bit_error_rate")),
+            balanced_detail,
         ),
         (
-            "Worst numeric recovery",
-            _combo_metric(combos, "mean_abs_value_error", max),
-            "highest mean absolute value error",
+            "Mean symbol error",
+            _format_rate(
+                _weighted_combo_metric(balanced_combos, "symbol_error_rate")
+            ),
+            balanced_detail,
         ),
         (
-            "Worst symbol error",
-            _combo_metric(combos, "symbol_error_rate", max),
-            "highest 3-bit symbol error rate",
+            "Mean numeric error",
+            _format_number(
+                _weighted_combo_metric(balanced_combos, "mean_abs_value_error")
+            ),
+            balanced_detail,
         ),
     ]
     return "\n".join(_summary_card(title, value, detail) for title, value, detail in cards)
@@ -182,6 +188,8 @@ def _plot_cards(plots: object) -> str:
     cards = []
     for plot in plots:
         plot_path = str(plot)
+        if "delta_vs_default" in Path(plot_path).stem:
+            continue
         title = Path(plot_path).stem.replace("_", " ")
         cards.append(
             f"""
@@ -191,6 +199,8 @@ def _plot_cards(plots: object) -> str:
           </figure>
             """
         )
+    if not cards:
+        return '<p class="muted">No plots were generated.</p>'
     return "\n".join(cards)
 
 
@@ -231,19 +241,32 @@ def _table(headers: tuple[str, ...] | list[str], rows: list[dict[str, object]]) 
     """
 
 
-def _combo_metric(
-    combos: list[Combo],
-    metric: str,
-    selector: Callable[[list[float]], float],
-) -> str:
-    values = [
-        float(_combo_metric_value(combo, metric))
+def _balanced_combos(combos: list[Combo]) -> list[Combo]:
+    return [
+        combo
         for combo in combos
-        if _combo_metric_value(combo, metric) is not None
+        if combo.get("one_probability") not in ("", None)
+        and float(combo["one_probability"]) == 0.5
     ]
-    if not values:
-        return "n/a"
-    return _format_number(selector(values))
+
+
+def _weighted_combo_metric(combos: list[Combo], metric: str) -> float | None:
+    weighted_total = 0.0
+    total_weight = 0.0
+    for combo in combos:
+        value = _combo_metric_value(combo, metric)
+        if value in ("", None):
+            continue
+        weight = float(combo.get("trial_count") or 1.0)
+        weighted_total += float(value) * weight
+        total_weight += weight
+    return weighted_total / total_weight if total_weight else None
+
+
+def _balanced_metric_detail(combos: list[Combo]) -> str:
+    count = len(combos)
+    noun = "combination" if count == 1 else "combinations"
+    return f"trial-weighted at p=0.5 across {count} {noun}"
 
 
 def _combo_metric_value(combo: Combo, metric: str) -> object:

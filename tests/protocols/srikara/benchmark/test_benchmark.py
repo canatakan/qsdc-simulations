@@ -6,6 +6,7 @@ from qsdc.protocols.srikara.benchmark.artifacts.tables import (
     read_combo_csv,
     read_trial_csv,
 )
+from qsdc.protocols.srikara.benchmark.artifacts.report import _plot_cards
 from qsdc.protocols.srikara.benchmark.artifacts.ui.index import write_benchmark_index
 from qsdc.protocols.srikara.benchmark.config import (
     load_benchmark_json,
@@ -205,6 +206,22 @@ def test_benchmark_report_contains_core_sections(tmp_path):
     assert "trials.csv" in html
     assert "benchmark.xlsx" not in html
     assert "config.json" not in html
+    assert "Mean bit error" in html
+    assert "Mean symbol error" in html
+    assert "Mean numeric error" in html
+    assert "Worst symbol error" not in html
+
+
+def test_benchmark_report_hides_delta_vs_default_plots():
+    html = _plot_cards(
+        [
+            "plots/bit_error_by_r_by_interval.png",
+            "plots/bit_error_by_r_delta_vs_default.png",
+        ]
+    )
+
+    assert "bit_error_by_r_by_interval.png" in html
+    assert "delta_vs_default" not in html
 
 
 def test_benchmark_ui_index_lists_runs(tmp_path):
@@ -215,13 +232,18 @@ def test_benchmark_ui_index_lists_runs(tmp_path):
     html = index_path.read_text(encoding="utf-8")
 
     assert index_path.name == "index.html"
-    assert "Run Comparison" in html
     assert "uniform_square" in html
     assert "alpha=uniform_square" not in html
     assert "uniform[0,2pi]" in html
     assert "theta=uniform" not in html
-    assert "accepted trials" in html
+    assert "accepted" in html
     assert "open" in html
+    assert "Report families" in html
+    assert "top-level report collections" in html
+    assert "Report configuration" in html
+    assert "One probability" in html
+    assert "Run History by Family" in html
+    assert "max symbol error" not in html
     assert (index_path.parent / "index.css").exists()
 
 

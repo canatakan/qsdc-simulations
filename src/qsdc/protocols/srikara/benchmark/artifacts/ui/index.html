@@ -22,7 +22,7 @@
 
     <section class="comparison-layout">
       <aside class="sidebar">
-        <h2>Benchmark Families</h2>
+        <h2>Report Families</h2>
         {{ group_nav }}
       </aside>
       <div class="group-list">
@@ -30,9 +30,10 @@
       </div>
     </section>
 
-    <section>
-      <h2>Run History</h2>
-      {{ run_table }}
+    <section class="history-section">
+      <h2>Run History by Family</h2>
+      <p class="section-description">Configuration and outcome summaries for every stored run. Error rates are trial-weighted at p=0.5.</p>
+      {{ run_history }}
     </section>
   </main>
 </body>

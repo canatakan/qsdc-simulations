@@ -68,8 +68,10 @@ def _run_row(
     interval_rows = _interval_rows(combos)
     balanced_combos = _balanced_combos(combos)
     balanced_interval_rows = _interval_rows(balanced_combos)
+    _, report_name = _split_group_name(str(summary.get("name")))
     return {
         "name": summary.get("name"),
+        "report_name": report_name,
         "run_id": summary.get("benchmark_run_id"),
         "run_order": _run_order(summary.get("benchmark_run_id")),
         "backend": parameters.get("backend"),
@@ -102,12 +104,13 @@ def _run_row(
         ),
         "accepted_rate": summary.get("accepted_rate"),
         "trial_count": summary.get("trial_count"),
-        "combo_count": summary.get("combo_count"),
-        "max_symbol_error_rate": _max_combo_metric(combos, "symbol_error_rate"),
-        "max_mean_abs_value_error": _max_combo_metric(combos, "mean_abs_value_error"),
-        "max_check_failure_rate": max(
-            _max_combo_metric(combos, "control_failed_check_rate") or 0.0,
-            _max_combo_metric(combos, "decoy_failed_check_rate") or 0.0,
+        "mean_bit_error_rate": _weighted_average(
+            balanced_combos,
+            "bit_error_rate",
+        ),
+        "mean_symbol_error_rate": _weighted_average(
+            balanced_combos,
+            "symbol_error_rate",
         ),
         "report_href": report_path.relative_to(root),
     }
@@ -115,26 +118,29 @@ def _run_row(
 
 def _render_index(root: Path, runs: list[dict[str, Any]]) -> str:
     groups = _run_groups(runs)
+    families = _family_groups(groups)
     template = read_template("index.html")
     replacements = {
         "title": _text(f"Srikara benchmark UI: {root.name}"),
         "heading": _text(root.name),
         "run_count": len(runs),
-        "cards": _cards(runs),
-        "group_nav": _group_nav(groups),
+        "cards": _cards(runs, families),
+        "group_nav": _group_nav(families),
         "group_sections": _group_sections(groups),
-        "run_table": _run_table(runs),
+        "run_history": _run_history(families),
     }
     return _replace_placeholders(template, replacements)
 
 
-def _cards(runs: list[dict[str, Any]]) -> str:
-    groups = _run_groups(runs)
+def _cards(
+    runs: list[dict[str, Any]],
+    families: list[dict[str, Any]],
+) -> str:
     comparable_runs = _non_quick_runs(runs)
     return "\n".join(
         [
             _card("Runs", len(runs), "benchmark reports found"),
-            _card("Families", len(groups), "comparable benchmark groups"),
+            _card("Report families", len(families), "top-level report collections"),
             _card(
                 "Best mean bit error",
                 _best_run_card_rate(
@@ -184,31 +190,41 @@ def _run_groups(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(groups, key=lambda group: str(group["name"]))
 
 
+def _family_groups(groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for group in groups:
+        family, _ = _split_group_name(str(group["name"]))
+        grouped.setdefault(family, []).append(group)
+    return [
+        {
+            "name": family,
+            "report_groups": report_groups,
+            "run_count": sum(len(group["runs"]) for group in report_groups),
+        }
+        for family, report_groups in sorted(grouped.items())
+    ]
+
+
 def _non_quick_runs(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [run for run in runs if not str(run["name"]).startswith("quick/")]
 
 
-def _group_nav(groups: list[dict[str, Any]]) -> str:
-    if not groups:
-        return '<p class="muted">No benchmark groups found.</p>'
-    grouped: dict[str, list[dict[str, Any]]] = {}
-    for group in groups:
-        parent, _ = _split_group_name(str(group["name"]))
-        grouped.setdefault(parent, []).append(group)
-
+def _group_nav(families: list[dict[str, Any]]) -> str:
+    if not families:
+        return '<p class="muted">No report families found.</p>'
     nav_groups = []
-    for parent, child_groups in grouped.items():
+    for family in families:
         links = "\n".join(
             (
                 f'<a class="sidebar-child" href="#{escape(_group_id(group["name"]))}">'
                 f'{_text(_split_group_name(str(group["name"]))[1])}</a>'
             )
-            for group in child_groups
+            for group in family["report_groups"]
         )
         nav_groups.append(
             f"""
           <div class="sidebar-group">
-            <div class="sidebar-parent">{_text(parent)}</div>
+            <div class="sidebar-parent">{_text(family["name"])}</div>
             {links}
           </div>
         """
@@ -267,7 +283,7 @@ def _group_section(group: dict[str, Any]) -> str:
         <div class="panel-header">
           <div>
             <h2>{_text(group["name"])}</h2>
-            <p>{_group_detail(run)}</p>
+            {_group_detail(run)}
           </div>
           <a class="button" href="{escape(str(run["report_href"]))}">open latest report</a>
         </div>
@@ -281,12 +297,26 @@ def _group_section(group: dict[str, Any]) -> str:
 
 
 def _group_detail(run: dict[str, Any]) -> str:
-    policies = ", ".join(str(value) for value in run["interval_policies"])
-    probabilities = ", ".join(f"{value:g}" for value in run["one_probabilities"])
-    return escape(
-        "intervals: "
-        f"{policies}; p: {probabilities}; "
-        f"axis: {run['check_axis_policy']}/{run['message_axis_policy']}"
+    policies = " · ".join(str(value) for value in run["interval_policies"])
+    probabilities = " · ".join(
+        f"{value:g}" for value in run["one_probabilities"]
+    )
+    axes = f"{run['check_axis_policy']} → {run['message_axis_policy']}"
+    return f"""
+      <div class="group-meta" aria-label="Report configuration">
+        {_meta_chip("Intervals", policies)}
+        {_meta_chip("One probability", probabilities)}
+        {_meta_chip("Axes", axes)}
+      </div>
+    """
+
+
+def _meta_chip(label: str, value: object) -> str:
+    return (
+        '<span class="meta-chip">'
+        f'<span class="meta-label">{escape(label)}</span>'
+        f'<span class="meta-value">{_text(value)}</span>'
+        "</span>"
     )
 
 
@@ -368,46 +398,75 @@ def _interval_table(run: dict[str, Any]) -> str:
     return _table(headers, rows, "comparison-table")
 
 
-def _run_table(runs: list[dict[str, Any]]) -> str:
+def _run_history(families: list[dict[str, Any]]) -> str:
+    if not families:
+        return '<p class="muted">No benchmark runs found.</p>'
+    return "\n".join(_family_history(family) for family in families)
+
+
+def _family_history(family: dict[str, Any]) -> str:
     headers = [
-        "name",
+        "configuration",
         "run",
         "backend",
-        "interval policies",
-        "check axis",
-        "message axis",
-        "alpha",
-        "theta",
+        "intervals",
+        "axes",
         "trials",
-        "combos",
-        "report",
-        "accepted trials",
-        "max symbol error",
-        "max numeric error",
-        "max check fail",
+        "accepted",
+        "mean bit error",
+        "mean symbol error",
     ]
     rows = []
-    for run in runs:
-        rows.append(
-            [
-                run["name"],
-                _format_run_id(run["run_id"]),
-                run["backend"],
-                run["interval_policies"],
-                run["check_axis_policy"],
-                run["message_axis_policy"],
-                _distribution_body(run["alpha_distribution"]),
-                _distribution_body(run["theta_distribution"]),
-                run["trial_count"],
-                run["combo_count"],
-                f'<a href="{escape(str(run["report_href"]))}">open</a>',
-                _format_rate(run["accepted_rate"]),
-                _format_rate(run["max_symbol_error_rate"]),
-                _format_number(run["max_mean_abs_value_error"]),
-                _format_rate(run["max_check_failure_rate"]),
-            ]
-        )
-    return _table(headers, rows, "table-wrap")
+    for group in family["report_groups"]:
+        for run in reversed(group["runs"]):
+            rows.append(
+                [
+                    run["report_name"],
+                    (
+                        f'<a href="{escape(str(run["report_href"]))}">'
+                        f'{escape(_format_run_id(run["run_id"]))}</a>'
+                    ),
+                    run["backend"],
+                    _interval_policy_summary(run["interval_policies"]),
+                    _axis_summary(run),
+                    run["trial_count"],
+                    _format_rate(run["accepted_rate"]),
+                    _format_rate(run["mean_bit_error_rate"]),
+                    _format_rate(run["mean_symbol_error_rate"]),
+                ]
+            )
+    report_count = len(family["report_groups"])
+    return f"""
+      <section class="history-family">
+        <header class="history-family-header">
+          <h3>{_text(family["name"])}</h3>
+          <p>
+            {_count_label(report_count, "report")} ·
+            {_count_label(family["run_count"], "run")}
+          </p>
+        </header>
+        {_table(headers, rows, "table-wrap")}
+      </section>
+    """
+
+
+def _axis_summary(run: dict[str, Any]) -> str:
+    check_axis = str(run["check_axis_policy"])
+    message_axis = str(run["message_axis_policy"])
+    if check_axis == message_axis:
+        return check_axis
+    return f"{check_axis} / {message_axis}"
+
+
+def _interval_policy_summary(policies: list[object]) -> str:
+    if len(policies) == 1:
+        return str(policies[0])
+    return f"{len(policies)} policies"
+
+
+def _count_label(count: int, noun: str) -> str:
+    suffix = "" if count == 1 else "s"
+    return f"{count} {noun}{suffix}"
 
 
 def _table(headers: list[str], rows: list[list[object]], class_name: str) -> str:
@@ -551,18 +610,6 @@ def _default_interval_row(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
     return None
 
 
-def _max_combo_metric(
-    combos: list[dict[str, Any]],
-    field: str,
-) -> float | None:
-    values = [
-        float(combo[field])
-        for combo in combos
-        if combo.get(field) not in ("", None)
-    ]
-    return max(values) if values else None
-
-
 def _best_run_card_rate(
     runs: list[dict[str, Any]],
     row_key: str,
@@ -647,10 +694,6 @@ def _group_id(value: object) -> str:
         character if character.isalnum() else "-"
         for character in str(value).lower()
     ).strip("-")
-
-
-def _distribution_body(value: object) -> object:
-    return value
 
 
 def _text(value: object) -> str:
