@@ -20,6 +20,7 @@ from qsdc.protocols.srikara.benchmark.artifacts.report import (
 )
 from qsdc.protocols.srikara.benchmark.artifacts.tables import (
     read_combo_csv,
+    read_trial_csv,
 )
 
 
@@ -79,7 +80,9 @@ def main() -> None:
 def write_plots_from_artifacts(output_dir: str | Path) -> list[str]:
     output_path = Path(output_dir)
     combos = read_combo_csv(output_path / "combos.csv")
-    plots = write_benchmark_plots(output_path, combos)
+    trials_path = output_path / "trials.csv"
+    trials = read_trial_csv(trials_path) if trials_path.exists() else []
+    plots = write_benchmark_plots(output_path, combos, trials)
     benchmark_path = output_path / "benchmark.json"
     if benchmark_path.exists():
         with benchmark_path.open("r", encoding="utf-8") as handle:

@@ -1,3 +1,4 @@
+{% from "components.html" import data_table, summary_card %}
 <!doctype html>
 <html lang="en">
 <head>
@@ -14,52 +15,61 @@
         <h1>{{ name }} <span class="run-id">{{ run_id }}</span></h1>
       </div>
       <dl class="run-meta">
-        {{ run_meta }}
+        {% for item in run_meta %}
+        <div><dt>{{ item.label }}</dt><dd>{{ item.value }}</dd></div>
+        {% endfor %}
       </dl>
     </header>
 
     <section class="cards" aria-label="Benchmark summary">
-      {{ cards }}
+      {% for card in summary_cards %}{{ summary_card(card) }}{% endfor %}
     </section>
 
     <section>
       <h2>Run Setup</h2>
-      {{ context }}
+      <div class="context-grid">
+        {% for item in context_items %}
+        <div class="context-item">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+        </div>
+        {% endfor %}
+      </div>
     </section>
 
     <section>
       <h2>Plots</h2>
       <div class="plot-grid">
-        {{ plots }}
+        {% include "report/plots.html" %}
       </div>
     </section>
 
     <section>
       <h2>Combo Outcomes</h2>
-      {{ combo_outcomes }}
+      {{ data_table(combo_outcomes) }}
     </section>
 
     <section>
       <h2>Check Failures</h2>
-      {{ check_failures }}
+      {{ data_table(check_failures) }}
     </section>
 
     <section class="raw-data">
       <h2>Raw Tables</h2>
       <details>
         <summary>combos.csv</summary>
-        {{ combo_table }}
+        {{ data_table(combo_table) }}
       </details>
       <details>
         <summary>trials.csv</summary>
-        {{ trial_table }}
+        {{ data_table(trial_table) }}
       </details>
     </section>
 
     <section>
       <h2>Artifacts</h2>
       <nav class="artifact-links">
-        {{ artifact_links }}
+        {% for link in artifact_links %}<a href="{{ link }}">{{ link }}</a>{% endfor %}
       </nav>
     </section>
   </main>
