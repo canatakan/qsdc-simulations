@@ -24,6 +24,15 @@ make install
 
   > Reference: S. Srikara, K. Thapliyal, and A. Pathak, Continuous variable direct secure quantum communication using gaussian states, Quantum Inf. Process. 19, 1 (2020).
 
+- `cao`: CV QSDC Gaussian-mapping simulator with an analytic backend,
+  paper-style bit uniformization, detection/parity checks, equiprobable
+  Gaussian mapping, and inverse message recovery.
+
+  > Reference: Z. Cao et al., Continuous-Variable Quantum Secure Direct
+  > Communication Based on Gaussian Mapping, Phys. Rev. Applied 16, 024012
+  > (2021). See `docs/protocols/cao/methodology.md` for the implementation map
+  > and model assumptions.
+
 ## Commands
 
 ```bash
