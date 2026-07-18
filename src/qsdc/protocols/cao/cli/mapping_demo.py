@@ -37,6 +37,9 @@ def main() -> None:
     print(f"backend = {result.backend_name}")
     print(f"accepted = {result.accepted}")
     print(f"round trip = {result.round_trip_ok}")
+    print(f"recovered message = {result.recovered_message!r}")
+    if result.decoding_error is not None:
+        print(f"decoding error = {result.decoding_error}")
     for box in result.boxes:
         print(
             f"{box.index}: {box.bits} -> {box.recovered_bits}, "

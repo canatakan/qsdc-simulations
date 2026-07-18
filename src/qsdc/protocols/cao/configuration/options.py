@@ -15,6 +15,11 @@ SIMULATOR_PARAMETERS = ParameterSet([
         validator=Validators.positive_int,
     ),
     Parameter(
+        name="detection_bit_count",
+        default=1,
+        validator=Validators.positive_int,
+    ),
+    Parameter(
         name="squeeze_r",
         default=0.7,
         validator=Validators.nonnegative_number,

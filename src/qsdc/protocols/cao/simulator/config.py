@@ -12,6 +12,7 @@ from qsdc.protocols.cao.configuration import SIMULATOR_PARAMETERS
 class MappingConfig:
     gaussian_variance: float
     box_bit_length: int
+    detection_bit_count: int
     squeeze_r: float
     channel_check_count: int
     authentication_check_count: int
@@ -21,6 +22,16 @@ class MappingConfig:
 
     def __post_init__(self) -> None:
         type(self).parameters().validate(self)
+        if self.detection_bit_count >= self.box_bit_length:
+            raise ValueError(
+                "detection_bit_count must be smaller than box_bit_length"
+            )
+
+    @property
+    def payload_box_bit_length(self) -> int:
+        """Number of block-uniformized bits carried by each mapped box."""
+
+        return self.box_bit_length - self.detection_bit_count
 
     @classmethod
     def parameters(cls) -> ParameterSet:

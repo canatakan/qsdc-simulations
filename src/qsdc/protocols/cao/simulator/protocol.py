@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from qsdc.common.bits import bytes_to_bits, chunk_bits
+from qsdc.common.bits import bits_to_bytes, bytes_to_bits, chunk_bits
 from qsdc.common.gaussian import EncodingInterval
 from qsdc.common.random.base import RandomSource
 from qsdc.common.random.classical import ClassicalRandomSource
@@ -17,10 +17,14 @@ from qsdc.protocols.cao.simulator.backends.base import (
 from qsdc.protocols.cao.simulator.config import MappingConfig
 from qsdc.protocols.cao.simulator.encoding import (
     bits_for_real,
+    decode_box,
+    encode_box,
     gaussian_encoding,
     interval_for_bits,
     sample_gaussian,
     sample_gaussian_from_interval,
+    restore_block_bits,
+    restore_message_bits,
     uniformize_block_bits,
     uniformize_message_bits,
 )
@@ -46,6 +50,13 @@ class MappedBox:
     measured_x: float
     measured_p: float
     recovered_bits: str
+    payload_bits: str
+    recovered_payload_bits: str
+    detection_positions: tuple[int, ...]
+    detection_bits: str
+    parity_bit: int
+    detection_valid: bool
+    parity_valid: bool
 
 
 @dataclass(frozen=True)
@@ -56,6 +67,11 @@ class MappingResult:
     raw_bits: str
     message_uniformized_bits: str
     block_uniformized_bits: str
+    recovered_block_uniformized_bits: str
+    recovered_message_uniformized_bits: str
+    recovered_raw_bits: str
+    recovered_message: str | None
+    decoding_error: str | None
     channel_checks: tuple[SecurityCheck, ...]
     authentication_checks: tuple[SecurityCheck, ...]
     channel_accepted: bool
@@ -68,7 +84,16 @@ class MappingResult:
 
     @property
     def round_trip_ok(self) -> bool:
-        return all(box.bits == box.recovered_bits for box in self.boxes)
+        return (
+            self.recovered_message == self.message
+            and self.recovered_raw_bits == self.raw_bits
+            and all(
+                box.bits == box.recovered_bits
+                and box.detection_valid
+                and box.parity_valid
+                for box in self.boxes
+            )
+        )
 
     @property
     def accepted(self) -> bool:
@@ -87,9 +112,12 @@ def simulate_mapping(
     active_random = random_source or ClassicalRandomSource(config.seed)
 
     raw_bits = bytes_to_bits(message.encode(config.encoding))
-    message_uniformized = uniformize_message_bits(raw_bits, active_random)
+    message_uniformized = uniformize_message_bits(raw_bits)
     block_uniformized = uniformize_block_bits(message_uniformized, active_random)
-    box_bits = chunk_bits(block_uniformized, config.box_bit_length)
+    payload_boxes = chunk_bits(
+        block_uniformized,
+        config.payload_box_bit_length,
+    )
     mapping = gaussian_encoding(config.box_bit_length, config.gaussian_variance)
 
     channel_checks = _run_security_checks(
@@ -110,7 +138,13 @@ def simulate_mapping(
     )
 
     boxes: list[MappedBox] = []
-    for index, bits in enumerate(box_bits):
+    for index, payload_bits in enumerate(payload_boxes):
+        encoded_box = encode_box(
+            payload_bits,
+            config.detection_bit_count,
+            active_random,
+        )
+        bits = encoded_box.mapping_bits
         interval = interval_for_bits(bits, mapping)
         x_value = sample_gaussian_from_interval(
             interval,
@@ -129,6 +163,12 @@ def simulate_mapping(
             measurement.x_message - noise.delta_x,
             mapping,
         )
+        decoded_box = decode_box(
+            recovered_bits,
+            encoded_box.detection_positions,
+            encoded_box.detection_bits,
+            encoded_box.parity_bit,
+        )
         boxes.append(
             MappedBox(
                 index=index,
@@ -141,8 +181,31 @@ def simulate_mapping(
                 measured_x=measurement.x_message,
                 measured_p=measurement.p_message,
                 recovered_bits=recovered_bits,
+                payload_bits=payload_bits,
+                recovered_payload_bits=decoded_box.payload_bits,
+                detection_positions=encoded_box.detection_positions,
+                detection_bits=encoded_box.detection_bits,
+                parity_bit=encoded_box.parity_bit,
+                detection_valid=decoded_box.detection_valid,
+                parity_valid=decoded_box.parity_valid,
             )
         )
+
+    recovered_block_uniformized = "".join(
+        box.recovered_payload_bits for box in boxes
+    )[:len(block_uniformized)]
+    recovered_message_uniformized = restore_block_bits(
+        recovered_block_uniformized
+    )
+    recovered_raw_bits = restore_message_bits(recovered_message_uniformized)
+    try:
+        recovered_message = bits_to_bytes(recovered_raw_bits).decode(
+            config.encoding
+        )
+        decoding_error = None
+    except UnicodeDecodeError as error:
+        recovered_message = None
+        decoding_error = str(error)
 
     return MappingResult(
         backend_name=active_backend.name,
@@ -151,6 +214,11 @@ def simulate_mapping(
         raw_bits=raw_bits,
         message_uniformized_bits=message_uniformized,
         block_uniformized_bits=block_uniformized,
+        recovered_block_uniformized_bits=recovered_block_uniformized,
+        recovered_message_uniformized_bits=recovered_message_uniformized,
+        recovered_raw_bits=recovered_raw_bits,
+        recovered_message=recovered_message,
+        decoding_error=decoding_error,
         channel_checks=channel_checks,
         authentication_checks=authentication_checks,
         channel_accepted=channel_accepted,
