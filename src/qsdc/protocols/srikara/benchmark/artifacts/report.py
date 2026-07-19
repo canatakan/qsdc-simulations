@@ -110,6 +110,7 @@ def _context_items(summary: dict[str, Any]) -> list[dict[str, str]]:
     return _labeled_values(
         [
             ("interval policies", parameters.get("interval_policies", ["default"])),
+            ("noise", parameters.get("noise")),
             ("alpha", parameters.get("alpha_distribution")),
             ("theta", parameters.get("theta_distribution")),
             ("payload bits", counts.get("payload_bit_count")),

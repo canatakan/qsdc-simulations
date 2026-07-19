@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,7 @@ COMBO_FIELDS = (
     "intervals",
     "one_probability",
     "r_distribution",
+    "noise",
     "trial_count",
     "accepted_count",
     "accepted_rate",
@@ -45,6 +47,7 @@ TRIAL_FIELDS = (
     "message_axis_policy",
     "one_probability",
     "r_distribution",
+    "noise",
     "accepted",
     "control_passed",
     "decoy_passed",
@@ -88,6 +91,7 @@ def _combo_row(combo: Combo) -> dict[str, object]:
         "intervals": combo["intervals"],
         "one_probability": combo["one_probability"],
         "r_distribution": combo["r_distribution"],
+        "noise": json.dumps(combo["noise"], sort_keys=True),
         "trial_count": combo["trial_count"],
         "accepted_count": combo["accepted_count"],
         "accepted_rate": combo["accepted_rate"],
@@ -128,6 +132,7 @@ def _trial_row(trial: Trial) -> dict[str, object]:
         "message_axis_policy": trial["message_axis_policy"],
         "one_probability": trial["one_probability"],
         "r_distribution": trial["r_distribution"],
+        "noise": json.dumps(trial["noise"], sort_keys=True),
         "accepted": trial["accepted"],
         "control_passed": trial["control_passed"],
         "decoy_passed": trial["decoy_passed"],
