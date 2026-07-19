@@ -1,7 +1,7 @@
 import pytest
 
 from qsdc.protocols.srikara.simulator.backends.analytic.ideal import AnalyticBackend
-from qsdc.protocols.srikara.simulator.config import ProtocolConfig
+from qsdc.protocols.srikara.configuration.configs import ProtocolConfig
 from qsdc.protocols.srikara.simulator.protocol import simulate_qsdc
 
 

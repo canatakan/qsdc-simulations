@@ -14,7 +14,6 @@ from qsdc.common.bits import weighted_random_bits
 from qsdc.common.random import make_random_source
 from qsdc.common.random.base import RandomSource
 from qsdc.common.random.classical import ClassicalRandomSource
-from qsdc.protocols.srikara.benchmark.config import BenchmarkConfig
 from qsdc.protocols.srikara.benchmark.metrics import (
     aggregate_trial_metrics,
     summarize_checks,
@@ -22,14 +21,15 @@ from qsdc.protocols.srikara.benchmark.metrics import (
 )
 from qsdc.protocols.srikara.benchmark.artifacts.output import write_benchmark_artifacts
 from qsdc.protocols.srikara.benchmark.seeds import derive_seed
-from qsdc.protocols.srikara.simulator.backends import make_backend
+from qsdc.protocols.srikara.configuration.configs import BenchmarkConfig, ProtocolConfig
+from qsdc.protocols.srikara.configuration.models import NoiseConfig
+from qsdc.protocols.srikara.simulator.backends import BackendConfig, make_backend
 from qsdc.protocols.srikara.simulator.backends.base import QSDCBackend
-from qsdc.protocols.srikara.simulator.config import ProtocolConfig
 from qsdc.protocols.srikara.simulator.distributions import SqueezeRDistribution
 from qsdc.protocols.srikara.simulator.protocol import simulate_qsdc
 
 
-BackendFactory = Callable[[str], QSDCBackend]
+BackendFactory = Callable[[BackendConfig], QSDCBackend]
 RandomSourceFactory = Callable[[str, int], RandomSource]
 
 
@@ -108,6 +108,9 @@ def run_benchmark(
             "sigma_diagnostics": effective_config.sigma_diagnostics,
             "check_axis_policy": effective_config.check_axis_policy,
             "message_axis_policy": effective_config.message_axis_policy,
+            "noise": NoiseConfig.from_runtime(
+                effective_config.noise
+            ).model_dump(mode="json"),
             "one_probabilities": list(effective_config.one_probabilities),
             "r_distributions": [
                 distribution.summary()
@@ -242,7 +245,7 @@ def _run_trial(
     symbols = chunk_bits(bits, 3)
     result = simulate_qsdc(
         symbols,
-        config=ProtocolConfig.from_options(
+        config=ProtocolConfig(
             n_states=config.n_states,
             alpha_distribution=config.alpha_distribution,
             squeeze_r_distribution=combo.r_distribution,
@@ -253,7 +256,9 @@ def _run_trial(
             message_axis_policy=config.message_axis_policy,
             seed=simulation_seed,
         ),
-        backend=backend_factory(config.backend),
+        backend=backend_factory(
+            BackendConfig(name=config.backend, noise=config.noise)
+        ),
         random_source=random_source_factory(config.random_source, simulation_seed),
     )
     message_metrics = summarize_messages(
@@ -273,6 +278,7 @@ def _run_trial(
         "intervals": result.intervals,
         "check_axis_policy": result.check_axis_policy,
         "message_axis_policy": result.message_axis_policy,
+        "noise": NoiseConfig.from_runtime(config.noise).model_dump(mode="json"),
         "one_probability": combo.one_probability,
         "r_distribution": combo.r_distribution.summary(),
         "r_distribution_config": combo.r_distribution.to_dict(),
@@ -343,6 +349,7 @@ def _aggregate_combo(
         "alpha_distribution_config": config.alpha_distribution.to_dict(),
         "theta_distribution": config.theta_distribution.summary(),
         "theta_distribution_config": config.theta_distribution.to_dict(),
+        "noise": NoiseConfig.from_runtime(config.noise).model_dump(mode="json"),
         "intervals": combo.intervals,
         "trial_count": trial_count,
         "accepted_count": accepted_count,

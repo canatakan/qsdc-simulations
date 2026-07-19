@@ -9,8 +9,8 @@ from typing import Any
 
 from qsdc.common.random import make_random_source
 from qsdc.protocols.srikara.benchmark.artifacts.ui.index import write_benchmark_index
-from qsdc.protocols.srikara.benchmark.config import load_benchmark_json
 from qsdc.protocols.srikara.benchmark.engine import run_benchmark
+from qsdc.protocols.srikara.configuration.configs import BenchmarkConfig
 from qsdc.protocols.srikara.simulator.backends import make_backend
 
 
@@ -94,7 +94,9 @@ def _run_sequential(
 ) -> list[tuple[Path, BaseException]]:
     failures = []
     for index, config_path in enumerate(config_paths, start=1):
-        config = load_benchmark_json(config_path)
+        config = BenchmarkConfig.model_validate_json(
+            config_path.read_text(encoding="utf-8")
+        )
         config_output_dir = output_root / config.name
         print(f"[{index}/{len(config_paths)}] {config.name}: {config_path}")
         if skip_existing and _has_existing_run(config_output_dir):
@@ -160,7 +162,9 @@ def _run_config_path(
     output_root: Path,
     skip_existing: bool,
 ) -> dict[str, Any]:
-    config = load_benchmark_json(config_path)
+    config = BenchmarkConfig.model_validate_json(
+        config_path.read_text(encoding="utf-8")
+    )
     config_output_dir = output_root / config.name
     if skip_existing and _has_existing_run(config_output_dir):
         return {

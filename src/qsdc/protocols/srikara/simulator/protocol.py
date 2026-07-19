@@ -5,7 +5,7 @@ from qsdc.common.random.base import RandomSource
 from qsdc.common.random.classical import ClassicalRandomSource
 from qsdc.protocols.srikara.simulator.backends.analytic.ideal import AnalyticBackend
 from qsdc.protocols.srikara.simulator.backends.base import QSDCBackend
-from qsdc.protocols.srikara.simulator.config import ProtocolConfig
+from qsdc.protocols.srikara.configuration.configs import ProtocolConfig
 from qsdc.protocols.srikara.simulator.encoding import (
     beta_for_message_value,
     bits_for_real,

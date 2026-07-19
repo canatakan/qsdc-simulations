@@ -2,20 +2,20 @@ import json
 from io import StringIO
 from pathlib import Path
 
+import pytest
+
 from qsdc.protocols.srikara.benchmark.artifacts.tables import (
     read_combo_csv,
     read_trial_csv,
 )
 from qsdc.protocols.srikara.benchmark.artifacts.report import _plot_cards
 from qsdc.protocols.srikara.benchmark.artifacts.ui.index import write_benchmark_index
-from qsdc.protocols.srikara.benchmark.config import (
-    load_benchmark_json,
-    BenchmarkConfig,
-)
 from qsdc.protocols.srikara.benchmark.cli import _config_paths
 from qsdc.protocols.srikara.benchmark.metrics import aggregate_trial_metrics
 from qsdc.protocols.srikara.benchmark.engine import run_benchmark
 from qsdc.protocols.srikara.benchmark.seeds import derive_seed
+from qsdc.protocols.srikara.configuration.configs import BenchmarkConfig
+from qsdc.protocols.srikara.simulator.backends import BackendConfig, make_backend
 
 
 TEST_BENCHMARK_CONFIG = {
@@ -73,7 +73,10 @@ def test_seed_derivation_is_stable():
 
 
 def test_benchmark_config_loads_json_file(tmp_path):
-    config = load_benchmark_json(_write_test_benchmark_config(tmp_path))
+    config_path = _write_test_benchmark_config(tmp_path)
+    config = BenchmarkConfig.model_validate_json(
+        config_path.read_text(encoding="utf-8")
+    )
 
     assert config.name == "test"
     assert config.backend == "analytic"
@@ -86,6 +89,105 @@ def test_benchmark_config_loads_json_file(tmp_path):
     assert config.message_symbol_count == 4
     assert config.n_states == 16
     assert len(config.r_distributions) == 2
+    assert config.noise.at("forward") == ()
+    assert config.noise.at("bob_readout") == ()
+    assert "noise" not in config.to_dict()
+
+
+def test_benchmark_loads_executable_noise_model(tmp_path):
+    raw = {
+        **TEST_BENCHMARK_CONFIG,
+        "backend": "sf-noise",
+        "noise": {
+            "forward": [{"type": "loss", "transmittance": 0.9}],
+            "bob_readout": [
+                {"type": "electronic_noise", "variance_snu": 0.0042}
+            ],
+        },
+    }
+    config_path = tmp_path / "noise.json"
+    config_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    config = BenchmarkConfig.model_validate_json(
+        config_path.read_text(encoding="utf-8")
+    )
+
+    assert config.backend == "sf-noise"
+    assert config.noise.at("forward")[0].transmittance == 0.9
+    assert config.noise.at("bob_readout")[0].variance_snu == 0.0042
+
+
+@pytest.mark.parametrize(
+    "noise",
+    [
+        {},
+        {"forward": [{"type": "loss", "transmittance": 0.9}]},
+    ],
+)
+def test_benchmark_accepts_noise_key_for_any_backend(tmp_path, noise):
+    raw = {
+        **TEST_BENCHMARK_CONFIG,
+        "backend": "analytic",
+        "noise": noise,
+    }
+    config_path = tmp_path / "old-noise-shape.json"
+    config_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    config = BenchmarkConfig.model_validate_json(
+        config_path.read_text(encoding="utf-8")
+    )
+
+    assert config.backend == "analytic"
+    assert len(config.noise.at("forward")) == len(noise.get("forward", []))
+    assert ("noise" in config.to_dict()) is bool(noise)
+
+
+def test_noisy_backend_accepts_empty_noise_configuration():
+    config = BenchmarkConfig.from_options(
+        **{
+            **TEST_BENCHMARK_CONFIG,
+            "backend": "sf-noise",
+            "noise": {},
+        }
+    )
+
+    assert config.backend == "sf-noise"
+    assert config.noise.at("forward") == ()
+    assert config.noise.at("bob_readout") == ()
+
+
+def test_noisy_backend_defaults_to_empty_noise_configuration():
+    config = BenchmarkConfig.from_options(
+        **{**TEST_BENCHMARK_CONFIG, "backend": "sf-noise"}
+    )
+
+    assert config.noise.at("forward") == ()
+    assert config.noise.at("bob_readout") == ()
+
+
+def test_benchmark_factory_receives_one_complete_backend_config():
+    received = []
+
+    def backend_factory(config: BackendConfig):
+        received.append(config)
+        return make_backend(config)
+
+    config = BenchmarkConfig.from_options(
+        **{
+            **TEST_BENCHMARK_CONFIG,
+            "trials_per_combo": 1,
+            "one_probabilities": [0.5],
+            "r_distributions": [{"kind": "fixed", "value": 0.4}],
+        }
+    )
+
+    run_benchmark(
+        config,
+        write_artifacts=False,
+        backend_factory=backend_factory,
+    )
+
+    assert received == [BackendConfig(name=config.backend, noise=config.noise)]
 
 
 def test_payload_bit_count_derives_padding_and_protocol_counts():

@@ -12,6 +12,7 @@ dependencies = [
   "Jinja2>=3.1,<4",
   "matplotlib",
   "numpy",
+  "pydantic>=2.13,<3",
   "strawberryfields",
 ]
 
