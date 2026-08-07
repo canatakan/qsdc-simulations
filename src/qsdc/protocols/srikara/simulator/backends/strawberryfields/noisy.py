@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from math import sqrt
 
 import numpy as np
 import strawberryfields as sf
@@ -11,7 +12,10 @@ from strawberryfields import ops
 from qsdc.protocols.srikara.simulator.backends.analytic.calculations import (
     displacement_after_unsqueeze,
 )
-from qsdc.protocols.srikara.simulator.backends.base import QSDCBackend
+from qsdc.protocols.srikara.simulator.backends.base import (
+    MeasurementExpectation,
+    QSDCBackend,
+)
 from qsdc.protocols.srikara.simulator.backends.strawberryfields.calculations import (
     homodyne_angle,
     homodyne_component_std,
@@ -23,12 +27,7 @@ from qsdc.protocols.srikara.simulator.noise import NoiseModel
 
 @dataclass(frozen=True)
 class SFNoiseBackend(QSDCBackend):
-    """One-shot SF measurements with an explicitly placed noise model.
-
-    ``measurement_noise_sigma`` remains the original fixed shot-noise
-    reference used by the unchanged protocol checks. It is not an estimate of
-    the configured model's total, potentially state-dependent variance.
-    """
+    """One-shot SF measurements with calibrated expectations."""
 
     noise: NoiseModel = field(default_factory=NoiseModel)
     name: str = "sf-noise"
@@ -70,6 +69,47 @@ class SFNoiseBackend(QSDCBackend):
             raise ValueError(f"unknown quadrature axis {axis!r}")
         return self.noise.amplitude_gain("return_path", "bob_detector") * component
 
+    def control_expectation(
+        self,
+        alpha: complex,
+        squeeze_r: float,
+        theta: float,
+        axis: str,
+    ) -> MeasurementExpectation:
+        return self._expectation(
+            self._control_program(alpha, squeeze_r, theta),
+            axis,
+            readout_stage="alice_readout",
+        )
+
+    def returned_expectation(
+        self,
+        alpha: complex,
+        squeeze_r: float,
+        theta: float,
+        axis: str,
+    ) -> MeasurementExpectation:
+        return self._expectation(
+            self._returned_program(alpha, squeeze_r, theta, beta=0j),
+            axis,
+            readout_stage="bob_readout",
+        )
+
+    def _expectation(
+        self,
+        program: sf.Program,
+        axis: str,
+        readout_stage: str,
+    ) -> MeasurementExpectation:
+        state = sf.Engine("gaussian").run(program).state
+        index = _quadrature_index(axis)
+        mean = float(state.means()[index]) / 2.0
+        variance = float(state.cov()[index, index]) / 4.0
+        variance += sum(
+            effect.variance for effect in self.noise.at(readout_stage)
+        )
+        return MeasurementExpectation(mean=mean, sigma=sqrt(variance))
+
     def _control_program(
         self,
         alpha: complex,
@@ -103,6 +143,7 @@ class SFNoiseBackend(QSDCBackend):
             ops.Dgate(alpha_abs, alpha_phase) | q[0]
             ops.Sgate(-squeeze_r, theta) | q[0]
             self.noise.apply("forward", q[0])
+            self.noise.apply("alice_delay", q[0])
             if beta != 0:
                 ops.Dgate(beta_abs, beta_phase) | q[0]
             self.noise.apply("return_path", q[0])
@@ -119,3 +160,11 @@ def _homodyne_sample(program: sf.Program, axis: str) -> float:
         ops.MeasureHomodyne(homodyne_angle(axis)) | q[0]
     result = sf.Engine("gaussian").run(program)
     return float(result.samples[0, 0]) / 2.0
+
+
+def _quadrature_index(axis: str) -> int:
+    if axis == "q":
+        return 0
+    if axis == "p":
+        return 1
+    raise ValueError(f"unknown quadrature axis {axis!r}")

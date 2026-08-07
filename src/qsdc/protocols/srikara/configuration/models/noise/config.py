@@ -29,6 +29,7 @@ class NoiseConfig(ConfigurationModel):
     """Ordered noise effects applied at each supported protocol stage."""
 
     forward: list[ChannelEffectConfig] = Field(default_factory=list)
+    alice_delay: list[ChannelEffectConfig] = Field(default_factory=list)
     return_path: list[ChannelEffectConfig] = Field(default_factory=list)
     alice_detector: list[DetectorInefficiencyConfig] = Field(default_factory=list)
     alice_readout: list[ElectronicNoiseConfig] = Field(default_factory=list)

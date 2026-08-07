@@ -32,6 +32,7 @@ class ControlCheck:
     index: int
     axis: str
     expected: float
+    expected_sigma: float
     measured: float
     passed: bool
 
@@ -41,6 +42,7 @@ class DecoyCheck:
     index: int
     axis: str
     expected: float
+    expected_sigma: float
     measured: float
     passed: bool
 
@@ -54,6 +56,7 @@ class MessageDecode:
     alice_beta: complex
     axis: str
     measured: float
+    expected_baseline: float
     observed_delta: float
     response_factor: float
     recovered_beta: complex
@@ -186,18 +189,24 @@ def _check_control(
     random_source: RandomSource,
 ) -> ControlCheck:
     axis = _check_axis(state, config, random_source)
-    expected = state.alpha.real if axis == "q" else state.alpha.imag
+    expectation = backend.control_expectation(
+        state.alpha,
+        state.squeeze_r,
+        state.theta,
+        axis,
+    )
     measured = backend.control_measurement(
         state.alpha, state.squeeze_r, state.theta, axis
     )
 
-    tolerance = config.tolerance_sigmas * backend.measurement_noise_sigma
+    tolerance = config.tolerance_sigmas * expectation.sigma
     return ControlCheck(
         index=state.index,
         axis=axis,
-        expected=expected,
+        expected=expectation.mean,
+        expected_sigma=expectation.sigma,
         measured=measured,
-        passed=abs(measured - expected) <= tolerance,
+        passed=abs(measured - expectation.mean) <= tolerance,
     )
 
 
@@ -208,18 +217,24 @@ def _check_decoy(
     random_source: RandomSource,
 ) -> DecoyCheck:
     axis = _check_axis(state, config, random_source)
-    expected = state.alpha.real if axis == "q" else state.alpha.imag
+    expectation = backend.returned_expectation(
+        state.alpha,
+        state.squeeze_r,
+        state.theta,
+        axis,
+    )
     measured = backend.returned_measurement(
         state.alpha, state.squeeze_r, state.theta, beta=0j, axis=axis
     )
 
-    tolerance = config.tolerance_sigmas * backend.measurement_noise_sigma
+    tolerance = config.tolerance_sigmas * expectation.sigma
     return DecoyCheck(
         index=state.index,
         axis=axis,
-        expected=expected,
+        expected=expectation.mean,
+        expected_sigma=expectation.sigma,
         measured=measured,
-        passed=abs(measured - expected) <= tolerance,
+        passed=abs(measured - expectation.mean) <= tolerance,
     )
 
 
@@ -247,8 +262,13 @@ def _decode_message(
     measured = backend.returned_measurement(
         state.alpha, state.squeeze_r, state.theta, beta=alice_beta, axis=axis
     )
-    initial_component = state.alpha.real if axis == "q" else state.alpha.imag
-    observed_delta = measured - initial_component
+    baseline_expectation = backend.returned_expectation(
+        state.alpha,
+        state.squeeze_r,
+        state.theta,
+        axis,
+    )
+    observed_delta = measured - baseline_expectation.mean
     response_factor = backend.message_response_factor(
         state.squeeze_r, state.theta, axis
     )
@@ -263,6 +283,7 @@ def _decode_message(
         alice_beta=alice_beta,
         axis=axis,
         measured=measured,
+        expected_baseline=baseline_expectation.mean,
         observed_delta=observed_delta,
         response_factor=response_factor,
         recovered_beta=recovered_beta,

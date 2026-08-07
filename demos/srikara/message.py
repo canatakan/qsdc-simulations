@@ -128,7 +128,7 @@ def main() -> None:
         "Control/decoy tolerance "
         f"(measurement noise sigmas): {result.check_tolerance_sigmas:g}"
     )
-    print(f"Measurement noise sigma: {result.measurement_noise_sigma:g}")
+    print(f"Nominal shot-noise sigma: {result.measurement_noise_sigma:g}")
 
     print()
 
@@ -166,16 +166,14 @@ def main() -> None:
     )
     print()
 
-    print("idx  axis  expected       measured       dev/sigma     status")
+    print("idx  axis  expected       measured       sigma       dev/sigma   status")
     for check in result.controls:
         status = "pass" if check.passed else "fail"
-        sigma_deviation = (
-            abs(check.measured - check.expected) / result.measurement_noise_sigma
-        )
+        sigma_deviation = abs(check.measured - check.expected) / check.expected_sigma
         print(
             f"{check.index:>3}  {check.axis:>4}  "
             f"{check.expected:>12.7f}  {check.measured:>12.7f}  "
-            f"{sigma_deviation:>9.4f}  {status}"
+            f"{check.expected_sigma:>10.7f}  {sigma_deviation:>9.4f}  {status}"
         )
     print(f"Control check result: {result.control_passed}")
 
@@ -200,16 +198,14 @@ def main() -> None:
     )
     print()
 
-    print("idx  axis  expected       measured       dev/sigma     status")
+    print("idx  axis  expected       measured       sigma       dev/sigma   status")
     for decoy in result.decoys:
         status = "pass" if decoy.passed else "fail"
-        sigma_deviation = (
-            abs(decoy.measured - decoy.expected) / result.measurement_noise_sigma
-        )
+        sigma_deviation = abs(decoy.measured - decoy.expected) / decoy.expected_sigma
         print(
             f"{decoy.index:>3}  {decoy.axis:>4}  "
             f"{decoy.expected:>12.7f}  {decoy.measured:>12.7f}  "
-            f"{sigma_deviation:>9.4f}  {status}"
+            f"{decoy.expected_sigma:>10.7f}  {sigma_deviation:>9.4f}  {status}"
         )
     print(f"Decoy check result: {result.decoy_passed}")
 

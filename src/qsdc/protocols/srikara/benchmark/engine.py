@@ -305,17 +305,15 @@ def _run_trial(
     if config.sigma_diagnostics:
         trial["check_sigma_deviations"] = _check_sigma_deviations(
             (*result.controls, *result.decoys),
-            result.measurement_noise_sigma,
         )
     return trial
 
 
 def _check_sigma_deviations(
     checks: Any,
-    measurement_noise_sigma: float,
 ) -> tuple[float, ...]:
     return tuple(
-        abs(check.measured - check.expected) / measurement_noise_sigma
+        abs(check.measured - check.expected) / check.expected_sigma
         for check in checks
     )
 
