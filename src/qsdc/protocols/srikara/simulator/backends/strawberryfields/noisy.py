@@ -17,6 +17,8 @@ from qsdc.protocols.srikara.simulator.backends.base import (
     QSDCBackend,
 )
 from qsdc.protocols.srikara.simulator.backends.strawberryfields.calculations import (
+    displacement_component,
+    displacement_component_variance,
     homodyne_angle,
     homodyne_component_std,
     sf_gate_args,
@@ -103,8 +105,10 @@ class SFNoiseBackend(QSDCBackend):
     ) -> MeasurementExpectation:
         state = sf.Engine("gaussian").run(program).state
         index = _quadrature_index(axis)
-        mean = float(state.means()[index]) / 2.0
-        variance = float(state.cov()[index, index]) / 4.0
+        mean = displacement_component(float(state.means()[index]))
+        variance = displacement_component_variance(
+            float(state.cov()[index, index])
+        )
         variance += sum(
             effect.variance for effect in self.noise.at(readout_stage)
         )
@@ -159,7 +163,7 @@ def _homodyne_sample(program: sf.Program, axis: str) -> float:
     with program.context as q:
         ops.MeasureHomodyne(homodyne_angle(axis)) | q[0]
     result = sf.Engine("gaussian").run(program)
-    return float(result.samples[0, 0]) / 2.0
+    return displacement_component(float(result.samples[0, 0]))
 
 
 def _quadrature_index(axis: str) -> int:

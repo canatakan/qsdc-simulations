@@ -20,7 +20,19 @@ def homodyne_angle(axis: str) -> float:
 
 
 def homodyne_component_std() -> float:
-    return sqrt(sf.hbar / 2.0) / 2.0
+    return sqrt(sf.hbar / 2.0) / sqrt(2.0 * sf.hbar)
+
+
+def displacement_component(value: float) -> float:
+    """Convert an SF quadrature value to a displacement component."""
+
+    return value / sqrt(2.0 * sf.hbar)
+
+
+def displacement_component_variance(variance: float) -> float:
+    """Convert an SF quadrature variance to displacement-component units."""
+
+    return variance / (2.0 * sf.hbar)
 
 
 def sf_gate_args(alpha: complex) -> tuple[float, float]:
@@ -31,9 +43,9 @@ def sf_gate_args(alpha: complex) -> tuple[float, float]:
 
 def component_from_means(x_mean: float, p_mean: float, axis: str) -> float:
     if axis == "q":
-        return x_mean / 2.0
+        return displacement_component(x_mean)
     if axis == "p":
-        return p_mean / 2.0
+        return displacement_component(p_mean)
     raise ValueError(f"unknown quadrature axis {axis!r}")
 
 
@@ -74,5 +86,5 @@ def homodyne_sample(prog: sf.Program, axis: str) -> float:
         ops.MeasureHomodyne(homodyne_angle(axis)) | q[0]
 
     result = sf.Engine("gaussian").run(prog)
-    return float(result.samples[0, 0]) / 2.0
+    return displacement_component(float(result.samples[0, 0]))
 

@@ -7,6 +7,11 @@ from strawberryfields import ops
 from qsdc.protocols.srikara.simulator.backends.strawberryfields.noisy import (
     SFNoiseBackend,
 )
+from qsdc.protocols.srikara.simulator.backends.strawberryfields.calculations import (
+    displacement_component,
+    displacement_component_variance,
+    homodyne_component_std,
+)
 from qsdc.protocols.srikara.simulator.backends.strawberryfields.sampled import (
     SFSampledBackend,
 )
@@ -130,10 +135,12 @@ def test_sf_moments_match_thermal_loss_and_detector_calculation():
     )
 
     state = sf.Engine("gaussian").run(program).state
-    reported_mean = float(state.means()[0]) / 2.0
-    reported_variance = float(state.cov()[0, 0]) / 4.0
+    reported_mean = displacement_component(float(state.means()[0]))
+    reported_variance = displacement_component_variance(
+        float(state.cov()[0, 0])
+    )
 
-    vacuum_variance = 0.25
+    vacuum_variance = homodyne_component_std() ** 2
     mean_after_thermal_loss = np.sqrt(0.64) * (1.5 + 0.75)
     variance_after_thermal_loss = (
         0.64 * vacuum_variance
@@ -165,9 +172,12 @@ def test_returned_expectation_includes_calibrated_optical_and_readout_noise():
         axis="q",
     )
 
-    variance_after_thermal_loss = 0.64 * 0.25 + 0.36 * 0.5
-    variance_after_detector = 0.64 * variance_after_thermal_loss + 0.36 * 0.25
-    expected_variance = variance_after_detector + 0.5 * 0.25
+    vacuum_variance = homodyne_component_std() ** 2
+    variance_after_thermal_loss = 0.64 * vacuum_variance + 0.36 * 0.5
+    variance_after_detector = (
+        0.64 * variance_after_thermal_loss + 0.36 * vacuum_variance
+    )
+    expected_variance = variance_after_detector + 0.5 * vacuum_variance
     assert expectation.mean == pytest.approx(0.8 * 0.8 * 1.5)
     assert expectation.sigma == pytest.approx(np.sqrt(expected_variance))
 

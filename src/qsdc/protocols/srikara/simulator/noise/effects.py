@@ -6,16 +6,13 @@ from dataclasses import dataclass
 from math import sqrt
 
 import numpy as np
+import strawberryfields as sf
 
 from qsdc.protocols.srikara.simulator.noise.base import (
     ChannelEffect,
     DetectorEffect,
     ReadoutEffect,
 )
-
-
-# SF uses hbar=2. The Srikara adapter reports quadratures divided by two.
-VACUUM_VARIANCE = 0.25
 
 
 @dataclass(frozen=True)
@@ -81,7 +78,15 @@ class ElectronicNoise(ReadoutEffect):
 
     @property
     def variance(self) -> float:
-        return self.variance_snu * VACUUM_VARIANCE
+        # SF reports Var(x_vacuum) = hbar/2 and
+        # <x> = sqrt(2*hbar) Re(alpha). Converting x to Re(alpha) therefore
+        # divides its variance by the square of sqrt(2*hbar).
+        sf_vacuum_variance = sf.hbar / 2.0
+        displacement_component_scale = sqrt(2.0 * sf.hbar)
+        vacuum_component_variance = (
+            sf_vacuum_variance / displacement_component_scale ** 2
+        )
+        return self.variance_snu * vacuum_component_variance
 
     def apply(self, measured: float) -> float:
         if self.variance == 0.0:

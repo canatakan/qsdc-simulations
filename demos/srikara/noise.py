@@ -7,9 +7,13 @@ from dataclasses import dataclass
 from math import sqrt
 
 import numpy as np
+import strawberryfields as sf
 
 from qsdc.protocols.srikara.configuration.models import NoiseConfig
 from qsdc.protocols.srikara.simulator.backends import BackendConfig, make_backend
+from qsdc.protocols.srikara.simulator.backends.strawberryfields.calculations import (
+    homodyne_component_std,
+)
 from qsdc.protocols.srikara.simulator.noise import (
     DetectorInefficiency,
     ElectronicNoise,
@@ -17,7 +21,9 @@ from qsdc.protocols.srikara.simulator.noise import (
     PureLoss,
     ThermalLoss,
 )
-from qsdc.protocols.srikara.simulator.noise.effects import VACUUM_VARIANCE
+
+
+VACUUM_VARIANCE = homodyne_component_std() ** 2
 
 
 NoiseValues = dict[str, list[dict[str, object]]]
@@ -303,7 +309,10 @@ def print_introduction(alpha: complex, beta: complex, sample_count: int) -> None
     print("=" * 42)
     print("Actual data: one MeasureHomodyne execution per independent optical mode")
     print("Expected data: standard Gaussian first/second-moment formulas")
-    print("Strawberry Fields hbar=2; simulator output is divided by 2")
+    print(
+        f"Strawberry Fields hbar={sf.hbar:g}; quadratures are divided by "
+        "sqrt(2*hbar)"
+    )
     print(f"Reported vacuum variance Vvac = {VACUUM_VARIANCE:g}")
     print(f"alpha_q = {alpha.real:g}; Alice beta_q = {beta.real:g}; r = 0")
     print(f"One-shot samples per scenario = {sample_count}")
