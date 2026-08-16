@@ -4,30 +4,29 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from math import sqrt
+from math import exp, sqrt
 
 import numpy as np
 import strawberryfields as sf
 
+from qsdc.common.quadrature import QuadratureAxis
 from qsdc.protocols.srikara.configuration.noise import (
+    DelayConfig,
     DetectorInefficiencyConfig,
     ElectronicNoiseConfig,
     NoiseConfig,
     PureLossConfig,
     ThermalLossConfig,
 )
-from qsdc.common.quadrature import QuadratureAxis
 from qsdc.protocols.srikara.simulator.backends import make_backend
+
 VACUUM_VARIANCE = 0.25
-
-
-NoiseValues = dict[str, list[dict[str, object]]]
 
 
 @dataclass(frozen=True)
 class Scenario:
     name: str
-    noise: NoiseValues
+    noise: dict[str, list[dict[str, object]]]
 
 
 @dataclass(frozen=True)
@@ -98,8 +97,18 @@ def build_scenarios() -> tuple[Scenario, ...]:
             {"forward": [{"type": "loss", "transmittance": 0.64}]},
         ),
         Scenario(
-            "Alice delay pure loss",
-            {"alice_delay": [{"type": "loss", "transmittance": 0.64}]},
+            "Alice storage loss",
+            {
+                "alice_delay": [
+                    {
+                        "type": "delay",
+                        "duration_seconds": 1.0,
+                        "lifetime_seconds": 2.0,
+                        "initial_efficiency": 1.0,
+                        "environment_nbar": 0.0,
+                    }
+                ]
+            },
         ),
         Scenario(
             "Return pure loss",
@@ -138,7 +147,13 @@ def build_scenarios() -> tuple[Scenario, ...]:
             {
                 "forward": [{"type": "loss", "transmittance": 0.81}],
                 "alice_delay": [
-                    {"type": "loss", "transmittance": 0.81}
+                    {
+                        "type": "delay",
+                        "duration_seconds": 0.5,
+                        "lifetime_seconds": 2.0,
+                        "initial_efficiency": 0.9,
+                        "environment_nbar": 0.01,
+                    }
                 ],
                 "return_path": [
                     {
@@ -243,6 +258,24 @@ def apply_effect_to_moments(
     variance: float,
 ) -> tuple[float, float, str]:
     """Apply one effect's standard first- and second-moment formulas."""
+
+    if isinstance(effect, DelayConfig):
+        transmittance = effect.initial_efficiency * exp(
+            -effect.duration_seconds / effect.lifetime_seconds
+        )
+        thermal_variance = (2.0 * effect.environment_nbar + 1.0) * VACUUM_VARIANCE
+        output_mean = sqrt(transmittance) * mean
+        output_variance = (
+            transmittance * variance
+            + (1.0 - transmittance) * thermal_variance
+        )
+        formula = (
+            f"storage T={transmittance:g}, nbar={effect.environment_nbar:g}: "
+            f"mean=sqrt(T)*mean={output_mean:.4f}, "
+            f"variance=T*variance+(1-T)*(2*nbar+1)*Vvac="
+            f"{output_variance:.4f}"
+        )
+        return output_mean, output_variance, formula
 
     if isinstance(effect, PureLossConfig):
         transmittance = effect.transmittance
@@ -391,6 +424,7 @@ def stage_effects(noise: NoiseConfig, stage: str) -> str:
     if not effects:
         return "-"
     labels = {
+        DelayConfig: "storage",
         PureLossConfig: "pure",
         ThermalLossConfig: "thermal",
         DetectorInefficiencyConfig: "detector",

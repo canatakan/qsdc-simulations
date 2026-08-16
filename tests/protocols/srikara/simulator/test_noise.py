@@ -6,6 +6,7 @@ from strawberryfields import ops
 
 from qsdc.common.quadrature import QuadratureAxis
 from qsdc.protocols.srikara.configuration.noise import (
+    DelayConfig,
     DetectorInefficiencyConfig,
     ElectronicNoiseConfig,
     NoiseConfig,
@@ -29,9 +30,7 @@ from qsdc.protocols.srikara.simulator.backends.strawberryfields.utils.noise impo
 
 
 def noise(**stages):
-    return NoiseConfig.model_validate({
-        stage: list(effects) for stage, effects in stages.items()
-    })
+    return NoiseConfig.model_validate(stages)
 
 
 def pure_loss(transmittance):
@@ -41,6 +40,20 @@ def pure_loss(transmittance):
 def thermal_loss(transmittance, environment_nbar):
     return ThermalLossConfig(
         transmittance=transmittance,
+        environment_nbar=environment_nbar,
+    )
+
+
+def delay(
+    duration_seconds,
+    lifetime_seconds,
+    initial_efficiency=1.0,
+    environment_nbar=0.0,
+):
+    return DelayConfig(
+        duration_seconds=duration_seconds,
+        lifetime_seconds=lifetime_seconds,
+        initial_efficiency=initial_efficiency,
         environment_nbar=environment_nbar,
     )
 
@@ -56,7 +69,7 @@ def electronic_noise(variance_snu):
 def test_effects_are_executable_and_independently_composable():
     model = noise(
         forward=(pure_loss(0.9),),
-        alice_delay=(pure_loss(0.7),),
+        alice_delay=(delay(2.0, 4.0, 0.7, 0.03),),
         return_path=(thermal_loss(0.8, 0.02),),
         bob_detector=(detector_inefficiency(0.6),),
     )
@@ -69,14 +82,17 @@ def test_effects_are_executable_and_independently_composable():
         ops.Dgate,
         ops.Sgate,
         ops.LossChannel,
-        ops.LossChannel,
+        ops.ThermalLossChannel,
         ops.Dgate,
         ops.ThermalLossChannel,
         ops.Sgate,
         ops.LossChannel,
     ]
     assert float(program.circuit[2].op.p[0]) == pytest.approx(0.9)
-    assert float(program.circuit[3].op.p[0]) == pytest.approx(0.7)
+    assert float(program.circuit[3].op.p[0]) == pytest.approx(
+        0.7 * np.exp(-2.0 / 4.0)
+    )
+    assert float(program.circuit[3].op.p[1]) == pytest.approx(0.03)
     assert float(program.circuit[5].op.p[0]) == pytest.approx(0.8)
     assert float(program.circuit[5].op.p[1]) == pytest.approx(0.02)
     assert float(program.circuit[7].op.p[0]) == pytest.approx(0.6)
@@ -106,7 +122,9 @@ def test_control_pipeline_places_forward_and_alice_detector_effects():
 
 
 def test_alice_delay_applies_only_to_stored_modes_before_message_encoding():
-    backend = SFNoiseBackend(noise(alice_delay=(pure_loss(0.64),)))
+    backend = SFNoiseBackend(
+        noise(alice_delay=(delay(np.log(1.0 / 0.64), 1.0),))
+    )
 
     control_program = backend._control_program(1 + 0j, 0.0, 0.0)
     returned_program = backend._returned_program(
@@ -123,7 +141,7 @@ def test_alice_delay_applies_only_to_stored_modes_before_message_encoding():
     assert [type(command.op) for command in returned_program.circuit] == [
         ops.Dgate,
         ops.Sgate,
-        ops.LossChannel,
+        ops.ThermalLossChannel,
         ops.Dgate,
         ops.Sgate,
     ]
@@ -131,7 +149,9 @@ def test_alice_delay_applies_only_to_stored_modes_before_message_encoding():
 
 
 def test_alice_delay_changes_expected_baseline_not_message_response():
-    backend = SFNoiseBackend(noise(alice_delay=(pure_loss(0.64),)))
+    backend = SFNoiseBackend(
+        noise(alice_delay=(delay(np.log(1.0 / 0.64), 1.0),))
+    )
 
     expectation = backend.returned_expectation(
         alpha=1.5 + 0j,
@@ -321,7 +341,15 @@ def test_message_response_includes_return_and_bob_detector_gain():
 def test_backend_configuration_round_trip_builds_executable_effects():
     raw = {
         "forward": [{"type": "loss", "transmittance": 0.9}],
-        "alice_delay": [{"type": "loss", "transmittance": 0.7}],
+        "alice_delay": [
+            {
+                "type": "delay",
+                "duration_seconds": 0.25,
+                "lifetime_seconds": 1.5,
+                "initial_efficiency": 0.9,
+                "environment_nbar": 0.01,
+            }
+        ],
         "return_path": [
             {
                 "type": "thermal_loss",
@@ -340,7 +368,7 @@ def test_backend_configuration_round_trip_builds_executable_effects():
     config = NoiseConfig.model_validate(raw)
 
     assert isinstance(config.forward[0], PureLossConfig)
-    assert isinstance(config.alice_delay[0], PureLossConfig)
+    assert isinstance(config.alice_delay[0], DelayConfig)
     assert isinstance(config.return_path[0], ThermalLossConfig)
     assert isinstance(config.bob_detector[0], DetectorInefficiencyConfig)
     assert isinstance(config.bob_readout[0], ElectronicNoiseConfig)

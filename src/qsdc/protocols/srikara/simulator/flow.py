@@ -1,4 +1,4 @@
-"""Protocol-flow abstractions for routing, delay, and public announcements."""
+"""Protocol-flow abstractions for routing and public announcements."""
 
 from __future__ import annotations
 
@@ -43,9 +43,7 @@ class OpticalSwitch:
         control_indices = tuple(sorted(shuffled_indices[:half]))
         delayed_indices = tuple(shuffled_indices[half:])
 
-        delayed_buffer = DelayBuffer(delayed_indices)
-        released_indices = self._random_source.shuffled(
-            delayed_buffer.release())
+        released_indices = self._random_source.shuffled(delayed_indices)
         message_indices = tuple(sorted(released_indices[:quarter]))
         decoy_indices = tuple(sorted(released_indices[quarter:]))
 
@@ -55,14 +53,6 @@ class OpticalSwitch:
             message_indices=message_indices,
             decoy_indices=decoy_indices,
         )
-
-
-@dataclass(frozen=True)
-class DelayBuffer:
-    indices: tuple[int, ...]
-
-    def release(self) -> tuple[int, ...]:
-        return self.indices
 
 
 def build_transcript(

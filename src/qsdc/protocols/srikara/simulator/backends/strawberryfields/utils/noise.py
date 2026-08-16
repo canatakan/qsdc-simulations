@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from math import sqrt
+from math import exp, sqrt
 
 import numpy as np
 from strawberryfields import hbar, ops
 
 from qsdc.protocols.srikara.configuration.noise import (
     ChannelEffectConfig,
+    DelayConfig,
     DetectorInefficiencyConfig,
     ElectronicNoiseConfig,
     PureLossConfig,
@@ -31,6 +32,22 @@ class Noise:
                     effect.transmittance,
                     effect.environment_nbar,
                 ) | register
+
+    @staticmethod
+    def apply_delay(
+        register: object,
+        effects: list[DelayConfig],
+    ) -> None:
+        """Apply storage loss accumulated during Alice's configured hold time."""
+
+        for effect in effects:
+            transmittance = effect.initial_efficiency * exp(
+                -effect.duration_seconds / effect.lifetime_seconds
+            )
+            ops.ThermalLossChannel(
+                transmittance,
+                effect.environment_nbar,
+            ) | register
 
     @staticmethod
     def apply_detector_noise(

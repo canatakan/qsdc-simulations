@@ -156,7 +156,7 @@ class SFNoiseBackend(QSDCBackend):
             ops.Dgate(alpha_abs, alpha_phase) | q[0]
             ops.Sgate(-squeeze_r, theta) | q[0]
             Noise.apply_channel_noise(q[0], self.noise.forward)
-            Noise.apply_channel_noise(q[0], self.noise.alice_delay)
+            Noise.apply_delay(q[0], self.noise.alice_delay)
             ops.Dgate(beta_abs, beta_phase) | q[0]
             Noise.apply_channel_noise(q[0], self.noise.return_path)
             ops.Sgate(squeeze_r, theta) | q[0]

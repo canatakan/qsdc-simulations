@@ -10,6 +10,18 @@ from qsdc.protocols.srikara.configuration.common import (
     Probability,
 )
 
+
+class DelayConfig(ConfigModel):
+    type: Literal["delay"] = "delay"
+    duration_seconds: NonNegativeFloat
+    lifetime_seconds: Annotated[
+        float,
+        Field(gt=0.0, allow_inf_nan=False),
+    ]
+    initial_efficiency: Probability
+    environment_nbar: NonNegativeFloat
+
+
 class PureLossConfig(ConfigModel):
     type: Literal["loss"] = "loss"
     transmittance: Probability
@@ -39,7 +51,7 @@ class ElectronicNoiseConfig(ConfigModel):
 
 class NoiseConfig(ConfigModel):
     forward: list[ChannelEffectConfig] = Field(default_factory=list)
-    alice_delay: list[ChannelEffectConfig] = Field(default_factory=list)
+    alice_delay: list[DelayConfig] = Field(default_factory=list)
     return_path: list[ChannelEffectConfig] = Field(default_factory=list)
     alice_detector: list[DetectorInefficiencyConfig] = Field(default_factory=list)
     alice_readout: list[ElectronicNoiseConfig] = Field(default_factory=list)
