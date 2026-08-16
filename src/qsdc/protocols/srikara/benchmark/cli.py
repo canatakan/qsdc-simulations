@@ -10,7 +10,7 @@ from typing import Any
 from qsdc.common.random import make_random_source
 from qsdc.protocols.srikara.benchmark.artifacts.ui.index import write_benchmark_index
 from qsdc.protocols.srikara.benchmark.engine import run_benchmark
-from qsdc.protocols.srikara.configuration.configs import BenchmarkConfig
+from qsdc.protocols.srikara.configuration.benchmark import BenchmarkConfig
 from qsdc.protocols.srikara.simulator.backends import make_backend
 
 

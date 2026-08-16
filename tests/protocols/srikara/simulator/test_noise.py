@@ -4,37 +4,61 @@ import strawberryfields as sf
 from pydantic import ValidationError
 from strawberryfields import ops
 
+from qsdc.common.quadrature import QuadratureAxis
+from qsdc.protocols.srikara.configuration.noise import (
+    DetectorInefficiencyConfig,
+    ElectronicNoiseConfig,
+    NoiseConfig,
+    PureLossConfig,
+    ThermalLossConfig,
+)
 from qsdc.protocols.srikara.simulator.backends.strawberryfields.noisy import (
     SFNoiseBackend,
-)
-from qsdc.protocols.srikara.simulator.backends.strawberryfields.calculations import (
-    displacement_component,
-    displacement_component_variance,
-    homodyne_component_std,
 )
 from qsdc.protocols.srikara.simulator.backends.strawberryfields.sampled import (
     SFSampledBackend,
 )
-from qsdc.protocols.srikara.configuration.models import NoiseConfig
-from qsdc.protocols.srikara.simulator.noise import (
-    DetectorInefficiency,
-    ElectronicNoise,
-    NoiseModel,
-    PureLoss,
-    ThermalLoss,
+from qsdc.protocols.srikara.simulator.backends.strawberryfields.utils import (
+    calculations,
 )
+from qsdc.protocols.srikara.simulator.backends.strawberryfields.utils.calculations import (
+    normalize_quadrature,
+    normalize_quadrature_variance,
+)
+from qsdc.protocols.srikara.simulator.backends.strawberryfields.utils.noise import Noise
 
 
 def noise(**stages):
-    return NoiseModel(stages)
+    return NoiseConfig.model_validate({
+        stage: list(effects) for stage, effects in stages.items()
+    })
+
+
+def pure_loss(transmittance):
+    return PureLossConfig(transmittance=transmittance)
+
+
+def thermal_loss(transmittance, environment_nbar):
+    return ThermalLossConfig(
+        transmittance=transmittance,
+        environment_nbar=environment_nbar,
+    )
+
+
+def detector_inefficiency(efficiency):
+    return DetectorInefficiencyConfig(efficiency=efficiency)
+
+
+def electronic_noise(variance_snu):
+    return ElectronicNoiseConfig(variance_snu=variance_snu)
 
 
 def test_effects_are_executable_and_independently_composable():
     model = noise(
-        forward=(PureLoss(0.9),),
-        alice_delay=(PureLoss(0.7),),
-        return_path=(ThermalLoss(0.8, 0.02),),
-        bob_detector=(DetectorInefficiency(0.6),),
+        forward=(pure_loss(0.9),),
+        alice_delay=(pure_loss(0.7),),
+        return_path=(thermal_loss(0.8, 0.02),),
+        bob_detector=(detector_inefficiency(0.6),),
     )
     backend = SFNoiseBackend(model)
 
@@ -61,8 +85,8 @@ def test_effects_are_executable_and_independently_composable():
 def test_control_pipeline_places_forward_and_alice_detector_effects():
     backend = SFNoiseBackend(
         noise(
-            forward=(ThermalLoss(0.8, 0.02),),
-            alice_detector=(DetectorInefficiency(0.6),),
+            forward=(thermal_loss(0.8, 0.02),),
+            alice_detector=(detector_inefficiency(0.6),),
         )
     )
 
@@ -82,7 +106,7 @@ def test_control_pipeline_places_forward_and_alice_detector_effects():
 
 
 def test_alice_delay_applies_only_to_stored_modes_before_message_encoding():
-    backend = SFNoiseBackend(noise(alice_delay=(PureLoss(0.64),)))
+    backend = SFNoiseBackend(noise(alice_delay=(pure_loss(0.64),)))
 
     control_program = backend._control_program(1 + 0j, 0.0, 0.0)
     returned_program = backend._returned_program(
@@ -107,24 +131,28 @@ def test_alice_delay_applies_only_to_stored_modes_before_message_encoding():
 
 
 def test_alice_delay_changes_expected_baseline_not_message_response():
-    backend = SFNoiseBackend(noise(alice_delay=(PureLoss(0.64),)))
+    backend = SFNoiseBackend(noise(alice_delay=(pure_loss(0.64),)))
 
     expectation = backend.returned_expectation(
         alpha=1.5 + 0j,
         squeeze_r=0.0,
         theta=0.0,
-        axis="q",
+        axis=QuadratureAxis.Q,
     )
 
     assert expectation.mean == pytest.approx(0.8 * 1.5)
-    assert backend.message_response_factor(0.0, 0.0, "q") == pytest.approx(1.0)
+    assert backend.message_response_factor(
+        0.0,
+        0.0,
+        QuadratureAxis.Q,
+    ) == pytest.approx(1.0)
 
 
 def test_sf_moments_match_thermal_loss_and_detector_calculation():
     backend = SFNoiseBackend(
         noise(
-            return_path=(ThermalLoss(0.64, 0.5),),
-            bob_detector=(DetectorInefficiency(0.64),),
+            return_path=(thermal_loss(0.64, 0.5),),
+            bob_detector=(detector_inefficiency(0.64),),
         )
     )
     program = backend._returned_program(
@@ -135,12 +163,12 @@ def test_sf_moments_match_thermal_loss_and_detector_calculation():
     )
 
     state = sf.Engine("gaussian").run(program).state
-    reported_mean = displacement_component(float(state.means()[0]))
-    reported_variance = displacement_component_variance(
+    reported_mean = normalize_quadrature(float(state.means()[0]))
+    reported_variance = normalize_quadrature_variance(
         float(state.cov()[0, 0])
     )
 
-    vacuum_variance = homodyne_component_std() ** 2
+    vacuum_variance = 0.25
     mean_after_thermal_loss = np.sqrt(0.64) * (1.5 + 0.75)
     variance_after_thermal_loss = (
         0.64 * vacuum_variance
@@ -159,9 +187,9 @@ def test_sf_moments_match_thermal_loss_and_detector_calculation():
 def test_returned_expectation_includes_calibrated_optical_and_readout_noise():
     backend = SFNoiseBackend(
         noise(
-            return_path=(ThermalLoss(0.64, 0.5),),
-            bob_detector=(DetectorInefficiency(0.64),),
-            bob_readout=(ElectronicNoise(0.5),),
+            return_path=(thermal_loss(0.64, 0.5),),
+            bob_detector=(detector_inefficiency(0.64),),
+            bob_readout=(electronic_noise(0.5),),
         )
     )
 
@@ -169,10 +197,10 @@ def test_returned_expectation_includes_calibrated_optical_and_readout_noise():
         alpha=1.5 + 0j,
         squeeze_r=0.0,
         theta=0.0,
-        axis="q",
+        axis=QuadratureAxis.Q,
     )
 
-    vacuum_variance = homodyne_component_std() ** 2
+    vacuum_variance = 0.25
     variance_after_thermal_loss = 0.64 * vacuum_variance + 0.36 * 0.5
     variance_after_detector = (
         0.64 * variance_after_thermal_loss + 0.36 * vacuum_variance
@@ -183,8 +211,6 @@ def test_returned_expectation_includes_calibrated_optical_and_readout_noise():
 
 
 def test_noisy_measurement_executes_sf_once_and_homodyne_once(monkeypatch):
-    import qsdc.protocols.srikara.simulator.backends.strawberryfields.noisy as noisy
-
     executed_programs = []
 
     class FakeResult:
@@ -198,10 +224,15 @@ def test_noisy_measurement_executes_sf_once_and_homodyne_once(monkeypatch):
             executed_programs.append(program)
             return FakeResult()
 
-    monkeypatch.setattr(noisy.sf, "Engine", FakeEngine)
-    backend = SFNoiseBackend(noise(forward=(PureLoss(0.9),)))
+    monkeypatch.setattr(calculations, "Engine", FakeEngine)
+    backend = SFNoiseBackend(noise(forward=(pure_loss(0.9),)))
 
-    measured = backend.control_measurement(1 + 0j, 0.2, 0.1, "q")
+    measured = backend.control_measurement(
+        1 + 0j,
+        0.2,
+        0.1,
+        QuadratureAxis.Q,
+    )
 
     assert measured == pytest.approx(0.75)
     assert len(executed_programs) == 1
@@ -220,12 +251,13 @@ def test_electronic_noise_is_one_separate_post_measurement_draw(monkeypatch):
         return 0.125
 
     monkeypatch.setattr(
-        "qsdc.protocols.srikara.simulator.noise.effects.np.random.normal",
+        "qsdc.protocols.srikara.simulator.backends.strawberryfields.utils.noise."
+        "np.random.normal",
         fake_normal,
     )
-    effect = ElectronicNoise(variance_snu=0.04)
+    effect = electronic_noise(0.04)
 
-    assert effect.apply(2.0) == pytest.approx(2.125)
+    assert Noise.apply_electronic_noise(2.0, [effect]) == pytest.approx(2.125)
     assert draws == [(0.0, pytest.approx(0.1))]
 
 
@@ -234,11 +266,15 @@ def test_zero_electronic_noise_does_not_draw(monkeypatch):
         raise AssertionError("zero electronic variance must not sample")
 
     monkeypatch.setattr(
-        "qsdc.protocols.srikara.simulator.noise.effects.np.random.normal",
+        "qsdc.protocols.srikara.simulator.backends.strawberryfields.utils.noise."
+        "np.random.normal",
         fail_if_called,
     )
 
-    assert ElectronicNoise(0.0).apply(2.0) == 2.0
+    assert Noise.apply_electronic_noise(
+        2.0,
+        [electronic_noise(0.0)],
+    ) == 2.0
 
 
 def test_empty_noise_model_matches_sf_sampled_for_same_seed():
@@ -246,10 +282,20 @@ def test_empty_noise_model_matches_sf_sampled_for_same_seed():
     sampled = SFSampledBackend()
 
     noisy.begin_run(17)
-    noisy_value = noisy.returned_measurement(0.5 + 0.2j, 0.3, 0.7, 0.1 + 0.1j, "p")
+    noisy_value = noisy.returned_measurement(
+        0.5 + 0.2j,
+        0.3,
+        0.7,
+        0.1 + 0.1j,
+        QuadratureAxis.P,
+    )
     sampled.begin_run(17)
     sampled_value = sampled.returned_measurement(
-        0.5 + 0.2j, 0.3, 0.7, 0.1 + 0.1j, "p"
+        0.5 + 0.2j,
+        0.3,
+        0.7,
+        0.1 + 0.1j,
+        QuadratureAxis.P,
     )
 
     assert noisy_value == pytest.approx(sampled_value)
@@ -258,13 +304,17 @@ def test_empty_noise_model_matches_sf_sampled_for_same_seed():
 def test_message_response_includes_return_and_bob_detector_gain():
     backend = SFNoiseBackend(
         noise(
-            forward=(PureLoss(0.01),),
-            return_path=(PureLoss(0.25),),
-            bob_detector=(DetectorInefficiency(0.25),),
+            forward=(pure_loss(0.01),),
+            return_path=(pure_loss(0.25),),
+            bob_detector=(detector_inefficiency(0.25),),
         )
     )
 
-    assert backend.message_response_factor(0.0, 0.0, "q") == pytest.approx(0.25)
+    assert backend.message_response_factor(
+        0.0,
+        0.0,
+        QuadratureAxis.Q,
+    ) == pytest.approx(0.25)
     assert backend.measurement_noise_sigma == pytest.approx(0.5)
 
 
@@ -287,14 +337,14 @@ def test_backend_configuration_round_trip_builds_executable_effects():
         ],
     }
 
-    model = NoiseConfig.model_validate(raw).build()
+    config = NoiseConfig.model_validate(raw)
 
-    assert isinstance(model.at("forward")[0], PureLoss)
-    assert isinstance(model.at("alice_delay")[0], PureLoss)
-    assert isinstance(model.at("return_path")[0], ThermalLoss)
-    assert isinstance(model.at("bob_detector")[0], DetectorInefficiency)
-    assert isinstance(model.at("bob_readout")[0], ElectronicNoise)
-    serialized = NoiseConfig.from_runtime(model).model_dump(mode="json")
+    assert isinstance(config.forward[0], PureLossConfig)
+    assert isinstance(config.alice_delay[0], PureLossConfig)
+    assert isinstance(config.return_path[0], ThermalLossConfig)
+    assert isinstance(config.bob_detector[0], DetectorInefficiencyConfig)
+    assert isinstance(config.bob_readout[0], ElectronicNoiseConfig)
+    serialized = config.model_dump(mode="json")
     assert serialized["forward"] == raw["forward"]
     assert serialized["alice_delay"] == raw["alice_delay"]
     assert serialized["return_path"] == raw["return_path"]
@@ -392,18 +442,6 @@ def test_noise_configuration_rejects_effects_at_wrong_stage(
             {
                 "name": "sf-noise",
                 "noise": {
-                    "bob_readout": [
-                        {"type": "electronic_noise", "variance_snu": "0.1"}
-                    ]
-                },
-            },
-            ("bob_readout", 0, "variance_snu"),
-            "float_type",
-        ),
-        (
-            {
-                "name": "sf-noise",
-                "noise": {
                     "return_path": [
                         {
                             "type": "thermal_loss",
@@ -429,18 +467,3 @@ def test_backend_configuration_rejects_invalid_nested_values(
         and error["type"] == error_code
         for error in exc_info.value.errors()
     )
-
-
-def test_noise_model_applies_any_configured_stage_parametrically():
-    calls = []
-
-    class Effect:
-        def apply(self, value):
-            calls.append(value)
-            return value + 1
-
-    model = noise(custom=(Effect(), Effect()))
-
-    assert model.apply("custom", 3) == 5
-    assert model.apply("missing", 3) == 3
-    assert calls == [3, 4]

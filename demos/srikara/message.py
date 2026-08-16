@@ -7,11 +7,8 @@ import textwrap
 
 from qsdc.common.bits import bits_to_bytes, bytes_to_bits
 from qsdc.common.random import make_random_source
-from qsdc.protocols.srikara.simulator.backends import (
-    BackendConfig,
-    make_backend,
-)
-from qsdc.protocols.srikara.configuration.configs import ProtocolConfig
+from qsdc.protocols.srikara.simulator.backends import make_backend
+from qsdc.protocols.srikara.configuration.simulator import SimulatorConfig
 from qsdc.protocols.srikara.simulator.encoding import (
     ENCODING_INTERVALS,
     interval_for_bits,
@@ -20,7 +17,7 @@ from qsdc.protocols.srikara.simulator.protocol import simulate_qsdc
 
 
 def main() -> None:
-    defaults = ProtocolConfig.from_options()
+    defaults = SimulatorConfig()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "message",
@@ -85,11 +82,11 @@ def main() -> None:
     }
     if args.tolerance_sigmas is not None:
         config_overrides["tolerance_sigmas"] = args.tolerance_sigmas
-    config = ProtocolConfig.from_options(**config_overrides)
+    config = SimulatorConfig.model_validate(config_overrides)
     result = simulate_qsdc(
         symbols,
         config=config,
-        backend=make_backend(BackendConfig(name=args.backend)),
+        backend=make_backend(args.backend),
         random_source=make_random_source(args.random_source, args.seed),
     )
 

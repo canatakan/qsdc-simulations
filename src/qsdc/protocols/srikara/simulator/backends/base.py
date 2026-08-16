@@ -5,6 +5,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+from qsdc.common.quadrature import QuadratureAxis
+
 
 @dataclass(frozen=True)
 class MeasurementExpectation:
@@ -26,19 +28,24 @@ class QSDCBackend(ABC):
 
     @abstractmethod
     def control_measurement(
-        self, alpha: complex, squeeze_r: float, theta: float, axis: str
+        self, alpha: complex, squeeze_r: float, theta: float, axis: QuadratureAxis
     ) -> float:
         """Measure one control quadrature after Alice applies S(-s)."""
 
     @abstractmethod
     def returned_measurement(
-        self, alpha: complex, squeeze_r: float, theta: float, beta: complex, axis: str
+        self,
+        alpha: complex,
+        squeeze_r: float,
+        theta: float,
+        beta: complex,
+        axis: QuadratureAxis,
     ) -> float:
         """Measure one returned quadrature after Bob applies S(-s)."""
 
     @abstractmethod
     def message_response_factor(
-        self, squeeze_r: float, theta: float, axis: str
+        self, squeeze_r: float, theta: float, axis: QuadratureAxis
     ) -> float:
         """Return the measured response to a unit message displacement."""
 
@@ -47,12 +54,12 @@ class QSDCBackend(ABC):
         alpha: complex,
         squeeze_r: float,
         theta: float,
-        axis: str,
+        axis: QuadratureAxis,
     ) -> MeasurementExpectation:
         """Return the expectation for an Alice control measurement."""
 
         return MeasurementExpectation(
-            mean=_component(alpha, axis),
+            mean=axis.component(alpha),
             sigma=self.measurement_noise_sigma,
         )
 
@@ -61,19 +68,8 @@ class QSDCBackend(ABC):
         alpha: complex,
         squeeze_r: float,
         theta: float,
-        axis: str,
+        axis: QuadratureAxis,
     ) -> MeasurementExpectation:
         """Return the expectation for a returned mode without a message."""
 
-        return MeasurementExpectation(
-            mean=_component(alpha, axis),
-            sigma=self.measurement_noise_sigma,
-        )
-
-
-def _component(value: complex, axis: str) -> float:
-    if axis == "q":
-        return value.real
-    if axis == "p":
-        return value.imag
-    raise ValueError(f"unknown quadrature axis {axis!r}")
+        return self.control_expectation(alpha, squeeze_r, theta, axis)

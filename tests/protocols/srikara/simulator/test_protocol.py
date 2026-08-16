@@ -2,7 +2,7 @@ import pytest
 
 from qsdc.protocols.srikara.simulator.backends.analytic.ideal import AnalyticBackend
 from qsdc.protocols.srikara.simulator.backends.base import MeasurementExpectation
-from qsdc.protocols.srikara.configuration.configs import ProtocolConfig
+from qsdc.protocols.srikara.configuration.simulator import SimulatorConfig
 from qsdc.protocols.srikara.simulator.protocol import simulate_qsdc
 
 
@@ -10,7 +10,7 @@ def test_qsdc_protocol_round_trips_messages():
     messages = ("000", "011", "101")
     result = simulate_qsdc(
         messages,
-        config=ProtocolConfig.from_options(n_states=12, seed=4),
+        config=SimulatorConfig(n_states=12, seed=4),
         backend=AnalyticBackend(),
     )
 
@@ -23,11 +23,11 @@ def test_qsdc_protocol_round_trips_messages():
     assert result.transcript.random_source == "classical"
 
 
-def test_check_axis_policy_uses_larger_displacement_component():
+def test_check_axis_policy_uses_larger_normalize_quadrature():
     messages = ("000", "011", "101")
     result = simulate_qsdc(
         messages,
-        config=ProtocolConfig.from_options(
+        config=SimulatorConfig(
             n_states=12,
             seed=4,
             check_axis_policy="optimized",
@@ -70,7 +70,7 @@ def test_protocol_uses_calibrated_expectations_for_checks_and_messages():
     messages = ("000", "011", "101")
     result = simulate_qsdc(
         messages,
-        config=ProtocolConfig.from_options(n_states=12, seed=4),
+        config=SimulatorConfig(n_states=12, seed=4),
         backend=CalibratedBackend(),
     )
 

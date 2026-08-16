@@ -1,3 +1,5 @@
+import pytest
+
 from qsdc.common.bits import chunk_bits
 from qsdc.common.random.classical import ClassicalRandomSource
 from qsdc.protocols.srikara.simulator.encoding import (
@@ -33,9 +35,13 @@ def test_boundaries_decode_to_right_interval():
     assert bits_for_real(3.0) == "111"
 
 
-def test_optimized_interval_round_trip_samples():
+@pytest.mark.parametrize(
+    "intervals",
+    ("optimized_v4", "optimized_v8", "optimized_v12"),
+)
+def test_optimized_interval_round_trip_samples(intervals):
     rng = ClassicalRandomSource(1)
     for bits in ("000", "001", "010", "011", "100", "101", "110", "111"):
-        value = sample_message_value(bits, rng, intervals="optimized")
-        assert interval_for_bits(bits, intervals="optimized").contains(value)
-        assert bits_for_real(value, intervals="optimized") == bits
+        value = sample_message_value(bits, rng, intervals=intervals)
+        assert interval_for_bits(bits, intervals=intervals).contains(value)
+        assert bits_for_real(value, intervals=intervals) == bits

@@ -6,15 +6,14 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from qsdc.common.quadrature import QuadratureAxis
 from qsdc.protocols.srikara.simulator.backends.base import QSDCBackend
-from qsdc.protocols.srikara.simulator.backends.strawberryfields.calculations import (
-    build_control_program,
-    build_returned_program,
-    homodyne_component_std,
+from qsdc.protocols.srikara.simulator.backends.strawberryfields.utils.calculations import (
+    build_program,
     homodyne_sample,
-    mean_component,
-    message_unit_beta,
+    quadrature_mean,
 )
+from qsdc.protocols.srikara.simulator.encoding import beta_for_message_value
 
 
 @dataclass(frozen=True)
@@ -22,33 +21,41 @@ class SFSampledBackend(QSDCBackend):
     """SF Gaussian circuits with sampled homodyne readout."""
 
     name: str = "sf-sampled"
-    measurement_noise_sigma: float = homodyne_component_std()
+    measurement_noise_sigma: float = 0.5
 
     def begin_run(self, seed: int) -> None:
         np.random.seed(seed)
 
     def control_measurement(
-        self, alpha: complex, squeeze_r: float, theta: float, axis: str
-    ) -> float:
-        return homodyne_sample(build_control_program(alpha, squeeze_r, theta), axis)
-
-    def returned_measurement(
-        self, alpha: complex, squeeze_r: float, theta: float, beta: complex, axis: str
+        self, alpha: complex, squeeze_r: float, theta: float, axis: QuadratureAxis
     ) -> float:
         return homodyne_sample(
-            build_returned_program(alpha, squeeze_r, theta, beta),
+            build_program(alpha, squeeze_r, theta, beta=0j),
+            axis,
+        )
+
+    def returned_measurement(
+        self,
+        alpha: complex,
+        squeeze_r: float,
+        theta: float,
+        beta: complex,
+        axis: QuadratureAxis,
+    ) -> float:
+        return homodyne_sample(
+            build_program(alpha, squeeze_r, theta, beta),
             axis,
         )
 
     def message_response_factor(
-        self, squeeze_r: float, theta: float, axis: str
+        self, squeeze_r: float, theta: float, axis: QuadratureAxis
     ) -> float:
-        return mean_component(
-            build_returned_program(
+        return quadrature_mean(
+            build_program(
                 alpha=0j,
                 squeeze_r=squeeze_r,
                 theta=theta,
-                beta=message_unit_beta(),
+                beta=beta_for_message_value(1.0),
             ),
             axis,
         )

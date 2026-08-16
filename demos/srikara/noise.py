@@ -9,21 +9,16 @@ from math import sqrt
 import numpy as np
 import strawberryfields as sf
 
-from qsdc.protocols.srikara.configuration.models import NoiseConfig
-from qsdc.protocols.srikara.simulator.backends import BackendConfig, make_backend
-from qsdc.protocols.srikara.simulator.backends.strawberryfields.calculations import (
-    homodyne_component_std,
+from qsdc.protocols.srikara.configuration.noise import (
+    DetectorInefficiencyConfig,
+    ElectronicNoiseConfig,
+    NoiseConfig,
+    PureLossConfig,
+    ThermalLossConfig,
 )
-from qsdc.protocols.srikara.simulator.noise import (
-    DetectorInefficiency,
-    ElectronicNoise,
-    NoiseModel,
-    PureLoss,
-    ThermalLoss,
-)
-
-
-VACUUM_VARIANCE = homodyne_component_std() ** 2
+from qsdc.common.quadrature import QuadratureAxis
+from qsdc.protocols.srikara.simulator.backends import make_backend
+VACUUM_VARIANCE = 0.25
 
 
 NoiseValues = dict[str, list[dict[str, object]]]
@@ -172,8 +167,8 @@ def run_scenario(
 ) -> ScenarioResult:
     """Sample independent modes through the real configured SF backend."""
 
-    noise = NoiseConfig.model_validate(scenario.noise).build()
-    backend = make_backend(BackendConfig(name="sf-noise", noise=noise))
+    config = NoiseConfig.model_validate(scenario.noise)
+    backend = make_backend("sf-noise", config)
     backend.begin_run(seed)
     measured = np.array([
         backend.returned_measurement(
@@ -181,21 +176,22 @@ def run_scenario(
             squeeze_r=0.0,
             theta=0.0,
             beta=beta,
-            axis="q",
+            axis=QuadratureAxis.Q,
         )
         for _ in range(samples)
     ])
-    expected, _ = calculate_expected_moments(noise, alpha.real, beta.real)
+    expected, _ = calculate_expected_moments(config, alpha.real, beta.real)
     calibrated_expectation = backend.returned_expectation(
         alpha=alpha,
         squeeze_r=0.0,
         theta=0.0,
-        axis="q",
+        axis=QuadratureAxis.Q,
     )
     calibrated = Moments(
         mean=(
             calibrated_expectation.mean
-            + backend.message_response_factor(0.0, 0.0, "q") * beta.real
+            + backend.message_response_factor(0.0, 0.0, QuadratureAxis.Q)
+            * beta.real
         ),
         variance=calibrated_expectation.sigma ** 2,
     )
@@ -203,7 +199,7 @@ def run_scenario(
 
 
 def calculate_expected_moments(
-    noise: NoiseModel,
+    noise: NoiseConfig,
     alpha_q: float,
     beta_q: float,
 ) -> tuple[Moments, list[str]]:
@@ -215,26 +211,26 @@ def calculate_expected_moments(
         f"input coherent mode: mean={mean:.4f}, variance={variance:.4f}"
     ]
 
-    for effect in noise.at("forward"):
+    for effect in noise.forward:
         mean, variance, formula = apply_effect_to_moments(effect, mean, variance)
         steps.append(f"forward {formula}")
 
-    for effect in noise.at("alice_delay"):
+    for effect in noise.alice_delay:
         mean, variance, formula = apply_effect_to_moments(effect, mean, variance)
         steps.append(f"Alice delay {formula}")
 
     mean += beta_q
     steps.append(f"Alice displacement: mean += {beta_q:.4f} -> {mean:.4f}")
 
-    for effect in noise.at("return_path"):
+    for effect in noise.return_path:
         mean, variance, formula = apply_effect_to_moments(effect, mean, variance)
         steps.append(f"return {formula}")
 
-    for effect in noise.at("bob_detector"):
+    for effect in noise.bob_detector:
         mean, variance, formula = apply_effect_to_moments(effect, mean, variance)
         steps.append(f"detector {formula}")
 
-    for effect in noise.at("bob_readout"):
+    for effect in noise.bob_readout:
         mean, variance, formula = apply_effect_to_moments(effect, mean, variance)
         steps.append(f"readout {formula}")
 
@@ -248,7 +244,7 @@ def apply_effect_to_moments(
 ) -> tuple[float, float, str]:
     """Apply one effect's standard first- and second-moment formulas."""
 
-    if isinstance(effect, PureLoss):
+    if isinstance(effect, PureLossConfig):
         transmittance = effect.transmittance
         output_mean = sqrt(transmittance) * mean
         output_variance = (
@@ -262,7 +258,7 @@ def apply_effect_to_moments(
         )
         return output_mean, output_variance, formula
 
-    if isinstance(effect, ThermalLoss):
+    if isinstance(effect, ThermalLossConfig):
         transmittance = effect.transmittance
         thermal_variance = (2.0 * effect.environment_nbar + 1.0) * VACUUM_VARIANCE
         output_mean = sqrt(transmittance) * mean
@@ -278,7 +274,7 @@ def apply_effect_to_moments(
         )
         return output_mean, output_variance, formula
 
-    if isinstance(effect, DetectorInefficiency):
+    if isinstance(effect, DetectorInefficiencyConfig):
         efficiency = effect.efficiency
         output_mean = sqrt(efficiency) * mean
         output_variance = (
@@ -292,7 +288,7 @@ def apply_effect_to_moments(
         )
         return output_mean, output_variance, formula
 
-    if isinstance(effect, ElectronicNoise):
+    if isinstance(effect, ElectronicNoiseConfig):
         added_variance = effect.variance_snu * VACUUM_VARIANCE
         output_variance = variance + added_variance
         formula = (
@@ -382,7 +378,7 @@ def print_stage_matrix(scenarios: tuple[Scenario, ...]) -> None:
     print(f"{'scenario':<28} " + "  ".join(f"{label:<10}" for _, label in stages))
     print("-" * 111)
     for scenario in scenarios:
-        noise = NoiseConfig.model_validate(scenario.noise).build()
+        noise = NoiseConfig.model_validate(scenario.noise)
         values = [stage_effects(noise, stage) for stage, _ in stages]
         print(
             f"{scenario.name:<28} "
@@ -390,21 +386,21 @@ def print_stage_matrix(scenarios: tuple[Scenario, ...]) -> None:
         )
 
 
-def stage_effects(noise: NoiseModel, stage: str) -> str:
-    effects = noise.at(stage)
+def stage_effects(noise: NoiseConfig, stage: str) -> str:
+    effects = getattr(noise, stage)
     if not effects:
         return "-"
     labels = {
-        PureLoss: "pure",
-        ThermalLoss: "thermal",
-        DetectorInefficiency: "detector",
-        ElectronicNoise: "electronic",
+        PureLossConfig: "pure",
+        ThermalLossConfig: "thermal",
+        DetectorInefficiencyConfig: "detector",
+        ElectronicNoiseConfig: "electronic",
     }
     return ", ".join(labels[type(effect)] for effect in effects)
 
 
 def print_calculation(scenario: Scenario, alpha_q: float, beta_q: float) -> None:
-    noise = NoiseConfig.model_validate(scenario.noise).build()
+    noise = NoiseConfig.model_validate(scenario.noise)
     _, steps = calculate_expected_moments(noise, alpha_q, beta_q)
     print(f"\n{scenario.name}")
     print("-" * len(scenario.name))
