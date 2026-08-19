@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from qsdc.common.quadrature import QuadratureAxis
 from qsdc.protocols.srikara.simulator.backends.base import QSDCBackend
-from qsdc.protocols.srikara.simulator.backends.strawberryfields.calculations import (
-    build_control_program,
-    build_returned_program,
-    mean_component,
-    message_unit_beta,
+from qsdc.protocols.srikara.simulator.backends.strawberryfields.utils.calculations import (
+    build_program,
+    quadrature_mean,
 )
+from qsdc.protocols.srikara.simulator.encoding import beta_for_message_value
 
 
 @dataclass(frozen=True)
@@ -24,26 +24,34 @@ class SFBackend(QSDCBackend):
         pass
 
     def control_measurement(
-        self, alpha: complex, squeeze_r: float, theta: float, axis: str
+        self, alpha: complex, squeeze_r: float, theta: float, axis: QuadratureAxis
     ) -> float:
-        return mean_component(build_control_program(alpha, squeeze_r, theta), axis)
+        return quadrature_mean(
+            build_program(alpha, squeeze_r, theta, beta=0j),
+            axis,
+        )
 
     def returned_measurement(
-        self, alpha: complex, squeeze_r: float, theta: float, beta: complex, axis: str
+        self,
+        alpha: complex,
+        squeeze_r: float,
+        theta: float,
+        beta: complex,
+        axis: QuadratureAxis,
     ) -> float:
-        return mean_component(
-            build_returned_program(alpha, squeeze_r, theta, beta), axis
+        return quadrature_mean(
+            build_program(alpha, squeeze_r, theta, beta), axis
         )
 
     def message_response_factor(
-        self, squeeze_r: float, theta: float, axis: str
+        self, squeeze_r: float, theta: float, axis: QuadratureAxis
     ) -> float:
-        return mean_component(
-            build_returned_program(
+        return quadrature_mean(
+            build_program(
                 alpha=0j,
                 squeeze_r=squeeze_r,
                 theta=theta,
-                beta=message_unit_beta(),
+                beta=beta_for_message_value(1.0),
             ),
             axis,
         )

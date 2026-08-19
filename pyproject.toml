@@ -9,8 +9,10 @@ description = "Continuous-variable QSDC protocol simulators."
 readme = "README.md"
 requires-python = ">=3.9,<3.10"
 dependencies = [
+  "Jinja2>=3.1,<4",
   "matplotlib",
   "numpy",
+  "pydantic>=2.13,<3",
   "strawberryfields",
 ]
 

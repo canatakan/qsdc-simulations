@@ -1,0 +1,10 @@
+{% if plots %}
+  {% for plot in plots %}
+<figure class="plot-card">
+  <img src="{{ plot.path }}" alt="{{ plot.title }}">
+  <figcaption>{{ plot.title }}</figcaption>
+</figure>
+  {% endfor %}
+{% else %}
+<p class="muted">No plots were generated.</p>
+{% endif %}

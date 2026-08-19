@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+from qsdc.common.quadrature import QuadratureAxis
 from qsdc.common.random.base import RandomSource
 from qsdc.common.random.classical import ClassicalRandomSource
 from qsdc.protocols.srikara.simulator.backends.analytic.ideal import AnalyticBackend
 from qsdc.protocols.srikara.simulator.backends.base import QSDCBackend
-from qsdc.protocols.srikara.simulator.config import ProtocolConfig
+from qsdc.protocols.srikara.configuration.simulator import SimulatorConfig
 from qsdc.protocols.srikara.simulator.encoding import (
     beta_for_message_value,
     bits_for_real,
@@ -30,8 +32,9 @@ class BobPreparedState:
 @dataclass(frozen=True)
 class ControlCheck:
     index: int
-    axis: str
+    axis: QuadratureAxis
     expected: float
+    expected_sigma: float
     measured: float
     passed: bool
 
@@ -39,8 +42,9 @@ class ControlCheck:
 @dataclass(frozen=True)
 class DecoyCheck:
     index: int
-    axis: str
+    axis: QuadratureAxis
     expected: float
+    expected_sigma: float
     measured: float
     passed: bool
 
@@ -52,8 +56,9 @@ class MessageDecode:
     sent_bits: str
     message_value: float
     alice_beta: complex
-    axis: str
+    axis: QuadratureAxis
     measured: float
+    expected_baseline: float
     observed_delta: float
     response_factor: float
     recovered_beta: complex
@@ -89,11 +94,10 @@ class ProtocolResult:
 
 def simulate_qsdc(
     message_bits: list[str] | tuple[str, ...],
-    config: ProtocolConfig | None = None,
+    config: SimulatorConfig,
     backend: QSDCBackend | None = None,
     random_source: RandomSource | None = None,
 ) -> ProtocolResult:
-    config = config or ProtocolConfig.from_options(n_states=4 * len(message_bits))
     active_backend: QSDCBackend = backend if backend is not None else AnalyticBackend()
     if config.n_states % 4 != 0:
         raise ValueError("n_states must be divisible by 4")
@@ -168,7 +172,7 @@ def simulate_qsdc(
 
 
 def _bob_prepare_states(
-    config: ProtocolConfig, random_source: RandomSource
+    config: SimulatorConfig, random_source: RandomSource
 ) -> list[BobPreparedState]:
     states: list[BobPreparedState] = []
     for index in range(config.n_states):
@@ -182,56 +186,72 @@ def _bob_prepare_states(
 def _check_control(
     state: BobPreparedState,
     backend: QSDCBackend,
-    config: ProtocolConfig,
+    config: SimulatorConfig,
     random_source: RandomSource,
 ) -> ControlCheck:
     axis = _check_axis(state, config, random_source)
-    expected = state.alpha.real if axis == "q" else state.alpha.imag
+    expectation = backend.control_expectation(
+        state.alpha,
+        state.squeeze_r,
+        state.theta,
+        axis,
+    )
     measured = backend.control_measurement(
         state.alpha, state.squeeze_r, state.theta, axis
     )
 
-    tolerance = config.tolerance_sigmas * backend.measurement_noise_sigma
+    tolerance = config.tolerance_sigmas * expectation.sigma
     return ControlCheck(
         index=state.index,
         axis=axis,
-        expected=expected,
+        expected=expectation.mean,
+        expected_sigma=expectation.sigma,
         measured=measured,
-        passed=abs(measured - expected) <= tolerance,
+        passed=abs(measured - expectation.mean) <= tolerance,
     )
 
 
 def _check_decoy(
     state: BobPreparedState,
     backend: QSDCBackend,
-    config: ProtocolConfig,
+    config: SimulatorConfig,
     random_source: RandomSource,
 ) -> DecoyCheck:
     axis = _check_axis(state, config, random_source)
-    expected = state.alpha.real if axis == "q" else state.alpha.imag
+    expectation = backend.returned_expectation(
+        state.alpha,
+        state.squeeze_r,
+        state.theta,
+        axis,
+    )
     measured = backend.returned_measurement(
         state.alpha, state.squeeze_r, state.theta, beta=0j, axis=axis
     )
 
-    tolerance = config.tolerance_sigmas * backend.measurement_noise_sigma
+    tolerance = config.tolerance_sigmas * expectation.sigma
     return DecoyCheck(
         index=state.index,
         axis=axis,
-        expected=expected,
+        expected=expectation.mean,
+        expected_sigma=expectation.sigma,
         measured=measured,
-        passed=abs(measured - expected) <= tolerance,
+        passed=abs(measured - expectation.mean) <= tolerance,
     )
 
 
 def _check_axis(
     state: BobPreparedState,
-    config: ProtocolConfig,
+    config: SimulatorConfig,
     random_source: RandomSource,
-) -> str:
+) -> QuadratureAxis:
     if config.check_axis_policy == "random":
-        return random_source.choice(("q", "p"))
+        return random_source.choice((QuadratureAxis.Q, QuadratureAxis.P))
     if config.check_axis_policy == "optimized":
-        return "q" if abs(state.alpha.real) >= abs(state.alpha.imag) else "p"
+        return (
+            QuadratureAxis.Q
+            if abs(state.alpha.real) >= abs(state.alpha.imag)
+            else QuadratureAxis.P
+        )
     raise ValueError(f"unknown check_axis_policy {config.check_axis_policy!r}")
 
 
@@ -239,7 +259,7 @@ def _decode_message(
     state: BobPreparedState,
     message: tuple[str, float, complex],
     backend: QSDCBackend,
-    config: ProtocolConfig,
+    config: SimulatorConfig,
     random_source: RandomSource,
 ) -> MessageDecode:
     bits, message_value, alice_beta = message
@@ -247,8 +267,13 @@ def _decode_message(
     measured = backend.returned_measurement(
         state.alpha, state.squeeze_r, state.theta, beta=alice_beta, axis=axis
     )
-    initial_component = state.alpha.real if axis == "q" else state.alpha.imag
-    observed_delta = measured - initial_component
+    baseline_expectation = backend.returned_expectation(
+        state.alpha,
+        state.squeeze_r,
+        state.theta,
+        axis,
+    )
+    observed_delta = measured - baseline_expectation.mean
     response_factor = backend.message_response_factor(
         state.squeeze_r, state.theta, axis
     )
@@ -263,6 +288,7 @@ def _decode_message(
         alice_beta=alice_beta,
         axis=axis,
         measured=measured,
+        expected_baseline=baseline_expectation.mean,
         observed_delta=observed_delta,
         response_factor=response_factor,
         recovered_beta=recovered_beta,
@@ -274,17 +300,21 @@ def _decode_message(
 def _message_axis(
     state: BobPreparedState,
     backend: QSDCBackend,
-    config: ProtocolConfig,
+    config: SimulatorConfig,
     random_source: RandomSource,
-) -> str:
+) -> QuadratureAxis:
     if config.message_axis_policy == "random":
-        return random_source.choice(("q", "p"))
+        return random_source.choice((QuadratureAxis.Q, QuadratureAxis.P))
     if config.message_axis_policy == "optimized":
         q_response = backend.message_response_factor(
-            state.squeeze_r, state.theta, "q"
+            state.squeeze_r, state.theta, QuadratureAxis.Q
         )
         p_response = backend.message_response_factor(
-            state.squeeze_r, state.theta, "p"
+            state.squeeze_r, state.theta, QuadratureAxis.P
         )
-        return "q" if abs(q_response) >= abs(p_response) else "p"
+        return (
+            QuadratureAxis.Q
+            if abs(q_response) >= abs(p_response)
+            else QuadratureAxis.P
+        )
     raise ValueError(f"unknown message_axis_policy {config.message_axis_policy!r}")

@@ -1,0 +1,41 @@
+{% macro summary_card(card) -%}
+<article class="card">
+  <h2>{{ card.title }}</h2>
+  <p class="card-value">{{ card.value }}</p>
+  <p>{{ card.detail }}</p>
+</article>
+{%- endmacro %}
+
+{% macro data_table(table, class_name="table-wrap") -%}
+<div class="{{ class_name }}">
+  <table>
+    <thead>
+      <tr>
+        {% for header in table.headers %}<th>{{ header }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in table.rows %}
+      <tr>
+        {% for cell in row %}
+        <td>
+          {% if cell.get("href") %}
+          <a href="{{ cell.href }}">{{ cell.text }}</a>
+          {% elif cell.get("metric") %}
+          <span class="metric-rate">{{ cell.text }}</span>
+            {% if cell.get("delta") %}
+          <span class="delta {{ cell.delta.class_name }}">{{ cell.delta.marker }} {{ cell.delta.text }}</span>
+            {% endif %}
+          {% elif cell.get("strong") %}
+          <strong>{{ cell.text }}</strong>
+          {% else %}
+          {{ cell.text }}
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{%- endmacro %}

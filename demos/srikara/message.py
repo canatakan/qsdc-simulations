@@ -7,18 +7,17 @@ import textwrap
 
 from qsdc.common.bits import bits_to_bytes, bytes_to_bits
 from qsdc.common.random import make_random_source
-from qsdc.protocols.srikara.configuration import (
-    OPTIMIZATION_PARAMETERS,
-    RUN_PARAMETERS,
-    SIMULATOR_PARAMETERS,
-)
 from qsdc.protocols.srikara.simulator.backends import make_backend
-from qsdc.protocols.srikara.simulator.config import ProtocolConfig
-from qsdc.protocols.srikara.simulator.encoding import interval_for_bits
+from qsdc.protocols.srikara.configuration.simulator import SimulatorConfig
+from qsdc.protocols.srikara.simulator.encoding import (
+    ENCODING_INTERVALS,
+    interval_for_bits,
+)
 from qsdc.protocols.srikara.simulator.protocol import simulate_qsdc
 
 
 def main() -> None:
+    defaults = SimulatorConfig()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "message",
@@ -27,11 +26,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--backend",
-        choices=RUN_PARAMETERS.choices("backend"),
-        default=RUN_PARAMETERS.default("backend"),
+        choices=("analytic", "sf", "sf-sampled", "sf-noise"),
+        default="sf-sampled",
         help="simulation backend",
     )
-    parser.add_argument("--seed", type=int, default=SIMULATOR_PARAMETERS.default("seed"))
+    parser.add_argument("--seed", type=int, default=defaults.seed)
     parser.add_argument("--encoding", default="utf-8")
     parser.add_argument(
         "--tolerance-sigmas",
@@ -41,20 +40,20 @@ def main() -> None:
     )
     parser.add_argument(
         "--random-source",
-        choices=RUN_PARAMETERS.choices("random_source"),
-        default=RUN_PARAMETERS.default("random_source"),
+        choices=("classical", "sf-bs-qrng"),
+        default="classical",
         help="protocol random source for routing, basis choices, and values",
     )
     parser.add_argument(
         "--intervals",
-        choices=OPTIMIZATION_PARAMETERS.choices("intervals"),
-        default=OPTIMIZATION_PARAMETERS.default("intervals"),
+        choices=tuple(ENCODING_INTERVALS),
+        default=defaults.intervals,
         help="message interval strategy",
     )
     parser.add_argument(
         "--message-axis-policy",
-        choices=OPTIMIZATION_PARAMETERS.choices("message_axis_policy"),
-        default=OPTIMIZATION_PARAMETERS.default("message_axis_policy"),
+        choices=("random", "optimized"),
+        default=defaults.message_axis_policy,
         help=(
             "message decoding axis policy; optimized chooses the q/p axis "
             "with the larger absolute response factor"
@@ -83,7 +82,7 @@ def main() -> None:
     }
     if args.tolerance_sigmas is not None:
         config_overrides["tolerance_sigmas"] = args.tolerance_sigmas
-    config = ProtocolConfig.from_options(**config_overrides)
+    config = SimulatorConfig.model_validate(config_overrides)
     result = simulate_qsdc(
         symbols,
         config=config,
@@ -126,7 +125,7 @@ def main() -> None:
         "Control/decoy tolerance "
         f"(measurement noise sigmas): {result.check_tolerance_sigmas:g}"
     )
-    print(f"Measurement noise sigma: {result.measurement_noise_sigma:g}")
+    print(f"Nominal shot-noise sigma: {result.measurement_noise_sigma:g}")
 
     print()
 
@@ -164,16 +163,14 @@ def main() -> None:
     )
     print()
 
-    print("idx  axis  expected       measured       dev/sigma     status")
+    print("idx  axis  expected       measured       sigma       dev/sigma   status")
     for check in result.controls:
         status = "pass" if check.passed else "fail"
-        sigma_deviation = (
-            abs(check.measured - check.expected) / result.measurement_noise_sigma
-        )
+        sigma_deviation = abs(check.measured - check.expected) / check.expected_sigma
         print(
             f"{check.index:>3}  {check.axis:>4}  "
             f"{check.expected:>12.7f}  {check.measured:>12.7f}  "
-            f"{sigma_deviation:>9.4f}  {status}"
+            f"{check.expected_sigma:>10.7f}  {sigma_deviation:>9.4f}  {status}"
         )
     print(f"Control check result: {result.control_passed}")
 
@@ -198,16 +195,14 @@ def main() -> None:
     )
     print()
 
-    print("idx  axis  expected       measured       dev/sigma     status")
+    print("idx  axis  expected       measured       sigma       dev/sigma   status")
     for decoy in result.decoys:
         status = "pass" if decoy.passed else "fail"
-        sigma_deviation = (
-            abs(decoy.measured - decoy.expected) / result.measurement_noise_sigma
-        )
+        sigma_deviation = abs(decoy.measured - decoy.expected) / decoy.expected_sigma
         print(
             f"{decoy.index:>3}  {decoy.axis:>4}  "
             f"{decoy.expected:>12.7f}  {decoy.measured:>12.7f}  "
-            f"{sigma_deviation:>9.4f}  {status}"
+            f"{decoy.expected_sigma:>10.7f}  {sigma_deviation:>9.4f}  {status}"
         )
     print(f"Decoy check result: {result.decoy_passed}")
 
