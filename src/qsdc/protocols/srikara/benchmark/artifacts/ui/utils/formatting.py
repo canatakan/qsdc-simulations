@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from qsdc.protocols.srikara.configuration.distribution import Distribution
+from qsdc.protocols.srikara.configuration.noise import NoiseConfig
+
 
 def rate(value: object) -> str:
     if value is None:
@@ -31,6 +34,23 @@ def run_id(value: object) -> str:
 
 def text(value: object) -> str:
     return "n/a" if value is None else str(value)
+
+
+def distribution_summary(value: Distribution) -> str:
+    return value.summary()
+
+
+def noise_summary(value: NoiseConfig) -> str:
+    configured = [
+        f"{name.replace('_', ' ')}: {', '.join(effect.type for effect in effects)}"
+        for name in type(value).model_fields
+        if (effects := getattr(value, name))
+    ]
+    return "; ".join(configured) if configured else "none"
+
+
+def plot_title(value: object) -> str:
+    return str(value).rsplit("/", 1)[-1].removesuffix(".png").replace("_", " ")
 
 
 def metric(name: str, value: object) -> str:
@@ -93,11 +113,7 @@ def html_id(value: object) -> str:
 
 
 def _is_identifier_field(header: str) -> bool:
-    return (
-        header.endswith("_seed")
-        or header.endswith("_index")
-        or header.endswith("_count")
-    )
+    return header.endswith(("_seed", "_index", "_count"))
 
 
 def _identifier(value: object) -> str:

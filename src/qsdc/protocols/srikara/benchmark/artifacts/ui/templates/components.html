@@ -1,9 +1,13 @@
-{% macro summary_card(card) -%}
+{% macro metric_card(title, value, detail) -%}
 <article class="card">
-  <h2>{{ card.title }}</h2>
-  <p class="card-value">{{ card.value }}</p>
-  <p>{{ card.detail }}</p>
+  <h3>{{ title }}</h3>
+  <p class="card-value">{{ value }}</p>
+  <p>{{ detail }}</p>
 </article>
+{%- endmacro %}
+
+{% macro summary_card(card) -%}
+{{ metric_card(card.title, card.value, card.detail) }}
 {%- endmacro %}
 
 {% macro data_table(table, class_name="table-wrap") -%}
@@ -19,14 +23,14 @@
       <tr>
         {% for cell in row %}
         <td>
-          {% if cell.get("href") %}
+          {% if cell.href is defined and cell.href %}
           <a href="{{ cell.href }}">{{ cell.text }}</a>
-          {% elif cell.get("metric") %}
+          {% elif cell.metric is defined and cell.metric %}
           <span class="metric-rate">{{ cell.text }}</span>
-            {% if cell.get("delta") %}
+            {% if cell.delta is defined and cell.delta %}
           <span class="delta {{ cell.delta.class_name }}">{{ cell.delta.marker }} {{ cell.delta.text }}</span>
             {% endif %}
-          {% elif cell.get("strong") %}
+          {% elif cell.strong is defined and cell.strong %}
           <strong>{{ cell.text }}</strong>
           {% else %}
           {{ cell.text }}

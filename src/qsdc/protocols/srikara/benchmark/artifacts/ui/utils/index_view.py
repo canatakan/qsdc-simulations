@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from qsdc.protocols.srikara.benchmark.artifacts.ui.formatting import (
+from qsdc.protocols.srikara.benchmark.artifacts.ui.utils.formatting import (
     compact_distribution,
     count,
     distribution,
@@ -15,7 +15,7 @@ from qsdc.protocols.srikara.benchmark.artifacts.ui.formatting import (
     run_id,
     text,
 )
-from qsdc.protocols.srikara.benchmark.artifacts.ui.index_data import (
+from qsdc.protocols.srikara.benchmark.artifacts.ui.utils.index_data import (
     best_run_value,
     delta_from_default,
     group_families,
@@ -43,28 +43,36 @@ def _summary_cards(
     families: list[dict[str, Any]],
 ) -> list[dict[str, str]]:
     comparable_runs = non_quick_runs(runs)
-    return [
-        _card("Runs", len(runs), "benchmark reports found"),
-        _card("Report families", len(families), "top-level report collections"),
-        _card(
+    cards = [
+        ("Runs", len(runs), "benchmark reports found"),
+        ("Report families", len(families), "top-level report collections"),
+        (
             "Best mean bit error",
-            rate(best_run_value(comparable_runs, "best_mean_bit", "bit_error_rate")),
+            rate(
+                best_run_value(
+                    comparable_runs,
+                    "best_mean_bit",
+                    "raw_bit_error_rate",
+                )
+            ),
             "for p=0.5, excluding quick benchmarks",
         ),
-        _card(
+        (
             "Best mean symbol error",
             rate(
                 best_run_value(
-                    comparable_runs, "best_mean_symbol", "symbol_error_rate"
+                    comparable_runs,
+                    "best_mean_symbol",
+                    "raw_symbol_error_rate",
                 )
             ),
             "for p=0.5, excluding quick benchmarks",
         ),
     ]
-
-
-def _card(title: str, value: object, detail: str) -> dict[str, str]:
-    return {"title": title, "value": text(value), "detail": detail}
+    return [
+        {"title": title, "value": text(value), "detail": detail}
+        for title, value, detail in cards
+    ]
 
 
 def _group_view(group: dict[str, Any]) -> dict[str, Any]:
@@ -75,22 +83,26 @@ def _group_view(group: dict[str, Any]) -> dict[str, Any]:
         "report_href": str(run["report_href"]),
         "chips": _configuration_chips(run),
         "scores": [
-            _score("LOWEST MEAN BIT ERROR (P=0.5)", run["best_mean_bit"], "bit_error_rate"),
+            _score(
+                "LOWEST MEAN BIT ERROR (P=0.5)",
+                run["best_mean_bit"],
+                "raw_bit_error_rate",
+            ),
             _score(
                 "LOWEST MEAN SYMBOL ERROR (P=0.5)",
                 run["best_mean_symbol"],
-                "symbol_error_rate",
+                "raw_symbol_error_rate",
             ),
             _score(
                 "LOWEST COMBO BIT ERROR (P=0.5)",
                 run["best_combo_bit"],
-                "bit_error_rate",
+                "raw_bit_error_rate",
                 include_distribution=True,
             ),
             _score(
                 "LOWEST COMBO SYMBOL ERROR (P=0.5)",
                 run["best_combo_symbol"],
-                "symbol_error_rate",
+                "raw_symbol_error_rate",
                 include_distribution=True,
             ),
         ],
@@ -229,7 +241,9 @@ def _cell(
 def _axis_summary(run: dict[str, Any]) -> str:
     check_axis = str(run["check_axis_policy"])
     message_axis = str(run["message_axis_policy"])
-    return check_axis if check_axis == message_axis else f"{check_axis} / {message_axis}"
+    return (
+        check_axis if check_axis == message_axis else f"{check_axis} / {message_axis}"
+    )
 
 
 def _interval_policy_summary(policies: list[object]) -> str:

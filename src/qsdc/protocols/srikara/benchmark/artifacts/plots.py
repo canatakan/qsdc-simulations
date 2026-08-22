@@ -4,25 +4,23 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import asdict, dataclass, replace
 from math import ceil
 from pathlib import Path
 from statistics import mean
-from typing import Any, Optional, Sequence, Union
+from typing import Any
 
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from pydantic import TypeAdapter
 
-from qsdc.protocols.srikara.benchmark.artifacts.report import (
-    write_benchmark_html_report,
+from qsdc.protocols.srikara.benchmark.artifacts.metrics import (
+    ArtifactTables,
+    BenchmarkArtifact,
 )
-from qsdc.protocols.srikara.benchmark.artifacts.tables import (
-    read_combo_csv,
-    read_trial_csv,
-)
-
 
 Combo = dict[str, Any]
 Trial = dict[str, Any]
@@ -38,16 +36,16 @@ class ErrorPlotSpec:
 
 ERROR_PLOT_SPECS: tuple[ErrorPlotSpec, ...] = (
     ErrorPlotSpec(
-        filename="bit_error_by_r.png",
-        title="Payload Bit Error by r Distribution",
-        y_label="bit error rate",
-        metric_field="bit_error_rate",
+        filename="raw_bit_error_by_r.png",
+        title="Raw Modulation-Bit Error by r Distribution",
+        y_label="raw measured bit error rate",
+        metric_field="raw_bit_error_rate",
     ),
     ErrorPlotSpec(
-        filename="symbol_error_by_r.png",
-        title="3-Bit Symbol Error by r Distribution",
-        y_label="symbol error rate",
-        metric_field="symbol_error_rate",
+        filename="raw_symbol_error_by_r.png",
+        title="Raw 3-Bit Symbol Error by r Distribution",
+        y_label="raw measured symbol error rate",
+        metric_field="raw_symbol_error_rate",
     ),
     ErrorPlotSpec(
         filename="value_error_by_r.png",
@@ -55,6 +53,13 @@ ERROR_PLOT_SPECS: tuple[ErrorPlotSpec, ...] = (
         y_label="mean |decoded - sampled|",
         metric_field="mean_abs_value_error",
     ),
+)
+
+RECOVERED_PAYLOAD_PLOT_SPEC = ErrorPlotSpec(
+    filename="recovered_payload_bit_error_by_r.png",
+    title="Recovered Payload Bit Error by r Distribution",
+    y_label="recovered payload bit error rate",
+    metric_field="recovered_payload_bit_error_rate",
 )
 
 DEFAULT_INTERVAL_LABEL = "default"
@@ -79,25 +84,28 @@ def main() -> None:
 
 def write_plots_from_artifacts(output_dir: str | Path) -> list[str]:
     output_path = Path(output_dir)
-    combos = read_combo_csv(output_path / "combos.csv")
-    trials_path = output_path / "trials.csv"
-    trials = read_trial_csv(trials_path) if trials_path.exists() else []
+    tables = ArtifactTables.read(output_path)
+    combos = tables.combo_plot_rows()
+    trials = [asdict(row) for row in tables.trials]
     plots = write_benchmark_plots(output_path, combos, trials)
     benchmark_path = output_path / "benchmark.json"
     if benchmark_path.exists():
-        with benchmark_path.open("r", encoding="utf-8") as handle:
-            benchmark = json.load(handle)
-        benchmark.setdefault("artifacts", {})["plots"] = plots
-        benchmark["artifacts"]["html_report"] = write_benchmark_html_report(
-            output_path,
-            benchmark,
-            combos,
-            trials,
+        artifact = TypeAdapter(BenchmarkArtifact).validate_json(
+            benchmark_path.read_text(encoding="utf-8")
         )
-        benchmark["artifacts"]["html_report_css"] = "report.css"
-        with benchmark_path.open("w", encoding="utf-8") as handle:
-            json.dump(benchmark, handle, indent=2, sort_keys=True)
-            handle.write("\n")
+        artifact = replace(
+            artifact,
+            artifacts=replace(artifact.artifacts, plots=tuple(plots)),
+        )
+        benchmark_path.write_text(
+            json.dumps(
+                TypeAdapter(BenchmarkArtifact).dump_python(artifact, mode="json"),
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     return plots
 
 
@@ -110,31 +118,25 @@ def write_benchmark_plots(
     plots_dir.mkdir(parents=True, exist_ok=True)
 
     plots: list[str] = []
-    for spec in ERROR_PLOT_SPECS:
-        interval_path = plots_dir / _interval_metric_filename(spec.filename)
+    specs = list(ERROR_PLOT_SPECS)
+    if any(str(combo.get("error_correction")) == "secded" for combo in combos):
+        specs.append(RECOVERED_PAYLOAD_PLOT_SPEC)
+    for spec in specs:
+        interval_path = plots_dir / f"{Path(spec.filename).stem}_by_interval.png"
         _write_interval_metric_plot(interval_path, combos, spec)
         plots.append(str(Path("plots") / interval_path.name))
 
-        delta_path = plots_dir / _delta_metric_filename(spec.filename)
+        delta_path = plots_dir / f"{Path(spec.filename).stem}_delta_vs_default.png"
         if _write_interval_delta_plot(delta_path, combos, spec):
             plots.append(str(Path("plots") / delta_path.name))
 
-    if trials and _has_sigma_diagnostics(trials):
+    sigma_deviations = _all_check_sigma_deviations(trials or [])
+    if sigma_deviations:
         sigma_path = plots_dir / SIGMA_DIAGNOSTIC_CURVE_FILENAME
-        _write_sigma_diagnostic_curve(sigma_path, trials)
+        _write_sigma_diagnostic_curve(sigma_path, sigma_deviations)
         plots.append(str(Path("plots") / sigma_path.name))
 
     return plots
-
-
-def _interval_metric_filename(filename: str) -> str:
-    stem = Path(filename).stem
-    return f"{stem}_by_interval.png"
-
-
-def _delta_metric_filename(filename: str) -> str:
-    stem = Path(filename).stem
-    return f"{stem}_delta_vs_default.png"
 
 
 def _write_interval_metric_plot(
@@ -184,8 +186,8 @@ def _combo_metric_table(
 ) -> dict[tuple[str, float, str], float]:
     values: dict[tuple[str, float, str], float] = {}
     for combo in combos:
-        y_value = _combo_metric(combo, metric_field)
-        if y_value is None:
+        y_value = combo.get(metric_field)
+        if y_value in ("", None):
             continue
         values[
             (
@@ -197,17 +199,6 @@ def _combo_metric_table(
     return values
 
 
-def _combo_metric(
-    combo: Combo,
-    metric_field: str,
-) -> Optional[Union[float, int]]:
-    if metric_field in combo:
-        return float(combo[metric_field])
-    if "all" in combo and metric_field in combo["all"]:
-        return float(combo["all"][metric_field])
-    return None
-
-
 def _write_interval_delta_plot(
     path: Path,
     combos: list[Combo],
@@ -217,7 +208,9 @@ def _write_interval_delta_plot(
     probabilities = _unique_sorted(float(combo["one_probability"]) for combo in combos)
     intervals = [
         intervals_label
-        for intervals_label in _unique_ordered(str(combo["intervals"]) for combo in combos)
+        for intervals_label in _unique_ordered(
+            str(combo["intervals"]) for combo in combos
+        )
         if intervals_label != DEFAULT_INTERVAL_LABEL
     ]
     if not intervals:
@@ -242,7 +235,9 @@ def _write_interval_delta_plot(
                 baseline = values.get((DEFAULT_INTERVAL_LABEL, probability, r_label))
                 candidate = values.get((intervals_label, probability, r_label))
                 y_values.append(
-                    0.0 if baseline is None or candidate is None else baseline - candidate
+                    0.0
+                    if baseline is None or candidate is None
+                    else baseline - candidate
                 )
             axis.bar(
                 x_values,
@@ -252,7 +247,12 @@ def _write_interval_delta_plot(
                 label=intervals_label,
             )
         axis.axhline(0.0, color="#172033", linewidth=0.8)
-        _style_metric_axis(axis, r_labels, f"p={probability:g}", f"default - {spec.y_label}")
+        _style_metric_axis(
+            axis,
+            r_labels,
+            f"p={probability:g}",
+            f"default - {spec.y_label}",
+        )
 
     _hide_unused_axes(axes, len(probabilities))
     figure.suptitle(
@@ -266,15 +266,7 @@ def _write_interval_delta_plot(
     return True
 
 
-def _has_sigma_diagnostics(trials: list[Trial]) -> bool:
-    return any(
-        isinstance(trial.get("check_sigma_deviations"), (list, tuple))
-        for trial in trials
-    )
-
-
-def _write_sigma_diagnostic_curve(path: Path, trials: list[Trial]) -> None:
-    thresholds = _all_check_sigma_deviations(trials)
+def _write_sigma_diagnostic_curve(path: Path, thresholds: list[float]) -> None:
     x_values, y_values = _pass_curve(thresholds)
     figure, axis = plt.subplots(figsize=(7.2, 4.6), constrained_layout=True)
     axis.step(
@@ -409,9 +401,7 @@ def _style_metric_axis(axis, r_labels: list[str], title: str, y_label: str) -> N
 def _legend_for_intervals(figure, axis, intervals: Sequence[str]) -> None:
     handles, labels = axis.get_legend_handles_labels()
     by_label = {
-        label: handle
-        for handle, label in zip(handles, labels)
-        if label in intervals
+        label: handle for handle, label in zip(handles, labels) if label in intervals
     }
     figure.legend(
         by_label.values(),

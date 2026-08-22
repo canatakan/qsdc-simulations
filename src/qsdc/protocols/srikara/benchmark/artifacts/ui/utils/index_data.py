@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Callable
 
-from qsdc.protocols.srikara.benchmark.artifacts.tables import read_combo_csv
+from pydantic import TypeAdapter
 
+from qsdc.protocols.srikara.benchmark.artifacts.metrics import (
+    ArtifactTables,
+    BenchmarkArtifact,
+)
 
 Run = dict[str, Any]
 Combo = dict[str, Any]
@@ -17,11 +20,13 @@ def find_runs(root: Path) -> list[Run]:
     runs = []
     for benchmark_path in sorted(root.rglob("benchmark.json")):
         run_dir = benchmark_path.parent
-        with benchmark_path.open("r", encoding="utf-8") as handle:
-            summary = json.load(handle)
-        combos_path = run_dir / "combos.csv"
-        combos = read_combo_csv(combos_path) if combos_path.exists() else []
-        runs.append(_run_row(root, run_dir, summary, combos))
+        artifact = TypeAdapter(BenchmarkArtifact).validate_json(
+            benchmark_path.read_text(encoding="utf-8")
+        )
+        combos = []
+        if (run_dir / "combos.csv").exists():
+            combos = ArtifactTables.read(run_dir).combo_plot_rows()
+        runs.append(_run_row(root, run_dir, artifact, combos))
     return sorted(runs, key=_run_sort_key)
 
 
@@ -88,25 +93,25 @@ def best_run_value(runs: list[Run], row_key: str, field: str) -> float | None:
 def _run_row(
     root: Path,
     run_dir: Path,
-    summary: dict[str, Any],
+    artifact: BenchmarkArtifact,
     combos: list[Combo],
 ) -> Run:
-    parameters = summary.get("parameters", {})
-    artifacts = summary.get("artifacts", {})
-    report_path = run_dir / str(artifacts.get("html_report", "report.html"))
+    config = artifact.config
+    metrics = artifact.metrics
+    report_path = run_dir / artifact.artifacts.html_report
     balanced_combos = _balanced_combos(combos)
-    _, report_name = split_group_name(str(summary.get("name")))
+    _, report_name = split_group_name(config.name)
     return {
-        "name": summary.get("name"),
+        "name": config.name,
         "report_name": report_name,
-        "run_id": summary.get("benchmark_run_id"),
-        "run_order": _run_order(summary.get("benchmark_run_id")),
-        "backend": parameters.get("backend"),
-        "interval_policies": parameters.get("interval_policies", ["default"]),
-        "check_axis_policy": parameters.get("check_axis_policy"),
-        "message_axis_policy": parameters.get("message_axis_policy"),
-        "alpha_distribution": parameters.get("alpha_distribution"),
-        "theta_distribution": parameters.get("theta_distribution"),
+        "run_id": artifact.run_id,
+        "run_order": _run_order(artifact.run_id),
+        "backend": config.backend,
+        "interval_policies": config.interval_policies,
+        "check_axis_policy": config.check_axis_policy,
+        "message_axis_policy": config.message_axis_policy,
+        "alpha_distribution": config.alpha_distribution.summary(),
+        "theta_distribution": config.theta_distribution.summary(),
         "one_probabilities": _unique_sorted(
             float(combo["one_probability"])
             for combo in combos
@@ -114,20 +119,21 @@ def _run_row(
         ),
         "interval_rows": _interval_rows(combos),
         "best_mean_bit": _best_row(
-            _interval_rows(balanced_combos), "bit_error_rate", min
+            _interval_rows(balanced_combos), "raw_bit_error_rate", min
         ),
         "best_mean_symbol": _best_row(
-            _interval_rows(balanced_combos), "symbol_error_rate", min
+            _interval_rows(balanced_combos), "raw_symbol_error_rate", min
         ),
-        "best_combo_bit": _best_row(balanced_combos, "bit_error_rate", min),
-        "best_combo_symbol": _best_row(
-            balanced_combos, "symbol_error_rate", min
+        "best_combo_bit": _best_row(balanced_combos, "raw_bit_error_rate", min),
+        "best_combo_symbol": _best_row(balanced_combos, "raw_symbol_error_rate", min),
+        "accepted_rate": metrics.protocol_acceptance_rate,
+        "trial_count": metrics.trial_count,
+        "mean_bit_error_rate": _weighted_average(
+            balanced_combos,
+            "raw_bit_error_rate",
         ),
-        "accepted_rate": summary.get("accepted_rate"),
-        "trial_count": summary.get("trial_count"),
-        "mean_bit_error_rate": _weighted_average(balanced_combos, "bit_error_rate"),
         "mean_symbol_error_rate": _weighted_average(
-            balanced_combos, "symbol_error_rate"
+            balanced_combos, "raw_symbol_error_rate"
         ),
         "report_href": report_path.relative_to(root),
     }
@@ -159,21 +165,18 @@ def _interval_row(intervals: str, combos: list[Combo]) -> dict[str, Any]:
     balanced_combos = _balanced_combos(combos)
     return {
         "intervals": intervals,
-        "accepted_rate": _weighted_average(combos, "accepted_rate"),
-        "bit_error_rate": _weighted_average(combos, "bit_error_rate"),
-        "symbol_error_rate": _weighted_average(combos, "symbol_error_rate"),
+        "accepted_rate": _weighted_average(combos, "protocol_acceptance_rate"),
+        "raw_bit_error_rate": _weighted_average(combos, "raw_bit_error_rate"),
+        "raw_symbol_error_rate": _weighted_average(
+            combos,
+            "raw_symbol_error_rate",
+        ),
         "balanced_bit_error_rate": _weighted_average(
-            balanced_combos, "bit_error_rate"
+            balanced_combos, "raw_bit_error_rate"
         ),
         "balanced_symbol_error_rate": _weighted_average(
-            balanced_combos, "symbol_error_rate"
+            balanced_combos, "raw_symbol_error_rate"
         ),
-        "control_check_count": _sum_field(combos, "control_check_count"),
-        "control_failed_check_count": _sum_field(
-            combos, "control_failed_check_count"
-        ),
-        "decoy_check_count": _sum_field(combos, "decoy_check_count"),
-        "decoy_failed_check_count": _sum_field(combos, "decoy_failed_check_count"),
         "mean_abs_value_error": _weighted_average(combos, "mean_abs_value_error"),
     }
 
@@ -188,14 +191,6 @@ def _weighted_average(combos: list[Combo], field: str) -> float | None:
         weighted_total += float(combo[field]) * weight
         total_weight += weight
     return weighted_total / total_weight if total_weight else None
-
-
-def _sum_field(combos: list[Combo], field: str) -> int:
-    return sum(
-        int(float(combo[field]))
-        for combo in combos
-        if combo.get(field) not in ("", None)
-    )
 
 
 def _balanced_combos(combos: list[Combo]) -> list[Combo]:
@@ -216,9 +211,7 @@ def _best_row(
     if not candidates:
         return None
     selected_value = selector(float(row[field]) for row in candidates)
-    return next(
-        row for row in candidates if float(row[field]) == selected_value
-    )
+    return next(row for row in candidates if float(row[field]) == selected_value)
 
 
 def _run_order(value: object) -> int:

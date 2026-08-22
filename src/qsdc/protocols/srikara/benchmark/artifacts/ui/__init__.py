@@ -7,6 +7,15 @@ from pathlib import Path
 
 from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
 
+from qsdc.protocols.srikara.benchmark.artifacts.ui.utils.formatting import (
+    distribution_summary,
+    noise_summary,
+    number,
+    plot_title,
+    rate,
+    run_id,
+    text,
+)
 
 _TEMPLATE_DIRECTORY = "templates"
 
@@ -30,6 +39,15 @@ _environment = Environment(
     trim_blocks=True,
     lstrip_blocks=True,
 )
+_environment.filters.update(
+    distribution_summary=distribution_summary,
+    noise_summary=noise_summary,
+    number=number,
+    plot_title=plot_title,
+    rate=rate,
+    run_id=run_id,
+    text=text,
+)
 
 
 def render_template(template_name: str, **context: object) -> str:
@@ -39,14 +57,7 @@ def render_template(template_name: str, **context: object) -> str:
 
 def copy_asset(name: str, destination: str | Path) -> None:
     """Copy a packaged UI asset to a generated artifact directory."""
-    Path(destination).write_bytes(_resource(name).read_bytes())
-
-
-def read_template(name: str) -> str:
-    """Return a packaged template source for backwards compatibility."""
-    template = _resource(_TEMPLATE_DIRECTORY, name)
-    resource = template if template.is_file() else _resource(name)
-    return resource.read_text(encoding="utf-8")
+    Path(destination).write_bytes(_resource("static", name).read_bytes())
 
 
 def _resource(*parts: str):

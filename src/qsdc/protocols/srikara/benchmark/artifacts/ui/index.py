@@ -6,15 +6,18 @@ import argparse
 from pathlib import Path
 
 from qsdc.protocols.srikara.benchmark.artifacts.ui import copy_asset, render_template
-from qsdc.protocols.srikara.benchmark.artifacts.ui.index_data import find_runs
-from qsdc.protocols.srikara.benchmark.artifacts.ui.index_view import (
+from qsdc.protocols.srikara.benchmark.artifacts.ui.utils.index_data import find_runs
+from qsdc.protocols.srikara.benchmark.artifacts.ui.utils.index_view import (
     build_index_context,
 )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("results_dir", help="directory containing benchmark run folders")
+    parser.add_argument(
+        "results_dir",
+        help="directory containing benchmark run folders",
+    )
     args = parser.parse_args()
     print(f"Generated benchmark UI at {write_benchmark_index(args.results_dir)}")
 

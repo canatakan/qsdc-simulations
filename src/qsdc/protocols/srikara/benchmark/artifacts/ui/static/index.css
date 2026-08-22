@@ -92,7 +92,8 @@ section > h2 {
   padding: 16px;
 }
 
-.card h2 {
+.card h2,
+.card h3 {
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;

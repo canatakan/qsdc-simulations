@@ -1,75 +1,165 @@
-{% from "components.html" import data_table, summary_card %}
+{% from "components.html" import data_table, metric_card %}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ title }}</title>
+  <title>{{ artifact.config.name }} benchmark report</title>
   <link rel="stylesheet" href="report.css">
 </head>
 <body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="product-name" href="#overview">Srikara benchmark</a>
+      <nav class="section-nav" aria-label="Report sections">
+        <a href="#overview">Overview</a>
+        <a href="#configuration">Configuration</a>
+        <a href="#diagnostics">Diagnostics</a>
+        <a href="#results">Results</a>
+        <a href="#data">Data</a>
+      </nav>
+    </div>
+  </header>
+
   <main>
-    <header class="page-header">
+    <header class="page-header" id="overview">
       <div>
-        <p class="eyebrow">Srikara benchmark</p>
-        <h1>{{ name }} <span class="run-id">{{ run_id }}</span></h1>
+        <p class="eyebrow">Benchmark report</p>
+        <h1>{{ artifact.config.name }}</h1>
+        <p class="page-description">
+          Protocol acceptance, payload recovery, decoding quality, and resource use.
+        </p>
       </div>
-      <dl class="run-meta">
-        {% for item in run_meta %}
-        <div><dt>{{ item.label }}</dt><dd>{{ item.value }}</dd></div>
-        {% endfor %}
-      </dl>
+      <div class="run-identity">
+        <span class="status-chip">{{ artifact.config.backend }}</span>
+        <span class="status-chip">{{ artifact.config.error_correction }}</span>
+        <strong>{{ artifact.run_id | run_id }}</strong>
+      </div>
     </header>
 
-    <section class="cards" aria-label="Benchmark summary">
-      {% for card in summary_cards %}{{ summary_card(card) }}{% endfor %}
+    <section class="dashboard-section" aria-labelledby="overview-heading">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Outcome</p>
+          <h2 id="overview-heading">Run overview</h2>
+        </div>
+      </div>
+      <div class="cards">
+        {{ metric_card("Protocol acceptance", artifact.metrics.protocol_acceptance_rate | rate, artifact.metrics.accepted_count ~ " accepted trials") }}
+        {{ metric_card("Payload recovery", artifact.metrics.payload_recovery_rate | rate, artifact.metrics.payload_recovered_count ~ " recovered payloads") }}
+        {{ metric_card("Delivered bits / state", artifact.metrics.delivered_bits_per_state | number, artifact.metrics.delivered_payload_bit_count ~ " delivered bits") }}
+        {{ metric_card("Transport attempts", artifact.metrics.total_attempt_count, artifact.metrics.trial_count ~ " trials") }}
+        {{ metric_card("Prepared states", artifact.metrics.total_state_count, "all attempts included") }}
+        {{ metric_card("Elapsed time", artifact.metrics.elapsed_seconds | number, "seconds") }}
+      </div>
     </section>
 
-    <section>
-      <h2>Run Setup</h2>
-      <div class="context-grid">
-        {% for item in context_items %}
-        <div class="context-item">
-          <span>{{ item.label }}</span>
-          <strong>{{ item.value }}</strong>
+    <section class="dashboard-section" id="configuration" aria-labelledby="configuration-heading">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Inputs</p>
+          <h2 id="configuration-heading">Configuration</h2>
         </div>
+        <p>The validated configuration serialized with this run.</p>
+      </div>
+      <dl class="configuration-grid panel">
+        <div><dt>Backend</dt><dd>{{ artifact.config.backend }}</dd></div>
+        <div><dt>Random source</dt><dd>{{ artifact.config.random_source }}</dd></div>
+        <div><dt>Payload bits</dt><dd>{{ artifact.config.payload_bit_count }}</dd></div>
+        <div><dt>Trials per combination</dt><dd>{{ artifact.config.trials_per_combo }}</dd></div>
+        <div><dt>Interval policies</dt><dd>{{ artifact.config.interval_policies | join(", ") }}</dd></div>
+        <div><dt>Error correction</dt><dd>{{ artifact.config.error_correction }}</dd></div>
+        <div><dt>Maximum attempts per block</dt><dd>{{ artifact.config.max_attempts_per_block }}</dd></div>
+        <div><dt>Tolerance</dt><dd>{{ artifact.config.tolerance_sigmas | number }} σ</dd></div>
+        <div>
+          <dt>Axis policy</dt>
+          <dd>
+            {% if artifact.config.check_axis_policy == artifact.config.message_axis_policy %}
+            {{ artifact.config.check_axis_policy }}
+            {% else %}
+            checks: {{ artifact.config.check_axis_policy }} · messages: {{ artifact.config.message_axis_policy }}
+            {% endif %}
+          </dd>
+        </div>
+        <div><dt>Alpha</dt><dd>{{ artifact.config.alpha_distribution | distribution_summary }}</dd></div>
+        <div><dt>Theta</dt><dd>{{ artifact.config.theta_distribution | distribution_summary }}</dd></div>
+        <div>
+          <dt>Squeezing distributions</dt>
+          <dd>
+            {% for distribution in artifact.config.r_distributions %}
+            <span class="inline-tag">{{ distribution | distribution_summary }}</span>
+            {% endfor %}
+          </dd>
+        </div>
+        <div class="configuration-wide"><dt>Noise</dt><dd>{{ artifact.config.noise | noise_summary }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="dashboard-section" id="diagnostics" aria-labelledby="diagnostics-heading">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Analysis</p>
+          <h2 id="diagnostics-heading">Diagnostics</h2>
+        </div>
+        <p>Decoding and interval-policy comparisons generated from the focused metric tables.</p>
+      </div>
+      <div class="plot-grid">
+        {% if artifact.artifacts.plots %}
+          {% for plot in artifact.artifacts.plots %}
+          {% if "delta_vs_default" not in plot %}
+        <figure class="plot-card">
+          <img src="{{ plot }}" alt="{{ plot | plot_title }}">
+          <figcaption>{{ plot | plot_title }}</figcaption>
+        </figure>
+          {% endif %}
+          {% endfor %}
+        {% else %}
+        <p class="muted">No plots were generated.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="dashboard-section" id="results" aria-labelledby="results-heading">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Breakdown</p>
+          <h2 id="results-heading">Results</h2>
+        </div>
+        <p>Combination outcomes and channel-check failures are kept separate.</p>
+      </div>
+      <article class="panel data-panel">
+        <div class="panel-heading"><h3>Combination outcomes</h3></div>
+        {{ data_table(combo_outcomes) }}
+      </article>
+      <article class="panel data-panel">
+        <div class="panel-heading"><h3>Channel checks</h3></div>
+        {{ data_table(check_failures) }}
+      </article>
+    </section>
+
+    <section class="dashboard-section" id="data" aria-labelledby="data-heading">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Artifacts</p>
+          <h2 id="data-heading">Data tables</h2>
+        </div>
+        <p>Focused CSV schemas instead of one wide benchmark record.</p>
+      </div>
+      <div class="data-stack">
+        {% for name, table in artifact_tables %}
+        <details class="panel">
+          <summary>{{ name }}</summary>
+          {{ data_table(table) }}
+        </details>
         {% endfor %}
       </div>
-    </section>
-
-    <section>
-      <h2>Plots</h2>
-      <div class="plot-grid">
-        {% include "report/plots.html" %}
-      </div>
-    </section>
-
-    <section>
-      <h2>Combo Outcomes</h2>
-      {{ data_table(combo_outcomes) }}
-    </section>
-
-    <section>
-      <h2>Check Failures</h2>
-      {{ data_table(check_failures) }}
-    </section>
-
-    <section class="raw-data">
-      <h2>Raw Tables</h2>
-      <details>
-        <summary>combos.csv</summary>
-        {{ data_table(combo_table) }}
-      </details>
-      <details>
-        <summary>trials.csv</summary>
-        {{ data_table(trial_table) }}
-      </details>
-    </section>
-
-    <section>
-      <h2>Artifacts</h2>
-      <nav class="artifact-links">
-        {% for link in artifact_links %}<a href="{{ link }}">{{ link }}</a>{% endfor %}
+      <nav class="artifact-links" aria-label="Download benchmark artifacts">
+        <a href="{{ artifact.artifacts.benchmark }}">JSON summary</a>
+        <a href="{{ artifact.artifacts.combos_csv }}">Combination outcomes</a>
+        <a href="{{ artifact.artifacts.trials_csv }}">Trial outcomes</a>
+        <a href="{{ artifact.artifacts.decoding_csv }}">Decoding metrics</a>
+        <a href="{{ artifact.artifacts.checks_csv }}">Channel checks</a>
+        <a href="{{ artifact.artifacts.corrections_csv }}">Correction metrics</a>
       </nav>
     </section>
   </main>
