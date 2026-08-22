@@ -14,10 +14,3 @@ def make_random_source(name: str, seed: int) -> RandomSource:
 
         return SFBeamSplitterQRNG(seed=seed)
     raise ValueError(f"unknown random source {name!r}")
-
-
-__all__ = [
-    "ClassicalRandomSource",
-    "RandomSource",
-    "make_random_source",
-]

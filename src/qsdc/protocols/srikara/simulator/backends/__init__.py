@@ -26,10 +26,3 @@ def make_backend(name: str, noise: NoiseConfig | None = None) -> QSDCBackend:
     if name == "sf-noise":
         return SFNoiseBackend(noise=noise or NoiseConfig())
     raise ValueError(f"unknown backend {name!r}")
-
-
-__all__ = [
-    "AnalyticBackend",
-    "QSDCBackend",
-    "make_backend",
-]
