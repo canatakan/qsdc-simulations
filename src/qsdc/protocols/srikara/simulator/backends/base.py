@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Optional
 
 from qsdc.common.quadrature import QuadratureAxis
 
@@ -29,7 +30,7 @@ class QSDCBackend(ABC):
     @abstractmethod
     def control_measurement(
         self, alpha: complex, squeeze_r: float, theta: float, axis: QuadratureAxis
-    ) -> float:
+    ) -> Optional[float]:
         """Measure one control quadrature after Alice applies S(-s)."""
 
     @abstractmethod
@@ -40,7 +41,7 @@ class QSDCBackend(ABC):
         theta: float,
         beta: complex,
         axis: QuadratureAxis,
-    ) -> float:
+    ) -> Optional[float]:
         """Measure one returned quadrature after Bob applies S(-s)."""
 
     @abstractmethod

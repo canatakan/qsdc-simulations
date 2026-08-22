@@ -1,5 +1,9 @@
-from qsdc.protocols.srikara.simulator.flow import ModeRoute, OpticalSwitch, build_transcript
 from qsdc.common.random.classical import ClassicalRandomSource
+from qsdc.protocols.srikara.simulator.flow import (
+    ModeRoute,
+    OpticalSwitch,
+    build_transcript,
+)
 
 
 def test_optical_switch_partitions_modes():

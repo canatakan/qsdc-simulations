@@ -22,10 +22,6 @@ from qsdc.protocols.srikara.simulator.backends.strawberryfields.sampled import (
 from qsdc.protocols.srikara.simulator.backends.strawberryfields.utils import (
     calculations,
 )
-from qsdc.protocols.srikara.simulator.backends.strawberryfields.utils.calculations import (
-    normalize_quadrature,
-    normalize_quadrature_variance,
-)
 from qsdc.protocols.srikara.simulator.backends.strawberryfields.utils.noise import Noise
 
 
@@ -89,9 +85,7 @@ def test_effects_are_executable_and_independently_composable():
         ops.LossChannel,
     ]
     assert float(program.circuit[2].op.p[0]) == pytest.approx(0.9)
-    assert float(program.circuit[3].op.p[0]) == pytest.approx(
-        0.7 * np.exp(-2.0 / 4.0)
-    )
+    assert float(program.circuit[3].op.p[0]) == pytest.approx(0.7 * np.exp(-2.0 / 4.0))
     assert float(program.circuit[3].op.p[1]) == pytest.approx(0.03)
     assert float(program.circuit[5].op.p[0]) == pytest.approx(0.8)
     assert float(program.circuit[5].op.p[1]) == pytest.approx(0.02)
@@ -122,9 +116,7 @@ def test_control_pipeline_places_forward_and_alice_detector_effects():
 
 
 def test_alice_delay_applies_only_to_stored_modes_before_message_encoding():
-    backend = SFNoiseBackend(
-        noise(alice_delay=(delay(np.log(1.0 / 0.64), 1.0),))
-    )
+    backend = SFNoiseBackend(noise(alice_delay=(delay(np.log(1.0 / 0.64), 1.0),)))
 
     control_program = backend._control_program(1 + 0j, 0.0, 0.0)
     returned_program = backend._returned_program(
@@ -135,8 +127,7 @@ def test_alice_delay_applies_only_to_stored_modes_before_message_encoding():
     )
 
     assert not any(
-        isinstance(command.op, ops.LossChannel)
-        for command in control_program.circuit
+        isinstance(command.op, ops.LossChannel) for command in control_program.circuit
     )
     assert [type(command.op) for command in returned_program.circuit] == [
         ops.Dgate,
@@ -149,9 +140,7 @@ def test_alice_delay_applies_only_to_stored_modes_before_message_encoding():
 
 
 def test_alice_delay_changes_expected_baseline_not_message_response():
-    backend = SFNoiseBackend(
-        noise(alice_delay=(delay(np.log(1.0 / 0.64), 1.0),))
-    )
+    backend = SFNoiseBackend(noise(alice_delay=(delay(np.log(1.0 / 0.64), 1.0),)))
 
     expectation = backend.returned_expectation(
         alpha=1.5 + 0j,
@@ -183,21 +172,19 @@ def test_sf_moments_match_thermal_loss_and_detector_calculation():
     )
 
     state = sf.Engine("gaussian").run(program).state
-    reported_mean = normalize_quadrature(float(state.means()[0]))
-    reported_variance = normalize_quadrature_variance(
+    reported_mean = calculations.normalize_quadrature(float(state.means()[0]))
+    reported_variance = calculations.normalize_quadrature_variance(
         float(state.cov()[0, 0])
     )
 
     vacuum_variance = 0.25
     mean_after_thermal_loss = np.sqrt(0.64) * (1.5 + 0.75)
     variance_after_thermal_loss = (
-        0.64 * vacuum_variance
-        + (1.0 - 0.64) * (2.0 * 0.5 + 1.0) * vacuum_variance
+        0.64 * vacuum_variance + (1.0 - 0.64) * (2.0 * 0.5 + 1.0) * vacuum_variance
     )
     expected_mean = np.sqrt(0.64) * mean_after_thermal_loss
     expected_variance = (
-        0.64 * variance_after_thermal_loss
-        + (1.0 - 0.64) * vacuum_variance
+        0.64 * variance_after_thermal_loss + (1.0 - 0.64) * vacuum_variance
     )
 
     assert reported_mean == pytest.approx(expected_mean)
@@ -291,10 +278,13 @@ def test_zero_electronic_noise_does_not_draw(monkeypatch):
         fail_if_called,
     )
 
-    assert Noise.apply_electronic_noise(
-        2.0,
-        [electronic_noise(0.0)],
-    ) == 2.0
+    assert (
+        Noise.apply_electronic_noise(
+            2.0,
+            [electronic_noise(0.0)],
+        )
+        == 2.0
+    )
 
 
 def test_empty_noise_model_matches_sf_sampled_for_same_seed():
@@ -357,12 +347,8 @@ def test_backend_configuration_round_trip_builds_executable_effects():
                 "environment_nbar": 0.02,
             }
         ],
-        "bob_detector": [
-            {"type": "detector_inefficiency", "efficiency": 0.6}
-        ],
-        "bob_readout": [
-            {"type": "electronic_noise", "variance_snu": 0.0042}
-        ],
+        "bob_detector": [{"type": "detector_inefficiency", "efficiency": 0.6}],
+        "bob_readout": [{"type": "electronic_noise", "variance_snu": 0.0042}],
     }
 
     config = NoiseConfig.model_validate(raw)
@@ -389,9 +375,7 @@ def test_backend_configuration_round_trip_builds_executable_effects():
             {
                 "name": "sf-noise",
                 "noise": {
-                    "forward": [
-                        {"type": "electronic_noise", "variance_snu": 0.1}
-                    ]
+                    "forward": [{"type": "electronic_noise", "variance_snu": 0.1}]
                 },
             },
             ("forward", 0),
@@ -400,11 +384,7 @@ def test_backend_configuration_round_trip_builds_executable_effects():
         (
             {
                 "name": "sf-noise",
-                "noise": {
-                    "bob_readout": [
-                        {"type": "loss", "transmittance": 0.9}
-                    ]
-                },
+                "noise": {"bob_readout": [{"type": "loss", "transmittance": 0.9}]},
             },
             ("bob_readout", 0, "type"),
             "literal_error",
@@ -416,15 +396,12 @@ def test_backend_configuration_round_trip_builds_executable_effects():
         ),
     ],
 )
-def test_noise_configuration_rejects_effects_at_wrong_stage(
-    raw, location, error_code
-):
+def test_noise_configuration_rejects_effects_at_wrong_stage(raw, location, error_code):
     with pytest.raises(ValidationError) as exc_info:
         NoiseConfig.model_validate(raw["noise"])
 
     assert any(
-        error["loc"][-len(location):] == location
-        and error["type"] == error_code
+        error["loc"][-len(location) :] == location and error["type"] == error_code
         for error in exc_info.value.errors()
     )
 
@@ -459,9 +436,7 @@ def test_noise_configuration_rejects_effects_at_wrong_stage(
         (
             {
                 "name": "sf-noise",
-                "noise": {
-                    "forward": [{"type": "loss", "transmittance": 1.1}]
-                },
+                "noise": {"forward": [{"type": "loss", "transmittance": 1.1}]},
             },
             ("forward", 0, "loss", "transmittance"),
             "less_than_equal",
@@ -484,14 +459,11 @@ def test_noise_configuration_rejects_effects_at_wrong_stage(
         ),
     ],
 )
-def test_backend_configuration_rejects_invalid_nested_values(
-    raw, location, error_code
-):
+def test_backend_configuration_rejects_invalid_nested_values(raw, location, error_code):
     with pytest.raises(ValidationError) as exc_info:
         NoiseConfig.model_validate(raw["noise"])
 
     assert any(
-        error["loc"][-len(location):] == location
-        and error["type"] == error_code
+        error["loc"][-len(location) :] == location and error["type"] == error_code
         for error in exc_info.value.errors()
     )
