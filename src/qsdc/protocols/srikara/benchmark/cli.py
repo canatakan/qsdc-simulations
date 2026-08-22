@@ -7,11 +7,9 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
-from qsdc.common.random import make_random_source
 from qsdc.protocols.srikara.benchmark.artifacts.ui.index import write_benchmark_index
 from qsdc.protocols.srikara.benchmark.engine import run_benchmark
 from qsdc.protocols.srikara.configuration.benchmark import BenchmarkConfig
-from qsdc.protocols.srikara.simulator.backends import make_backend
 
 
 def main() -> None:
@@ -106,8 +104,6 @@ def _run_sequential(
             report = run_benchmark(
                 config.with_output_dir(str(config_output_dir)),
                 progress=True,
-                backend_factory=make_backend,
-                random_source_factory=make_random_source,
             )
         except Exception as error:
             if not keep_going:
@@ -176,8 +172,6 @@ def _run_config_path(
     report = run_benchmark(
         config.with_output_dir(str(config_output_dir)),
         progress=False,
-        backend_factory=make_backend,
-        random_source_factory=make_random_source,
     )
     return {
         "name": config.name,
