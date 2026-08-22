@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+from qsdc.common.random.classical import ClassicalRandomSource
 from qsdc.protocols.srikara.simulator.backends.analytic.calculations import (
     displacement_after_unsqueeze,
     recover_alice_displacement,
     squeeze_displace_forward,
     squeeze_displace_inverse,
 )
-from qsdc.protocols.srikara.simulator.encoding import beta_for_message_value, bits_for_real
+from qsdc.protocols.srikara.simulator.encoding import (
+    beta_for_message_value,
+    bits_for_real,
+)
 from qsdc.protocols.srikara.simulator.flow import ModeRoute, build_transcript
-from qsdc.common.random.classical import ClassicalRandomSource
 
 
 def main() -> None:
@@ -104,8 +107,7 @@ def main() -> None:
     print("Formula:")
     print("observed_delta = alpha_measured - alpha")
     print(
-        f"observed_delta = {fmt(returned_alpha)} - {fmt(alpha)} = "
-        f"{fmt(observed_delta)}"
+        f"observed_delta = {fmt(returned_alpha)} - {fmt(alpha)} = {fmt(observed_delta)}"
     )
     print(
         "beta_A_recovered = observed_delta cosh(r) "

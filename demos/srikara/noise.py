@@ -23,9 +23,8 @@ from qsdc.protocols.srikara.configuration.simulator import SimulatorConfig
 from qsdc.protocols.srikara.simulator.backends.strawberryfields.noisy import (
     SFNoiseBackend,
 )
-from qsdc.protocols.srikara.simulator.backends.strawberryfields.utils.calculations import (
-    normalize_quadrature,
-    normalize_quadrature_variance,
+from qsdc.protocols.srikara.simulator.backends.strawberryfields.utils import (
+    calculations as sf_calculations,
 )
 from qsdc.protocols.srikara.simulator.backends.strawberryfields.utils.noise import (
     Noise,
@@ -51,8 +50,8 @@ def _moments(operations: list[object], axis: QuadratureAxis) -> tuple[float, flo
 
     mean, variance = state.quad_expectation(0, axis.angle)
     return (
-        normalize_quadrature(float(mean)),
-        normalize_quadrature_variance(float(variance)),
+        sf_calculations.normalize_quadrature(float(mean)),
+        sf_calculations.normalize_quadrature_variance(float(variance)),
     )
 
 
@@ -95,7 +94,8 @@ def main() -> None:
         bob_readout=[readout],
     )
     config = SimulatorConfig(
-        n_states=4,
+        backend="sf-noise",
+        noise=noise,
         intervals="optimized_v8",
         alpha_distribution=AlphaConfig(bound=2.0),
         squeeze_r_distribution=UniformSqueezeConfig(lower=0.25, upper=1.0),
@@ -106,10 +106,11 @@ def main() -> None:
         seed=4,
     )
 
-    result = simulate_qsdc([BITS], config, backend=SFNoiseBackend(noise))
-    message = result.messages[0]
-    decoy = result.decoys[0]
-    prepared = result.prepared_states[message.index]
+    result = simulate_qsdc(BITS, config, backend=SFNoiseBackend(noise))
+    protocol = result.blocks[0].protocol
+    message = protocol.messages[0]
+    decoy = protocol.decoys[0]
+    prepared = protocol.prepared_states[message.index]
     interval = interval_for_bits(message.sent_bits, intervals=message.intervals)
     alpha_abs, alpha_phase = polar(prepared.alpha)
     beta_abs, beta_phase = polar(message.alice_beta)
@@ -117,15 +118,12 @@ def main() -> None:
     delay_transmittance = delay.initial_efficiency * exp(
         -delay.duration_seconds / delay.lifetime_seconds
     )
-    delay_environment_variance = (
-        2.0 * delay.environment_nbar + 1.0
-    ) * VACUUM_VARIANCE
+    delay_environment_variance = (2.0 * delay.environment_nbar + 1.0) * VACUUM_VARIANCE
     return_environment_variance = (
         2.0 * returned.environment_nbar + 1.0
     ) * VACUUM_VARIANCE
     readout_variance = sum(
-        Noise.readout_variance(effect.variance_snu)
-        for effect in noise.bob_readout
+        Noise.readout_variance(effect.variance_snu) for effect in noise.bob_readout
     )
 
     operations: list[object] = [
@@ -135,7 +133,9 @@ def main() -> None:
     prepared_moments = _moments(operations, message.axis)
     operations.append(sf.ops.LossChannel(forward.transmittance))
     loss_moments = _moments(operations, message.axis)
-    operations.append(sf.ops.ThermalLossChannel(delay_transmittance, delay.environment_nbar))
+    operations.append(
+        sf.ops.ThermalLossChannel(delay_transmittance, delay.environment_nbar)
+    )
     delay_moments = _moments(operations, message.axis)
     before_message_operations = list(operations)
     operations.append(sf.ops.Dgate(beta_abs, beta_phase))
@@ -166,16 +166,16 @@ def main() -> None:
         f"""Noisy QSDC transfer
 ===================
 sent bits = {message.sent_bits}
-control modes = {result.control_indices}
-delayed modes = {result.route.delayed_indices}
-message mode = {result.message_indices}
-decoy mode = {result.decoy_indices}
+control modes = {protocol.control_indices}
+delayed modes = {protocol.route.delayed_indices}
+message mode = {protocol.message_indices}
+decoy mode = {protocol.decoy_indices}
 
 Control checks at Alice
 -----------------------
 """
     )
-    for control in result.controls:
+    for control in protocol.controls:
         deviation = abs(control.measured - control.expected) / control.expected_sigma
         print(
             f"mode {control.index}: axis={control.axis.value}, "
@@ -184,37 +184,41 @@ Control checks at Alice
             f"passed={control.passed}"
         )
 
+    print("\nReturned decoy check at Bob")
+    print("---------------------------")
     print(
-        f"""
-Returned decoy check at Bob
----------------------------
-mode {decoy.index}: axis={decoy.axis.value}, expected={decoy.expected:.6f}, measured={decoy.measured:.6f}, sigma={decoy.expected_sigma:.6f}, passed={decoy.passed}
-
-Message-mode noise path
------------------------
-Alice samples m = {message.message_value:.6f} from the interval [{interval.lower:g}, {interval.upper:g})
-Alice displacement beta = {message.alice_beta:.6f}
-Bob measures the {message.axis.value} quadrature
-
-"""
+        f"mode {decoy.index}: axis={decoy.axis.value}, "
+        f"expected={decoy.expected:.6f}, measured={decoy.measured:.6f}, "
+        f"sigma={decoy.expected_sigma:.6f}, passed={decoy.passed}"
     )
+    print("\nMessage-mode noise path")
+    print("-----------------------")
+    print(
+        f"Alice samples m = {message.message_value:.6f} from the interval "
+        f"[{interval.lower:g}, {interval.upper:g})"
+    )
+    print(f"Alice displacement beta = {message.alice_beta:.6f}")
+    print(f"Bob measures the {message.axis.value} quadrature\n")
     _print_stage(
         1,
         "Bob prepares the mode",
-        f"D(alpha), alpha = {prepared.alpha:.6f}, vacuum variance = {VACUUM_VARIANCE:.6f}",
+        f"D(alpha), alpha = {prepared.alpha:.6f}, "
+        f"vacuum variance = {VACUUM_VARIANCE:.6f}",
         prepared_moments,
     )
     _print_stage(
         2,
         "Forward pure loss",
         f"mu' = sqrt({forward.transmittance:g}) * mu; "
-        f"V' = {forward.transmittance:g} * V + (1 - {forward.transmittance:g}) * V_vacuum",
+        f"V' = {forward.transmittance:g} * V + "
+        f"(1 - {forward.transmittance:g}) * V_vacuum",
         loss_moments,
     )
     _print_stage(
         3,
         "Alice's delay storage",
-        f"T_delay = {delay_transmittance:.6f}; V_environment = {delay_environment_variance:.6f}",
+        f"T_delay = {delay_transmittance:.6f}; "
+        f"V_environment = {delay_environment_variance:.6f}",
         delay_moments,
     )
     _print_stage(
@@ -226,7 +230,8 @@ Bob measures the {message.axis.value} quadrature
     _print_stage(
         5,
         "Thermal return loss",
-        f"mu' = sqrt({returned.transmittance:g}) * mu; V_environment = {return_environment_variance:.6f}",
+        f"mu' = sqrt({returned.transmittance:g}) * mu; "
+        f"V_environment = {return_environment_variance:.6f}",
         return_moments,
     )
     _print_stage(

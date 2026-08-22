@@ -6,8 +6,6 @@ import argparse
 import textwrap
 
 from qsdc.common.bits import bits_to_bytes, bytes_to_bits
-from qsdc.common.random import make_random_source
-from qsdc.protocols.srikara.simulator.backends import make_backend
 from qsdc.protocols.srikara.configuration.simulator import SimulatorConfig
 from qsdc.protocols.srikara.simulator.encoding import (
     ENCODING_INTERVALS,
@@ -70,12 +68,13 @@ def main() -> None:
     padding = (-len(bitstream)) % 3
     padded_bitstream = bitstream + ("0" * padding)
     symbols = tuple(
-        padded_bitstream[index: index + 3]
+        padded_bitstream[index : index + 3]
         for index in range(0, len(padded_bitstream), 3)
     )
 
     config_overrides = {
-        "n_states": 4 * len(symbols),
+        "backend": args.backend,
+        "random_source": args.random_source,
         "seed": args.seed,
         "intervals": args.intervals,
         "message_axis_policy": args.message_axis_policy,
@@ -83,20 +82,14 @@ def main() -> None:
     if args.tolerance_sigmas is not None:
         config_overrides["tolerance_sigmas"] = args.tolerance_sigmas
     config = SimulatorConfig.model_validate(config_overrides)
-    result = simulate_qsdc(
-        symbols,
-        config=config,
-        backend=make_backend(args.backend),
-        random_source=make_random_source(args.random_source, args.seed),
-    )
+    result = simulate_qsdc(bitstream, config)
+    protocol = result.blocks[0].protocol
 
     decoded_symbols = tuple(
-        message_mode.decoded_bits for message_mode in result.messages
+        message_mode.decoded_bits for message_mode in protocol.messages
     )
     decoded_bitstream = "".join(decoded_symbols)
-    unpadded_bits = (
-        decoded_bitstream[:-padding] if padding else decoded_bitstream
-    )
+    unpadded_bits = decoded_bitstream[:-padding] if padding else decoded_bitstream
     decoded_payload = bits_to_bytes(unpadded_bits)
     decoded_message = decoded_payload.decode(args.encoding, errors="replace")
 
@@ -115,36 +108,36 @@ def main() -> None:
     print_symbol_rows(symbols)
 
     print_header("3. Quantum channel configuration")
-    print(f"Backend: {result.backend_name}")
-    print(f"Protocol random source: {result.random_source_name}")
-    print(f"Intervals: {result.intervals}")
-    print(f"Message axis policy: {result.message_axis_policy}")
+    print(f"Backend: {protocol.backend_name}")
+    print(f"Protocol random source: {protocol.random_source_name}")
+    print(f"Intervals: {protocol.intervals}")
+    print(f"Message axis policy: {protocol.message_axis_policy}")
     print(f"Random seed: {args.seed}")
     print(f"Backend measurement seed: {args.seed}")
     print(
         "Control/decoy tolerance "
-        f"(measurement noise sigmas): {result.check_tolerance_sigmas:g}"
+        f"(measurement noise sigmas): {protocol.check_tolerance_sigmas:g}"
     )
-    print(f"Nominal shot-noise sigma: {result.measurement_noise_sigma:g}")
+    print(f"Nominal shot-noise sigma: {protocol.measurement_noise_sigma:g}")
 
     print()
 
-    print(f"Total optical modes n: {config.n_states}")
-    print(f"Control modes n/2: {len(result.control_indices)}")
-    print(f"Message modes n/4: {len(result.message_indices)}")
-    print(f"Decoy modes n/4: {len(result.decoy_indices)}")
-    print(f"Delayed modes n/2: {len(result.route.delayed_indices)}")
+    print(f"Total optical modes n: {len(protocol.prepared_states)}")
+    print(f"Control modes n/2: {len(protocol.control_indices)}")
+    print(f"Message modes n/4: {len(protocol.message_indices)}")
+    print(f"Decoy modes n/4: {len(protocol.decoy_indices)}")
+    print(f"Delayed modes n/2: {len(protocol.route.delayed_indices)}")
 
     print()
 
-    print(f"Control coordinates: {result.control_indices}")
-    print(f"Delayed coordinates: {result.route.delayed_indices}")
-    print(f"Message coordinates: {result.message_indices}")
-    print(f"Decoy coordinates: {result.decoy_indices}")
+    print(f"Control coordinates: {protocol.control_indices}")
+    print(f"Delayed coordinates: {protocol.route.delayed_indices}")
+    print(f"Message coordinates: {protocol.message_indices}")
+    print(f"Decoy coordinates: {protocol.decoy_indices}")
 
     print_header("4. Bob prepares S(s_j)D(alpha_j)|0>")
     print("idx  alpha_j                         r_j        theta_j")
-    for state in result.prepared_states:
+    for state in protocol.prepared_states:
         print(
             f"{state.index:>3}  {format_complex(state.alpha):<30} "
             f"{state.squeeze_r:>8.5f}  {state.theta:>9.5f}"
@@ -153,18 +146,18 @@ def main() -> None:
     print()
     print(
         "Announcement via classical channel (Alice -> Bob): "
-        f"{result.transcript.control_coordinates.label}"
+        f"{protocol.transcript.control_coordinates.label}"
     )
 
     print_header("5. Alice checks control modes")
     print(
         "Announcement via classical channel (Bob -> Alice): "
-        f"{result.transcript.control_parameter_coordinates.label}"
+        f"{protocol.transcript.control_parameter_coordinates.label}"
     )
     print()
 
     print("idx  axis  expected       measured       sigma       dev/sigma   status")
-    for check in result.controls:
+    for check in protocol.controls:
         status = "pass" if check.passed else "fail"
         sigma_deviation = abs(check.measured - check.expected) / check.expected_sigma
         print(
@@ -172,11 +165,11 @@ def main() -> None:
             f"{check.expected:>12.7f}  {check.measured:>12.7f}  "
             f"{check.expected_sigma:>10.7f}  {sigma_deviation:>9.4f}  {status}"
         )
-    print(f"Control check result: {result.control_passed}")
+    print(f"Control check result: {protocol.control_passed}")
 
     print_header("6. Alice encodes message modes with D(beta_A)")
     print("idx  bits  interval       m_A           beta_A")
-    for message_mode in result.messages:
+    for message_mode in protocol.messages:
         interval = interval_for_bits(
             message_mode.sent_bits,
             intervals=message_mode.intervals,
@@ -191,12 +184,12 @@ def main() -> None:
     print_header("7. Bob checks returned decoys")
     print(
         "Announcement via classical channel (Alice -> Bob): "
-        f"{result.transcript.decoy_coordinates.label}"
+        f"{protocol.transcript.decoy_coordinates.label}"
     )
     print()
 
     print("idx  axis  expected       measured       sigma       dev/sigma   status")
-    for decoy in result.decoys:
+    for decoy in protocol.decoys:
         status = "pass" if decoy.passed else "fail"
         sigma_deviation = abs(decoy.measured - decoy.expected) / decoy.expected_sigma
         print(
@@ -204,14 +197,13 @@ def main() -> None:
             f"{decoy.expected:>12.7f}  {decoy.measured:>12.7f}  "
             f"{decoy.expected_sigma:>10.7f}  {sigma_deviation:>9.4f}  {status}"
         )
-    print(f"Decoy check result: {result.decoy_passed}")
+    print(f"Decoy check result: {protocol.decoy_passed}")
 
     print_header("8. Bob decodes message modes")
     print(
-        "idx  axis  sent  decoded  measured      Delta        factor       "
-        "m recovered"
+        "idx  axis  sent  decoded  measured      Delta        factor       m recovered"
     )
-    for message_mode in result.messages:
+    for message_mode in protocol.messages:
         print(
             f"{message_mode.index:>3}  {message_mode.axis:>4}  "
             f"{message_mode.sent_bits:>4}  "
@@ -247,7 +239,7 @@ def print_wrapped(bits: str, width: int = 72) -> None:
 
 def print_symbol_rows(symbols: tuple[str, ...], per_row: int = 16) -> None:
     for index in range(0, len(symbols), per_row):
-        row = symbols[index: index + per_row]
+        row = symbols[index : index + per_row]
         print(f"{index:>3}-{index + len(row) - 1:<3}: {' '.join(row)}")
 
 
