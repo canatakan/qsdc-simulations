@@ -222,7 +222,9 @@ class DecodingMetrics:
     raw_symbol_erasure_rate: float
     mean_abs_value_error: float
     mean_interval_margin: float
-    recovered_payload_bit_error_rate: Optional[float]
+    post_correction_bit_error_rate: float
+    post_correction_bit_erasure_rate: float
+    exact_payload_rate: float
 
     @classmethod
     def from_combo(cls, combo: BenchmarkCombo) -> DecodingMetrics:
@@ -235,10 +237,39 @@ class DecodingMetrics:
         measured = tuple(
             message for message in messages if message.decoded_bits is not None
         )
-        recovered_trials = tuple(
-            trial for trial in combo.trials if trial.result.recovered_bits is not None
-        )
         measured_bit_count = 3 * len(measured)
+        payload_bit_count = sum(
+            len(trial.expected_payload_bits) for trial in combo.trials
+        )
+        post_correction_errors = 0
+        post_correction_erasures = 0
+        for trial in combo.trials:
+            for final in trial.result.blocks:
+                block = final.block
+                expected = trial.expected_payload_bits[
+                    block.payload_offset : block.payload_offset
+                    + block.payload_bit_count
+                ]
+                observed: list[Optional[str]] = []
+                if final.decode is not None and final.decode.codewords:
+                    for codeword in final.decode.codewords:
+                        if codeword.data_bits is None:
+                            observed.extend([None] * 4)
+                        else:
+                            observed.extend(codeword.data_bits)
+                    observed = observed[: block.payload_bit_count]
+                elif final.recovered_bits is not None:
+                    observed.extend(final.recovered_bits)
+                else:
+                    observed.extend([None] * block.payload_bit_count)
+
+                post_correction_errors += sum(
+                    received is not None and received != sent
+                    for sent, received in zip(expected, observed)
+                )
+                post_correction_erasures += sum(
+                    received is None for received in observed
+                )
         return cls(
             combo.index,
             (
@@ -268,17 +299,11 @@ class DecodingMetrics:
                 for message in measured
                 if message.decoded_value is not None
             ),
-            (
-                sum(
-                    hamming_distance(
-                        trial.expected_payload_bits,
-                        trial.result.recovered_bits or "",
-                    )
-                    for trial in recovered_trials
-                )
-                / sum(len(trial.expected_payload_bits) for trial in recovered_trials)
-                if recovered_trials
-                else None
+            post_correction_errors / payload_bit_count if payload_bit_count else 0.0,
+            post_correction_erasures / payload_bit_count if payload_bit_count else 0.0,
+            _fraction(
+                trial.result.recovered_bits == trial.expected_payload_bits
+                for trial in combo.trials
             ),
         )
 

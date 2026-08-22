@@ -55,11 +55,11 @@ ERROR_PLOT_SPECS: tuple[ErrorPlotSpec, ...] = (
     ),
 )
 
-RECOVERED_PAYLOAD_PLOT_SPEC = ErrorPlotSpec(
-    filename="recovered_payload_bit_error_by_r.png",
-    title="Recovered Payload Bit Error by r Distribution",
-    y_label="recovered payload bit error rate",
-    metric_field="recovered_payload_bit_error_rate",
+POST_CORRECTION_PAYLOAD_PLOT_SPEC = ErrorPlotSpec(
+    filename="post_correction_bit_error_by_r.png",
+    title="Post-Correction Payload Bit Error by r Distribution",
+    y_label="post-correction logical bit error rate",
+    metric_field="post_correction_bit_error_rate",
 )
 
 DEFAULT_INTERVAL_LABEL = "default"
@@ -120,7 +120,7 @@ def write_benchmark_plots(
     plots: list[str] = []
     specs = list(ERROR_PLOT_SPECS)
     if any(str(combo.get("error_correction")) == "secded" for combo in combos):
-        specs.append(RECOVERED_PAYLOAD_PLOT_SPEC)
+        specs.append(POST_CORRECTION_PAYLOAD_PLOT_SPEC)
     for spec in specs:
         interval_path = plots_dir / f"{Path(spec.filename).stem}_by_interval.png"
         _write_interval_metric_plot(interval_path, combos, spec)

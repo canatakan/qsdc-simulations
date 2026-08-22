@@ -121,7 +121,7 @@ def test_benchmark_projects_one_complete_simulator_config():
 def test_artifact_metrics_are_split_by_concern():
     assert len(ComboOutcome.__dataclass_fields__) == 9
     assert len(TrialOutcome.__dataclass_fields__) == 9
-    assert len(DecodingMetrics.__dataclass_fields__) == 8
+    assert len(DecodingMetrics.__dataclass_fields__) == 10
     assert len(CheckMetrics.__dataclass_fields__) == 8
     assert len(CorrectionMetrics.__dataclass_fields__) == 5
 
@@ -209,10 +209,12 @@ def test_enabled_benchmark_reports_fec_metrics_and_plot(tmp_path):
     assert report.config.transport_block_count == 1
     assert trial.result.payload_recovered
     tables = ArtifactTables.from_results(report.combos, report.trials)
-    assert tables.decoding[0].recovered_payload_bit_error_rate == 0.0
+    assert tables.decoding[0].post_correction_bit_error_rate == 0.0
+    assert tables.decoding[0].post_correction_bit_erasure_rate == 0.0
+    assert tables.decoding[0].exact_payload_rate == 1.0
     assert tables.decoding[0].raw_bit_error_rate == 0.0
     assert trial.result.total_state_count == 32
-    assert "plots/recovered_payload_bit_error_by_r_by_interval.png" in (
+    assert "plots/post_correction_bit_error_by_r_by_interval.png" in (
         report.artifacts.plots
     )
 
