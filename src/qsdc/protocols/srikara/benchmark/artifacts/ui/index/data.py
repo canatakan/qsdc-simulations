@@ -1,4 +1,4 @@
-"""Load and aggregate benchmark runs for the multi-run index."""
+"""Load benchmark artifacts and derive the index's run-level data."""
 
 from __future__ import annotations
 
@@ -16,7 +16,8 @@ Run = dict[str, Any]
 Combo = dict[str, Any]
 
 
-def find_runs(root: Path) -> list[Run]:
+def load_runs(root: Path) -> list[Run]:
+    """Load every benchmark artifact beneath ``root`` for index generation."""
     runs = []
     for benchmark_path in sorted(root.rglob("benchmark.json")):
         run_dir = benchmark_path.parent
@@ -30,66 +31,6 @@ def find_runs(root: Path) -> list[Run]:
     return sorted(runs, key=_run_sort_key)
 
 
-def group_runs(runs: list[Run]) -> list[dict[str, Any]]:
-    grouped: dict[str, list[Run]] = {}
-    for run in runs:
-        grouped.setdefault(str(run["name"]), []).append(run)
-
-    groups = []
-    for name, group_items in grouped.items():
-        ordered_runs = sorted(group_items, key=lambda run: run["run_order"])
-        groups.append({"name": name, "runs": ordered_runs, "latest": ordered_runs[-1]})
-    return sorted(groups, key=lambda group: str(group["name"]))
-
-
-def group_families(groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    grouped: dict[str, list[dict[str, Any]]] = {}
-    for group in groups:
-        family, _ = split_group_name(str(group["name"]))
-        grouped.setdefault(family, []).append(group)
-    return [
-        {
-            "name": family,
-            "report_groups": report_groups,
-            "run_count": sum(len(group["runs"]) for group in report_groups),
-        }
-        for family, report_groups in sorted(grouped.items())
-    ]
-
-
-def split_group_name(name: str) -> tuple[str, str]:
-    if "/" not in name:
-        return name, name
-    return tuple(name.split("/", 1))
-
-
-def non_quick_runs(runs: list[Run]) -> list[Run]:
-    return [run for run in runs if not str(run["name"]).startswith("quick/")]
-
-
-def delta_from_default(
-    row: dict[str, Any],
-    rows: list[dict[str, Any]],
-    field: str,
-) -> float | None:
-    default_row = next(
-        (candidate for candidate in rows if candidate.get("intervals") == "default"),
-        None,
-    )
-    if default_row is None or default_row.get(field) is None or row.get(field) is None:
-        return None
-    return float(default_row[field]) - float(row[field])
-
-
-def best_run_value(runs: list[Run], row_key: str, field: str) -> float | None:
-    values = [
-        float(run[row_key][field])
-        for run in runs
-        if run.get(row_key) is not None and run[row_key].get(field) is not None
-    ]
-    return min(values) if values else None
-
-
 def _run_row(
     root: Path,
     run_dir: Path,
@@ -100,7 +41,7 @@ def _run_row(
     metrics = artifact.metrics
     report_path = run_dir / artifact.artifacts.html_report
     balanced_combos = _balanced_combos(combos)
-    _, report_name = split_group_name(config.name)
+    report_name = config.name.split("/", 1)[-1]
     return {
         "name": config.name,
         "report_name": report_name,

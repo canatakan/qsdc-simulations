@@ -16,10 +16,13 @@ from qsdc.protocols.srikara.benchmark.artifacts.metrics import (
     BenchmarkRun,
 )
 from qsdc.protocols.srikara.benchmark.artifacts.plots import write_benchmark_plots
-from qsdc.protocols.srikara.benchmark.artifacts.ui import copy_asset, render_template
-from qsdc.protocols.srikara.benchmark.artifacts.ui.utils.formatting import (
+from qsdc.protocols.srikara.benchmark.artifacts.ui.formatting import (
     human_header,
     table_cell,
+)
+from qsdc.protocols.srikara.benchmark.artifacts.ui.rendering import (
+    copy_asset,
+    render_template,
 )
 
 

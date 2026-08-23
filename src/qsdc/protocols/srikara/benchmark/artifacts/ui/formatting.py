@@ -1,4 +1,4 @@
-"""Consistent display formatting for benchmark HTML artifacts."""
+"""Format benchmark values for display in the static UI."""
 
 from __future__ import annotations
 

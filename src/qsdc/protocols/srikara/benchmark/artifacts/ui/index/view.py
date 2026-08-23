@@ -1,11 +1,11 @@
-"""Build presentation-only data for the multi-run benchmark index."""
+"""Build the template context for the multi-run benchmark index."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
-from qsdc.protocols.srikara.benchmark.artifacts.ui.utils.formatting import (
+from ..formatting import (
     compact_distribution,
     count,
     distribution,
@@ -15,19 +15,11 @@ from qsdc.protocols.srikara.benchmark.artifacts.ui.utils.formatting import (
     run_id,
     text,
 )
-from qsdc.protocols.srikara.benchmark.artifacts.ui.utils.index_data import (
-    best_run_value,
-    delta_from_default,
-    group_families,
-    group_runs,
-    non_quick_runs,
-    split_group_name,
-)
 
 
 def build_index_context(root: Path, runs: list[dict[str, Any]]) -> dict[str, Any]:
-    groups = group_runs(runs)
-    families = group_families(groups)
+    groups = _group_runs(runs)
+    families = _group_families(groups)
     return {
         "title": f"Srikara benchmark UI: {root.name}",
         "heading": root.name,
@@ -42,14 +34,14 @@ def _summary_cards(
     runs: list[dict[str, Any]],
     families: list[dict[str, Any]],
 ) -> list[dict[str, str]]:
-    comparable_runs = non_quick_runs(runs)
+    comparable_runs = _non_quick_runs(runs)
     cards = [
         ("Runs", len(runs), "benchmark reports found"),
         ("Report families", len(families), "top-level report collections"),
         (
             "Best mean bit error",
             rate(
-                best_run_value(
+                _best_run_value(
                     comparable_runs,
                     "best_mean_bit",
                     "raw_bit_error_rate",
@@ -60,7 +52,7 @@ def _summary_cards(
         (
             "Best mean symbol error",
             rate(
-                best_run_value(
+                _best_run_value(
                     comparable_runs,
                     "best_mean_symbol",
                     "raw_symbol_error_rate",
@@ -172,7 +164,7 @@ def _family_view(family: dict[str, Any]) -> dict[str, Any]:
         "navigation": [
             {
                 "id": html_id(group["name"]),
-                "label": split_group_name(str(group["name"]))[1],
+                "label": _split_group_name(str(group["name"]))[1],
             }
             for group in family["report_groups"]
         ],
@@ -218,7 +210,7 @@ def _metric_cell(
     rows: list[dict[str, Any]],
     field: str,
 ) -> dict[str, Any]:
-    delta = delta_from_default(row, rows, field)
+    delta = _delta_from_default(row, rows, field)
     delta_view = None
     if delta:
         delta_view = {
@@ -248,3 +240,67 @@ def _axis_summary(run: dict[str, Any]) -> str:
 
 def _interval_policy_summary(policies: list[object]) -> str:
     return str(policies[0]) if len(policies) == 1 else f"{len(policies)} policies"
+
+
+def _group_runs(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for run in runs:
+        grouped.setdefault(str(run["name"]), []).append(run)
+
+    groups = []
+    for name, items in grouped.items():
+        ordered_runs = sorted(items, key=lambda run: run["run_order"])
+        groups.append({"name": name, "runs": ordered_runs, "latest": ordered_runs[-1]})
+    return sorted(groups, key=lambda group: str(group["name"]))
+
+
+def _group_families(groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for group in groups:
+        family, _ = _split_group_name(str(group["name"]))
+        grouped.setdefault(family, []).append(group)
+    return [
+        {
+            "name": family,
+            "report_groups": report_groups,
+            "run_count": sum(len(group["runs"]) for group in report_groups),
+        }
+        for family, report_groups in sorted(grouped.items())
+    ]
+
+
+def _split_group_name(name: str) -> tuple[str, str]:
+    if "/" not in name:
+        return name, name
+    return tuple(name.split("/", 1))
+
+
+def _non_quick_runs(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [run for run in runs if not str(run["name"]).startswith("quick/")]
+
+
+def _best_run_value(
+    runs: list[dict[str, Any]],
+    row_key: str,
+    field: str,
+) -> float | None:
+    values = [
+        float(run[row_key][field])
+        for run in runs
+        if run.get(row_key) is not None and run[row_key].get(field) is not None
+    ]
+    return min(values) if values else None
+
+
+def _delta_from_default(
+    row: dict[str, Any],
+    rows: list[dict[str, Any]],
+    field: str,
+) -> float | None:
+    default_row = next(
+        (candidate for candidate in rows if candidate.get("intervals") == "default"),
+        None,
+    )
+    if default_row is None or default_row.get(field) is None or row.get(field) is None:
+        return None
+    return float(default_row[field]) - float(row[field])
