@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">Srikara benchmark · {{ layout }} · {{ execution }}</p>
+    <h1>{{ title }}</h1>
+  </header>
+
+  <section class="cards">
+    <article><h3>Runs</h3><p>{{ summary.runs }} × {{ summary.repetitions }}</p></article>
+    <article><h3>Payload delivered</h3><p>{{ "%.2f"|format(100 * summary.delivered_fraction) }}%</p></article>
+    <article><h3>Delivered bits / state</h3><p>{{ "%.4f"|format(summary.delivered_bits_per_state) }}</p></article>
+    <article><h3>Information / state</h3><p>{{ "%.4f"|format(summary.information_per_state) }}</p></article>
+    <article><h3>Simulation time</h3><p>{{ seconds }}</p></article>
+  </section>
+
+  <section>
+    {% for plot in plots %}
+    <img src="plots/{{ plot }}" alt="{{ title }} {{ layout }} plot {{ loop.index }}">
+    {% endfor %}
+  </section>
+
+  <section>
+    <h2>Results</h2>
+    <div class="table">
+      <table>
+        <thead>
+          <tr>
+            <th class="number">#</th><th>Condition</th>{% if show_series %}<th>Series</th>{% endif %}
+            <th class="number">BER</th><th class="number">Raw BER</th><th class="number">Erasures</th>
+            <th class="number">Delivered</th><th class="number">Bits / state</th>
+            <th class="number">Information / state</th><th class="number">Blocks</th>
+            <th class="number">Retries</th><th class="number">Rejected by checks</th>
+            <th class="number">Uncorrectable</th><th class="number">Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in table %}
+          <tr>
+            <td class="number">{{ row.id }}</td><td>{{ row.condition }}</td>{% if show_series %}<td>{{ row.series }}</td>{% endif %}
+            {% for cell in row.cells %}<td class="number">{{ cell }}</td>{% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Shared parameters</h2>
+    <div class="table">
+      <table>
+        <tbody>
+          {% for name, value in shared.items() %}
+          <tr><th>{{ name }}</th><td>{{ value }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="links"><a href="results.json">results.json</a> · <a href="runs.csv">runs.csv</a></p>
+  </section>
+</main>
+</body>
+</html>

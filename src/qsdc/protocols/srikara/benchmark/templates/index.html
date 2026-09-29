@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">Srikara benchmarks</p>
+    <h1>{{ title }}</h1>
+  </header>
+  {% for folder, rows in sections.items() %}
+  <section>
+    <h2>{{ folder }}</h2>
+    <div class="table">
+      <table>
+        <thead>
+          <tr><th>Study</th><th class="number">Executions</th><th class="number">Cases</th><th class="number">Payload delivered</th><th class="number">Bits / state</th><th class="number">Time</th></tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td><a href="{{ row.href }}">{{ row.name }}</a></td>
+            <td class="number">{{ row.executions }}</td>
+            <td class="number">{{ row.runs }}</td>
+            <td class="number">{{ row.delivered }}</td>
+            <td class="number">{{ row.per_state }}</td>
+            <td class="number">{{ row.seconds }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% else %}
+  <p>No benchmark results yet.</p>
+  {% endfor %}
+</main>
+</body>
+</html>
