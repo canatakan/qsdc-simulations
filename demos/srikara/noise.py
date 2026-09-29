@@ -1,278 +1,108 @@
-"""Transfer one three-bit symbol and show its noise calculations."""
+"""Send a short message through a noisy channel and follow every mode through every noise stage.
 
-from cmath import polar
-from math import exp, sqrt
+Examples:
+    python demos/srikara/noise.py
+    python demos/srikara/noise.py "Hi" --secded --max-attempts 2
+"""
 
-import strawberryfields as sf
+from __future__ import annotations
 
-from qsdc.common.quadrature import QuadratureAxis
-from qsdc.protocols.srikara.configuration.distribution import (
-    AlphaConfig,
-    UniformSqueezeConfig,
-    UniformThetaConfig,
-)
-from qsdc.protocols.srikara.configuration.noise import (
-    DelayConfig,
-    DetectorInefficiencyConfig,
-    ElectronicNoiseConfig,
+import argparse
+
+from walkthrough import header, show_transmission, table
+
+from qsdc.common.bits import bytes_to_bits
+from qsdc.protocols.srikara.config import (
+    Channel,
+    Detector,
+    Memory,
     NoiseConfig,
-    PureLossConfig,
-    ThermalLossConfig,
+    SimulatorConfig,
+    Uniform,
 )
-from qsdc.protocols.srikara.configuration.simulator import SimulatorConfig
-from qsdc.protocols.srikara.simulator.backends.strawberryfields.noisy import (
-    SFNoiseBackend,
+from qsdc.protocols.srikara.simulator.backends import VACUUM_VARIANCE
+from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
+
+NOISE = NoiseConfig(
+    forward=Channel(transmittance=0.9),
+    memory=Memory(seconds=0.5, lifetime_seconds=2.0, efficiency=0.9, nbar=0.01),
+    backward=Channel(transmittance=0.9, nbar=0.02),
+    alice_detector=Detector(efficiency=0.95, electronic_variance=0.02),
+    bob_detector=Detector(efficiency=0.95, electronic_variance=0.02),
 )
-from qsdc.protocols.srikara.simulator.backends.strawberryfields.utils import (
-    calculations as sf_calculations,
-)
-from qsdc.protocols.srikara.simulator.backends.strawberryfields.utils.noise import (
-    Noise,
-)
-from qsdc.protocols.srikara.simulator.encoding import interval_for_bits
-from qsdc.protocols.srikara.simulator.protocol import simulate_qsdc
-
-BITS = "011"
-VACUUM_VARIANCE = 0.25
-
-
-def _moments(operations: list[object], axis: QuadratureAxis) -> tuple[float, float]:
-    """Evaluate an independent diagnostic SF program built from operations."""
-
-    program = sf.Program(1)
-    with program.context as q:
-        for operation in operations:
-            operation | q[0]
-
-    state = sf.Engine("gaussian").run(program).state
-    if state is None:
-        raise RuntimeError("diagnostic Strawberry Fields program returned no state")
-
-    mean, variance = state.quad_expectation(0, axis.angle)
-    return (
-        sf_calculations.normalize_quadrature(float(mean)),
-        sf_calculations.normalize_quadrature_variance(float(variance)),
-    )
-
-
-def _print_stage(
-    number: int,
-    title: str,
-    formula: str,
-    moments: tuple[float, float],
-) -> None:
-    mean, variance = moments
-    print(
-        f"{number}. {title}\n"
-        f"   {formula}\n"
-        f"   expected mean = {mean:.6f}\n"
-        f"   expected variance = {variance:.6f}\n"
-    )
 
 
 def main() -> None:
-    forward = PureLossConfig(transmittance=0.9)
-    delay = DelayConfig(
-        duration_seconds=0.5,
-        lifetime_seconds=2.0,
-        initial_efficiency=0.9,
-        environment_nbar=0.01,
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    returned = ThermalLossConfig(
-        transmittance=0.9,
-        environment_nbar=0.02,
+    parser.add_argument(
+        "message", nargs="?", default="Q", help="text to send (default: Q)"
     )
-    detector = DetectorInefficiencyConfig(efficiency=0.95)
-    readout = ElectronicNoiseConfig(variance_snu=0.02)
-    noise = NoiseConfig(
-        forward=[forward],
-        alice_delay=[delay],
-        return_path=[returned],
-        alice_detector=[detector],
-        alice_readout=[readout],
-        bob_detector=[detector],
-        bob_readout=[readout],
+    parser.add_argument("--seed", type=int, default=4)
+    parser.add_argument(
+        "--secded",
+        action="store_true",
+        help="protect the payload with interleaved SECDED",
     )
+    parser.add_argument(
+        "--max-attempts", type=int, default=1, help="attempts per block"
+    )
+    args = parser.parse_args()
+
     config = SimulatorConfig(
-        backend="sf-noise",
-        noise=noise,
+        backend="sf-sampled",
+        noise=NOISE,
         intervals="optimized_v8",
-        alpha_distribution=AlphaConfig(bound=2.0),
-        squeeze_r_distribution=UniformSqueezeConfig(lower=0.25, upper=1.0),
-        theta_distribution=UniformThetaConfig(lower_pi=0.0, upper_pi=2.0),
+        squeeze_r=Uniform(lower=0.25, upper=1.0),
         tolerance_sigmas=4.0,
-        check_axis_policy="optimized",
-        message_axis_policy="optimized",
-        seed=4,
+        axis_policy="optimized",
+        seed=args.seed,
+        error_correction="secded" if args.secded else "none",
+        max_attempts=args.max_attempts,
     )
+    explain_noise()
+    payload = bytes_to_bits(args.message.encode())
+    transmission = SrikaraSimulator(config).transmit(payload)
+    show_transmission(config, args.message, payload, transmission, trace_noise=True)
 
-    result = simulate_qsdc(BITS, config, backend=SFNoiseBackend(noise))
-    protocol = result.blocks[0].protocol
-    message = protocol.messages[0]
-    decoy = protocol.decoys[0]
-    prepared = protocol.prepared_states[message.index]
-    interval = interval_for_bits(message.sent_bits, intervals=message.intervals)
-    alpha_abs, alpha_phase = polar(prepared.alpha)
-    beta_abs, beta_phase = polar(message.alice_beta)
 
-    delay_transmittance = delay.initial_efficiency * exp(
-        -delay.duration_seconds / delay.lifetime_seconds
-    )
-    delay_environment_variance = (2.0 * delay.environment_nbar + 1.0) * VACUUM_VARIANCE
-    return_environment_variance = (
-        2.0 * returned.environment_nbar + 1.0
-    ) * VACUUM_VARIANCE
-    readout_variance = sum(
-        Noise.readout_variance(effect.variance_snu) for effect in noise.bob_readout
-    )
-
-    operations: list[object] = [
-        sf.ops.Dgate(alpha_abs, alpha_phase),
-        sf.ops.Sgate(-prepared.squeeze_r, prepared.theta),
-    ]
-    prepared_moments = _moments(operations, message.axis)
-    operations.append(sf.ops.LossChannel(forward.transmittance))
-    loss_moments = _moments(operations, message.axis)
-    operations.append(
-        sf.ops.ThermalLossChannel(delay_transmittance, delay.environment_nbar)
-    )
-    delay_moments = _moments(operations, message.axis)
-    before_message_operations = list(operations)
-    operations.append(sf.ops.Dgate(beta_abs, beta_phase))
-    encoded_moments = _moments(operations, message.axis)
-    operations.append(
-        sf.ops.ThermalLossChannel(returned.transmittance, returned.environment_nbar)
-    )
-    return_moments = _moments(operations, message.axis)
-    operations.append(sf.ops.Sgate(prepared.squeeze_r, prepared.theta))
-    unsqueezed_moments = _moments(operations, message.axis)
-    operations.append(sf.ops.LossChannel(detector.efficiency))
-    detector_moments = _moments(operations, message.axis)
-
-    no_message_operations = before_message_operations + [
-        sf.ops.Dgate(0.0, 0.0),
-        sf.ops.ThermalLossChannel(returned.transmittance, returned.environment_nbar),
-        sf.ops.Sgate(prepared.squeeze_r, prepared.theta),
-        sf.ops.LossChannel(detector.efficiency),
-    ]
-    expected_baseline, _ = _moments(no_message_operations, message.axis)
-    expected_measurement = detector_moments[0]
-    total_variance = detector_moments[1] + readout_variance
-    total_sigma = sqrt(total_variance)
-    random_residual = message.measured - expected_measurement
-    decoded_random_error = random_residual / message.response_factor
-
-    print(
-        f"""Noisy QSDC transfer
-===================
-sent bits = {message.sent_bits}
-control modes = {protocol.control_indices}
-delayed modes = {protocol.route.delayed_indices}
-message mode = {protocol.message_indices}
-decoy mode = {protocol.decoy_indices}
-
-Control checks at Alice
------------------------
-"""
-    )
-    for control in protocol.controls:
-        deviation = abs(control.measured - control.expected) / control.expected_sigma
-        print(
-            f"mode {control.index}: axis={control.axis.value}, "
-            f"expected={control.expected:.6f}, measured={control.measured:.6f}, "
-            f"sigma={control.expected_sigma:.6f}, deviation={deviation:.3f} sigma, "
-            f"passed={control.passed}"
-        )
-
-    print("\nReturned decoy check at Bob")
-    print("---------------------------")
-    print(
-        f"mode {decoy.index}: axis={decoy.axis.value}, "
-        f"expected={decoy.expected:.6f}, measured={decoy.measured:.6f}, "
-        f"sigma={decoy.expected_sigma:.6f}, passed={decoy.passed}"
-    )
-    print("\nMessage-mode noise path")
-    print("-----------------------")
-    print(
-        f"Alice samples m = {message.message_value:.6f} from the interval "
-        f"[{interval.lower:g}, {interval.upper:g})"
-    )
-    print(f"Alice displacement beta = {message.alice_beta:.6f}")
-    print(f"Bob measures the {message.axis.value} quadrature\n")
-    _print_stage(
-        1,
-        "Bob prepares the mode",
-        f"D(alpha), alpha = {prepared.alpha:.6f}, "
-        f"vacuum variance = {VACUUM_VARIANCE:.6f}",
-        prepared_moments,
-    )
-    _print_stage(
-        2,
-        "Forward pure loss",
-        f"mu' = sqrt({forward.transmittance:g}) * mu; "
-        f"V' = {forward.transmittance:g} * V + "
-        f"(1 - {forward.transmittance:g}) * V_vacuum",
-        loss_moments,
-    )
-    _print_stage(
-        3,
-        "Alice's delay storage",
-        f"T_delay = {delay_transmittance:.6f}; "
-        f"V_environment = {delay_environment_variance:.6f}",
-        delay_moments,
-    )
-    _print_stage(
-        4,
-        f"Alice encodes {message.sent_bits}",
-        f"D(beta), beta = {message.alice_beta:.6f}; mean shifts by beta",
-        encoded_moments,
-    )
-    _print_stage(
-        5,
-        "Thermal return loss",
-        f"mu' = sqrt({returned.transmittance:g}) * mu; "
-        f"V_environment = {return_environment_variance:.6f}",
-        return_moments,
-    )
-    _print_stage(
-        6,
-        "Bob applies inverse squeezing",
-        f"Sgate({prepared.squeeze_r:.6f}, {prepared.theta:.6f})",
-        unsqueezed_moments,
-    )
-    _print_stage(
-        7,
-        "Bob's detector inefficiency",
-        f"V' = {detector.efficiency:g} * V + (1 - {detector.efficiency:g}) * V_vacuum",
-        detector_moments,
+def explain_noise() -> None:
+    header("How each noise stage acts on one quadrature (mean mu, variance V)")
+    v0 = VACUUM_VARIANCE
+    memory = NOISE.memory
+    table(
+        ("Stage", "Mean", "Variance"),
+        [
+            (
+                "Thermal loss (T, nbar)",
+                "mu -> sqrt(T) mu",
+                f"V -> T V + (1 - T)(2 nbar + 1) {v0}",
+            ),
+            (
+                "Pure loss / detector (eta)",
+                "mu -> sqrt(eta) mu",
+                f"V -> eta V + (1 - eta) {v0}",
+            ),
+            (
+                "Memory",
+                "thermal loss with",
+                f"T = eff exp(-t / lifetime) = {memory.transmittance:.4f}",
+            ),
+            ("Electronic readout (v SNU)", "unchanged", f"V -> V + v * {v0}"),
+            (
+                "Squeezing S(s), unsqueezing S(-s)",
+                "linear map",
+                "stretches one axis, shrinks the other",
+            ),
+        ],
     )
     print(
-        f"""8. Electronic readout
-   added_variance = variance_snu * vacuum_variance
-                  = {readout.variance_snu:g} * {VACUUM_VARIANCE:g}
-                  = {readout_variance:.6f}
-   measured_variance = {detector_moments[1]:.6f} + {readout_variance:.6f}
-                     = {total_variance:.6f}
-   measured_sigma = sqrt({total_variance:.6f}) = {total_sigma:.6f}
-
-9. Bob's actual sampled measurement and decoding
-   expected noisy mean = {expected_measurement:.6f}
-   sampled measurement = {message.measured:.6f}
-   expected baseline without Alice's message = {expected_baseline:.6f}
-   calibrated measurement
-       = raw measurement - calculated no-message baseline
-       = {message.measured:.6f} - {expected_baseline:.6f}
-       = {message.observed_delta:.6f}
-   decoded m = observed displacement / response factor
-             = {message.observed_delta:.6f} / {message.response_factor:.6f}
-             = {message.decoded_value:.6f}
-   random residual = {random_residual:.6f}
-   decoded random error = {decoded_random_error:.6f}
-
-sent bits = {message.sent_bits}
-decoded bits = {message.decoded_bits}
-protocol accepted = {result.accepted}
-"""
+        "\nAlice's displacement happens after the channel to Alice and the memory, so only the\n"
+        "channel back to Bob and Bob's detector attenuate the message: response gain\n"
+        f"sqrt(T_back * eta_Bob) = {(NOISE.backward.transmittance * NOISE.bob_detector.efficiency) ** 0.5:.4f}.\n"
+        "Checks use the expected mean and variance of this noisy channel, so honest noise\n"
+        "widens the tolerance instead of failing the checks."
     )
 
 
