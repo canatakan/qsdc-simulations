@@ -1,168 +1,68 @@
-"""Map logical bits to Srikara symbols and back."""
+"""Split a payload into protocol blocks, optionally protected by interleaved SECDED codewords."""
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Sequence
 
-from qsdc.common.bits import chunk_bits
-from qsdc.common.error_correction import Secded84, SecdedDecode
-from qsdc.protocols.srikara.configuration.simulator import ErrorCorrection
+from qsdc.common.error_correction import secded_decode, secded_encode
 
-LOGICAL_BITS_PER_FEC_BLOCK = 12
-FEC_SYMBOLS_PER_BLOCK = 8
-SECDED = Secded84()
+# SECDED stripe: 12 payload bits as three (8, 4) codewords, interleaved into 8 symbols.
+STRIPE_BITS = 12
+STRIPE_SYMBOLS = 8
 
 
 @dataclass(frozen=True)
-class TransportBlock:
-    index: int
-    payload_offset: int
-    payload_bit_count: int
-    encoded_bits: str
+class Block:
+    offset: int
+    bits: str
     symbols: tuple[str, ...]
 
 
-@dataclass(frozen=True)
-class TransportFrame:
-    payload_bit_count: int
-    padding_bit_count: int
-    error_correction: ErrorCorrection
-    blocks: tuple[TransportBlock, ...]
-
-    @property
-    def symbol_count(self) -> int:
-        return sum(len(block.symbols) for block in self.blocks)
-
-    @property
-    def transmitted_bit_count(self) -> int:
-        return 3 * self.symbol_count
-
-    @property
-    def first_attempt_state_count(self) -> int:
-        return 4 * self.symbol_count
-
-    @property
-    def transport_block_count(self) -> int:
-        return len(self.blocks)
-
-    @property
-    def coded_bit_count(self) -> int:
-        if self.error_correction == "secded":
-            return self.transmitted_bit_count
-        return self.payload_bit_count
-
-    @property
-    def codeword_count(self) -> int:
-        return 3 * len(self.blocks) if self.error_correction == "secded" else 0
-
-    @property
-    def nominal_code_rate(self) -> float:
-        return 0.5 if self.error_correction == "secded" else 1.0
-
-    @property
-    def effective_code_rate(self) -> float:
-        return self.payload_bit_count / self.transmitted_bit_count
-
-    @property
-    def overhead_bit_count(self) -> int:
-        return self.transmitted_bit_count - self.payload_bit_count
-
-
-@dataclass(frozen=True)
-class TransportDecode:
-    recovered_bits: Optional[str]
-    codewords: tuple[SecdedDecode, ...] = ()
-
-    @property
-    def clean_codewords(self) -> int:
-        return sum(codeword.status == "clean" for codeword in self.codewords)
-
-    @property
-    def corrected_codewords(self) -> int:
-        return sum(codeword.status == "corrected" for codeword in self.codewords)
-
-    @property
-    def corrected_bits(self) -> int:
-        return sum(codeword.corrected_bits for codeword in self.codewords)
-
-    @property
-    def recovered_erasures(self) -> int:
-        return sum(codeword.recovered_erasures for codeword in self.codewords)
-
-    @property
-    def uncorrectable_codewords(self) -> int:
-        return sum(codeword.status == "uncorrectable" for codeword in self.codewords)
-
-
-def encode_payload(bits: str, error_correction: ErrorCorrection) -> TransportFrame:
+def encode_blocks(
+    payload: str, error_correction: str, symbols_per_block: int = 1
+) -> list[Block]:
+    """Uncoded blocks carry `symbols_per_block` symbols; SECDED blocks carry whole stripes."""
     if error_correction == "none":
-        return _uncoded_frame(bits)
-    return _secded_frame(bits)
+        size = 3 * symbols_per_block
+        encode = _symbols
+    else:
+        size = STRIPE_BITS * max(1, symbols_per_block // STRIPE_SYMBOLS)
+        encode = _secded_symbols
+    blocks = []
+    for offset in range(0, len(payload), size):
+        bits = payload[offset : offset + size]
+        blocks.append(Block(offset, bits, encode(bits)))
+    return blocks
 
 
 def decode_block(
-    block: TransportBlock,
-    decoded_symbols: Sequence[Optional[str]],
-    error_correction: ErrorCorrection,
-) -> TransportDecode:
+    block: Block, symbols: Sequence[str], error_correction: str
+) -> str | None:
+    """Recover the block's payload bits, or None if SECDED detects an uncorrectable stripe."""
     if error_correction == "none":
-        recovered = None
-        if all(symbol is not None for symbol in decoded_symbols):
-            recovered = "".join(symbol or "" for symbol in decoded_symbols)
-            recovered = recovered[: block.payload_bit_count]
-        return TransportDecode(recovered)
+        return "".join(symbols)[: len(block.bits)]
 
-    codewords = tuple(
-        SECDED.decode(
-            "".join(
-                SECDED.ERASURE if symbol is None else symbol[lane]
-                for symbol in decoded_symbols
-            )
-        )
-        for lane in range(3)
-    )
-    recovered = None
-    if all(codeword.data_bits is not None for codeword in codewords):
-        recovered = "".join(codeword.data_bits or "" for codeword in codewords)
-        recovered = recovered[: block.payload_bit_count]
-    return TransportDecode(recovered, codewords)
+    data = []
+    for start in range(0, len(symbols), STRIPE_SYMBOLS):
+        stripe = symbols[start : start + STRIPE_SYMBOLS]
+        data += [secded_decode("".join(lane)) for lane in zip(*stripe)]
+    if None in data:
+        return None
+    return "".join(data)[: len(block.bits)]
 
 
-def _uncoded_frame(bits: str) -> TransportFrame:
-    symbols = chunk_bits(bits, 3)
-    padding = (3 * len(symbols)) - len(bits)
-    block = TransportBlock(0, 0, len(bits), "".join(symbols), symbols)
-    return TransportFrame(len(bits), padding, "none", (block,))
+def _symbols(bits: str) -> tuple[str, ...]:
+    padded = bits.ljust(-(-len(bits) // 3) * 3, "0")
+    return tuple(padded[i : i + 3] for i in range(0, len(padded), 3))
 
 
-def _secded_frame(bits: str) -> TransportFrame:
-    padding = (-len(bits)) % LOGICAL_BITS_PER_FEC_BLOCK
-    padded = bits + ("0" * padding)
-    blocks = tuple(
-        _secded_block(index, offset, padded[offset : offset + 12], len(bits))
-        for index, offset in enumerate(range(0, len(padded), 12))
-    )
-    return TransportFrame(len(bits), padding, "secded", blocks)
-
-
-def _secded_block(
-    index: int,
-    offset: int,
-    source_bits: str,
-    payload_bit_count: int,
-) -> TransportBlock:
-    codewords = tuple(
-        SECDED.encode(source_bits[start : start + 4])
-        for start in range(0, 12, 4)
-    )
-    symbols = tuple(
-        "".join(codeword[position] for codeword in codewords) for position in range(8)
-    )
-    return TransportBlock(
-        index=index,
-        payload_offset=offset,
-        payload_bit_count=min(12, payload_bit_count - offset),
-        encoded_bits="".join(symbols),
-        symbols=symbols,
-    )
+def _secded_symbols(bits: str) -> tuple[str, ...]:
+    padded = bits.ljust(-(-len(bits) // STRIPE_BITS) * STRIPE_BITS, "0")
+    symbols: list[str] = []
+    for start in range(0, len(padded), STRIPE_BITS):
+        stripe = padded[start : start + STRIPE_BITS]
+        codewords = [secded_encode(stripe[i : i + 4]) for i in range(0, 12, 4)]
+        # Symbol k carries bit k of all three codewords: one bad symbol costs each one bit.
+        symbols += ["".join(column) for column in zip(*codewords)]
+    return tuple(symbols)
