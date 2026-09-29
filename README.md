@@ -25,59 +25,146 @@ make install
   The simulator optionally applies pure-Python extended Hamming
   SECDED (8,4,4) coding with a depth-3 interleaver. Each 12-bit payload stripe
   becomes an independently accepted 32-state transport block. Failed blocks
-  can be retried with an explicit bound; rejected blocks never expose a
-  delivered payload.
+  can be retried with an explicit bound.
 
   > Reference: S. Srikara, K. Thapliyal, and A. Pathak, Continuous variable direct secure quantum communication using gaussian states, Quantum Inf. Process. 19, 1 (2020).
 
 ## Commands
 
+`make install` installs the package with two commands, `srikara-demo` and
+`srikara-benchmark`, into `.venv/bin`. Use them after
+`source .venv/bin/activate`, or call them as `.venv/bin/srikara-demo`.
+
 ```bash
 make test
 make srikara/test
-make srikara/demo/basic
-make srikara/demo/analytic
-make srikara/demo/sf
-make srikara/demo/sf-sampled
 ```
 
-Benchmark configs are stored with the benchmark package:
+### Demos
+
+| Demo | What it shows | Command |
+| --- | --- | --- |
+| `basic` | The paper's algebra for one symbol, by hand, plus the effect of theta | `srikara-demo basic` |
+| `message` | A text message through every protocol step, with per-mode noise traces on the Strawberry Fields backends | `srikara-demo message "hello"` |
+| `noise` | The noise model, then a short message through a noisy channel, every mode through every stage | `srikara-demo noise` |
+| `optimized` | A message with the fully optimized settings (SECDED, retries, r = 1.5): one line per block and a short look inside one block | `srikara-demo optimized "hello world"` |
+
+`srikara-demo NAME --help` lists a demo's options. For example:
 
 ```bash
-cd src/qsdc/protocols/srikara/benchmark
-srikara-benchmark
+srikara-demo message "hello" --backend analytic
+srikara-demo message "hello" --backend sf-sampled --random-source sf-bs-qrng --seed 30
+srikara-demo message "hello" --optimized --noise medium --secded --max-attempts 3
+srikara-demo noise "Hi" --secded
+srikara-demo optimized "hello world" --noise high --example 3
 ```
 
-## Srikara payload error correction
+### Benchmarks
+
+```bash
+srikara-benchmark list
+srikara-benchmark run --study theta_fixed --workload light
+srikara-benchmark rerender
+```
+
+`rerender` rebuilds every report's plots, `runs.csv`, `report.html` and the index
+from its `results.json`, without simulating again, for example after a change
+to the report layout.
+
+## Srikara simulator
+
+`SimulatorConfig` (`srikara/config.py`) holds every choice for one simulator; its
+defaults are the noiseless paper setting.
 
 ```python
-from qsdc.protocols.srikara.configuration.simulator import SimulatorConfig
-from qsdc.protocols.srikara.simulator.protocol import simulate_qsdc
+from qsdc.protocols.srikara.config import SimulatorConfig
+from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
 
-config = SimulatorConfig(
-    error_correction="secded",
-    max_attempts_per_block=3,
-    seed=11,
-)
-result = simulate_qsdc("101001110010", config)
-
-assert result.delivery_status == "recovered"
-assert result.recovered_bits == "101001110010"
+config = SimulatorConfig(error_correction="secded", max_attempts=3)
+transmission = SrikaraSimulator(config).transmit("101001110010")
+assert transmission.recovered_bits == "101001110010"
 ```
 
-`simulate_qsdc` is the only transmission API. Payload framing, correction,
-and bounded selective retries are controlled entirely by `SimulatorConfig`.
-Benchmark comparison configs live under
-`src/qsdc/protocols/srikara/benchmark/configs/error_correction/`.
+The payload is split into blocks of `symbols_per_block` 3-bit symbols
+(`simulator/transport.py`). With SECDED, blocks hold whole stripes: 12 payload
+bits coded as three interleaved extended Hamming (8, 4) codewords, sent as 8
+symbols. Each block runs the protocol once with 4 states per symbol
+(`simulator/protocol.py`). A run is accepted when at most `max_failed_fraction`
+of its control and decoy checks fall outside `tolerance_sigmas` (the paper's
+rule, the default, is that all pass). A rejected block, or one with a stripe
+SECDED cannot correct, is sent again up to `max_attempts` times.
+`recovered_bits` is only set when every block was recovered.
 
-Benchmark CSV files contain only scalar setup fields and defined measurements;
-they do not embed JSON configuration or retry blobs. The generated HTML report
-includes the formulas for every headline metric, including separate raw-channel
-and post-FEC error rates.
+The squeezing angle matters: Alice displaces along the diagonal 1 + i, and
+after Bob's unsqueezing the better quadrature carries it with gain
+cosh r + √2 sinh r at θ = 5π/4 (or 7π/4) but only e^-r at θ = π/2.
 
-For a compact, interactive optimized message transfer demo:
+Backends (`simulator/backends.py`):
+
+- `analytic`: the paper's algebra, noiseless.
+- `sf`: Strawberry Fields Gaussian circuits, read out as exact means.
+- `sf-sampled`: the same circuits, read out as homodyne samples.
+
+Both Strawberry Fields backends apply `SimulatorConfig.noise`: a thermal loss
+channel in each direction, Alice's memory, and each party's detector efficiency
+and electronic noise. Checks compare measurements against the expectation of
+the noisy circuit, so honest noise is not mistaken for an eavesdropper.
+
+## Benchmarks
+
+A `Benchmark` is a name, a tuple of `Case`s and the names of its plotted axes:
+no axes draws a comparison, one a sweep, two a heatmap. Each case is a
+`SimulatorConfig`, a `Workload` (payload size, probability of a one, seed), a
+series name, an optional label, and its coordinates `at` on those axes.
+
+```python
+from pathlib import Path
+
+from qsdc.protocols.srikara.benchmark.benchmark import Benchmark, Case, Workload, run_benchmark
+from qsdc.protocols.srikara.benchmark.catalog import OPTIMIZED
+from qsdc.protocols.srikara.benchmark.report import write_report
+
+benchmark = Benchmark(
+    "one_probability",
+    tuple(Case(OPTIMIZED, Workload(payload_bits=1024, one_probability=p), at=(p,)) for p in (0.1, 0.5, 0.9)),
+    axes=("Probability of one",),
+)
+print(write_report(run_benchmark(benchmark), Path("results")) / "report.html")
+```
+
+`catalog.py` defines the presets (`WORKLOADS`, `NOISES`, the cumulative
+`OPTIMIZATION_STEPS`) and 18 built-in studies: 3 reference studies per workload
+and 15 studies of the optimized simulator per noise baseline. The optimized
+simulator uses optimized axes, v12 intervals and θ = 5π/4. Run the studies
+with `srikara-benchmark` (in `.venv/bin`):
 
 ```bash
-python demos/srikara/optimized_message.py "hello"
-python demos/srikara/optimized_message.py "hello" --noise --secded --max-attempts 3
+srikara-benchmark list
+srikara-benchmark run --study optimization_comparison --noise low
+srikara-benchmark run --workload light --repetitions 5
+srikara-benchmark run --skip-existing
+srikara-benchmark index
 ```
+
+`run` defaults to every study, all four noise baselines, the `medium` workload
+and one repetition. `--repetitions N` reruns every case with N independent
+seeds (the first is the configured one); rates pool all repetitions and come
+with 95% intervals. `--skip-existing` skips studies that already have a report,
+so an interrupted run can be resumed. Reports go to
+`results/<workload>/<reference|noise>/<study>/run_<time>/` as `results.json`,
+`runs.csv`, plots and `report.html`; `results/index.html` links the latest
+execution of every study.
+
+Measurements (`benchmark/metrics.py`) are counts; rates are derived from them:
+
+- Bit error rate: wrong bits / bits in released blocks (undefined when nothing
+  was released).
+- Raw bit error rate: wrong symbol bits before error correction, over all attempts.
+- Erasure rate: bits in blocks that were never released / payload bits.
+- Delivered: correct bits in released blocks / payload bits.
+- Delivered bits per state: the same correct bits / all prepared states,
+  retries included.
+- Information per state: mutual information between sent and decoded symbols
+  (before correction, all attempts) / all prepared states. It is bounded by the
+  payload's symbol entropy, so it is below 3/4 for short or biased payloads.
+- Rejection rate: attempts rejected by the checks / all attempts.
