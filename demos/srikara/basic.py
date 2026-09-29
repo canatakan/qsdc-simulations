@@ -1,132 +1,101 @@
-"""Print a hand-checkable one-symbol CV QSDC calculation."""
+"""Print a hand-checkable one-symbol CV QSDC calculation (r = 0, so every step is exact)."""
 
 from __future__ import annotations
 
-from qsdc.common.random.classical import ClassicalRandomSource
-from qsdc.protocols.srikara.simulator.backends.analytic.calculations import (
-    displacement_after_unsqueeze,
-    recover_alice_displacement,
-    squeeze_displace_forward,
-    squeeze_displace_inverse,
-)
-from qsdc.protocols.srikara.simulator.encoding import (
-    beta_for_message_value,
-    bits_for_real,
-)
-from qsdc.protocols.srikara.simulator.flow import ModeRoute, build_transcript
+from math import cosh, exp, pi, sinh, sqrt
+
+from qsdc.protocols.srikara.simulator.backends import AnalyticBackend
+from qsdc.protocols.srikara.simulator.encoding import INTERVAL_CODES, MESSAGE_DIRECTION
+from qsdc.protocols.srikara.simulator.routing import ModeRoute
+
+ROUTE = ModeRoute(control=(0, 1), delayed=(2, 3), message=(2,), decoy=(3,))
+ALPHA = 2.0 + 3.0j
+SQUEEZE_R = 0.0
+THETA = 0.0
+BITS = "110"
+MESSAGE_VALUE = 2.5
 
 
 def main() -> None:
-    qrng = ClassicalRandomSource(seed=3)
-    route = ModeRoute(
-        control_indices=(0, 1),
-        delayed_indices=(2, 3),
-        message_indices=(2,),
-        decoy_indices=(3,),
+    beta_a = MESSAGE_VALUE * MESSAGE_DIRECTION
+
+    header("1. Fixed inputs")
+    print(
+        f"n = 4 modes: control {ROUTE.control}, message {ROUTE.message}, decoy {ROUTE.decoy}"
     )
-    transcript = build_transcript(route, qrng)
-    alpha = 2.0 + 3.0j
-    squeeze_r = 0.0
-    theta = 0.0
-    bits = "110"
-    message_value = 2.5
-    alice_beta = beta_for_message_value(message_value)
+    print(f"alpha = {fmt(ALPHA)}, r = {SQUEEZE_R}, theta = {THETA}")
+    print(f"bits = {BITS}, m_A = {MESSAGE_VALUE}, beta_A = m_A(1 + i) = {fmt(beta_a)}")
 
-    print_header("1. Fixed inputs")
-    print(f"protocol random source = {qrng.name}")
-    print("total modes n = 4")
-    print(f"control coordinates = {route.control_indices}")
-    print(f"delayed coordinates = {route.delayed_indices}")
-    print(f"message coordinates = {route.message_indices}")
-    print(f"decoy coordinates = {route.decoy_indices}")
-    print(f"alpha = {fmt(alpha)}")
-    print(f"r = {squeeze_r}")
-    print(f"theta = {theta}")
-    print(f"bits = {bits}")
-    print(f"m_A = {message_value}")
-    print(f"beta_A = m_A(1 + i) = {fmt(alice_beta)}")
-
-    print_header("2. Bob prepares S(s)D(alpha)|0>")
-    prepared_beta = squeeze_displace_forward(alpha, squeeze_r, theta)
-    print("Formula:")
+    header("2. Bob prepares S(s)D(alpha)|0> = D(beta)S(s)|0>")
+    prepared = AnalyticBackend.squeezed_displacement(ALPHA, SQUEEZE_R, THETA)
     print("beta = alpha cosh(r) + exp(i theta) alpha* sinh(r)")
-    print("With r = 0: cosh(0) = 1 and sinh(0) = 0")
-    print(f"beta = ({fmt(alpha)}) * 1 + exp(0i) * ({fmt(alpha.conjugate())}) * 0")
-    print(f"beta = {fmt(prepared_beta)}")
-    print(f"Prepared state: S(0)D(alpha)|0> = D({fmt(prepared_beta)})|0>")
     print(
-        "Announcement via classical channel (Alice -> Bob): "
-        f"{transcript.control_coordinates.label}"
+        f"     = ({fmt(ALPHA)}) * 1 + ({fmt(ALPHA.conjugate())}) * 0 = {fmt(prepared)}"
+    )
+    print("Alice -> Bob: coordinates of the control modes")
+
+    header("3. Alice checks a control mode")
+    print("Bob -> Alice: s and alpha of the control modes")
+    control = AnalyticBackend.unsqueezed_displacement(prepared, SQUEEZE_R, THETA)
+    print("After S(-s): beta cosh(r) - exp(i theta) beta* sinh(r)")
+    print(f"           = {fmt(control)}")
+    print(
+        f"q should read Re(alpha) = {control.real:g}, p should read Im(alpha) = {control.imag:g}"
     )
 
-    print_header("3. Alice control check example")
-    print(
-        "Announcement via classical channel (Bob -> Alice): "
-        f"{transcript.control_parameter_coordinates.label}"
-    )
-    control_after_unsqueeze = squeeze_displace_inverse(prepared_beta, squeeze_r, theta)
-    print("Formula:")
-    print("alpha_recovered = beta cosh(r) - exp(i theta) beta* sinh(r)")
-    print(f"alpha_recovered = {fmt(control_after_unsqueeze)}")
-    print(f"q measurement should be Re(alpha) = {control_after_unsqueeze.real:g}")
-    print(f"p measurement should be Im(alpha) = {control_after_unsqueeze.imag:g}")
+    header("4. Alice encodes the message mode")
+    print(f"{MESSAGE_VALUE:g} lies in (2, 3), the interval of {BITS}: D({fmt(beta_a)})")
+    print("Alice -> Bob: coordinates of the decoy modes")
 
-    print_header("4. Delay and Alice encodes")
-    print(f"Delay buffer holds coordinates: {route.delayed_indices}")
-    print(f"Released message coordinate: {route.message_indices[0]}")
-    print("Formula:")
-    print("beta_A = m_A + i m_A")
-    print(f"beta_A = {message_value:g} + i{message_value:g} = {fmt(alice_beta)}")
-    print(f"{message_value:g} lies in interval (2, 3), so bits = {bits}")
-
-    print_header("5. Decoy announcement")
-    print(
-        "Announcement via classical channel (Alice -> Bob): "
-        f"{transcript.decoy_coordinates.label}"
-    )
-    print(f"Released decoy coordinate: {route.decoy_indices[0]}")
-
-    print_header("6. Bob receives and unsqueezes")
-    delta = displacement_after_unsqueeze(alice_beta, squeeze_r, theta)
-    returned_alpha = alpha + delta
-    print("Formula:")
+    header("5. Bob unsqueezes the returned mode")
+    delta = AnalyticBackend.unsqueezed_displacement(beta_a, SQUEEZE_R, THETA)
     print("Delta = beta_A cosh(r) - exp(i theta) beta_A* sinh(r)")
-    print(
-        f"Delta = ({fmt(alice_beta)}) * 1 - exp(0i) * "
-        f"({fmt(alice_beta.conjugate())}) * 0"
-    )
-    print(f"Delta = {fmt(delta)}")
-    print(f"alpha_measured = alpha + Delta = {fmt(alpha)} + {fmt(delta)}")
-    print(f"alpha_measured = {fmt(returned_alpha)}")
+    print(f"      = {fmt(delta)}")
+    print(f"measured displacement = alpha + Delta = {fmt(ALPHA + delta)}")
 
-    print_header("7. Bob decodes")
-    observed_delta = returned_alpha - alpha
-    recovered_beta = recover_alice_displacement(observed_delta, squeeze_r, theta)
-    decoded_value = (recovered_beta.real + recovered_beta.imag) / 2.0
-    decoded_bits = bits_for_real(decoded_value)
-    print("Formula:")
-    print("observed_delta = alpha_measured - alpha")
-    print(
-        f"observed_delta = {fmt(returned_alpha)} - {fmt(alpha)} = {fmt(observed_delta)}"
-    )
-    print(
-        "beta_A_recovered = observed_delta cosh(r) "
-        "+ exp(i theta) observed_delta* sinh(r)"
-    )
-    print(f"beta_A_recovered = {fmt(recovered_beta)}")
-    print("m_A_recovered = (Re(beta_A_recovered) + Im(beta_A_recovered)) / 2")
-    print(
-        "m_A_recovered = "
-        f"({recovered_beta.real:g} + {recovered_beta.imag:g}) / 2 = {decoded_value:g}"
-    )
-    print(f"decoded bits = {decoded_bits}")
+    header("6. Bob decodes")
+    recovered = AnalyticBackend.squeezed_displacement(delta, SQUEEZE_R, THETA)
+    decoded_value = (recovered.real + recovered.imag) / 2.0
+    print(f"beta_A = Delta cosh(r) + exp(i theta) Delta* sinh(r) = {fmt(recovered)}")
+    print(f"m_A = (Re + Im) / 2 = {decoded_value:g}")
+    print(f"decoded bits = {INTERVAL_CODES['default'].decode(decoded_value)}")
+
+    squeezed_example(beta_a)
 
 
-def print_header(title: str) -> None:
-    print()
-    print("=" * len(title))
-    print(title)
-    print("=" * len(title))
+def squeezed_example(beta_a: complex) -> None:
+    """The same symbol with real squeezing: Bob reads one quadrature and divides by its response."""
+    header("7. The same symbol with squeezing, r = 0.5")
+    r = 0.5
+    print("Bob measures one quadrature of alpha + Delta and divides by the response")
+    print("Delta(m_A = 1) on that quadrature. With beta_A along 1 + i, the angle theta")
+    print("decides whether S(-s) stretches or shrinks Alice's displacement:")
+    rows = []
+    for theta_pi in (0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75):
+        theta = theta_pi * pi
+        unit = AnalyticBackend.unsqueezed_displacement(MESSAGE_DIRECTION, r, theta)
+        delta = AnalyticBackend.unsqueezed_displacement(beta_a, r, theta)
+        axis = "q" if abs(unit.real) >= abs(unit.imag) else "p"
+        response = unit.real if axis == "q" else unit.imag
+        shift = delta.real if axis == "q" else delta.imag
+        rows.append((theta_pi, fmt(unit), axis, response, shift, shift / response))
+    print(
+        f"\n{'theta/pi':>8}  {'Delta(m=1)':>18}  axis  {'response':>8}  {'shift':>8}  m_A"
+    )
+    for theta_pi, unit, axis, response, shift, value in rows:
+        print(
+            f"{theta_pi:>8g}  {unit:>18}  {axis:>4}  {response:>8.4f}  {shift:>8.4f}  {value:g}"
+        )
+    print(
+        f"\ncosh r + sqrt(2) sinh r = {cosh(r) + sqrt(2) * sinh(r):.4f} (best, theta = 5pi/4 or 7pi/4)"
+    )
+    print(f"exp(-r)                 = {exp(-r):.4f} (worst, theta = pi/2)")
+    print("Without noise every angle decodes m_A exactly; with homodyne noise of fixed")
+    print("size, a larger response means a smaller error in the decoded m_A.")
+
+
+def header(title: str) -> None:
+    print(f"\n{title}\n{'=' * len(title)}")
 
 
 def fmt(value: complex) -> str:
