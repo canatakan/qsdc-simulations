@@ -1,9 +1,6 @@
-"""Strawberry Fields beam-splitter QRNG."""
-
 from __future__ import annotations
 
 from collections import deque
-from typing import Sequence, TypeVar
 
 import numpy as np
 import strawberryfields as sf
@@ -11,103 +8,59 @@ from strawberryfields import ops
 
 from qsdc.common.random.base import RandomSource
 
-T = TypeVar("T")
-
 
 class SFBeamSplitterQRNG(RandomSource):
-    """Simulated beam-splitter QRNG using Strawberry Fields."""
+    """Beam-splitter QRNG: a single photon on a 50:50 splitter yields one random bit per shot."""
 
     name = "sf-bs-qrng"
 
-    def __init__(
-        self,
-        *,
-        seed: int | None = None,
-        batch_size: int = 1024,
-        cutoff_dim: int = 2,
-    ):
-        if batch_size <= 0:
-            raise ValueError("batch_size must be positive")
-        if cutoff_dim < 2:
-            raise ValueError("cutoff_dim must be at least 2")
-
+    def __init__(self, seed: int | None = None, batch_size: int = 1024):
+        self.seed = seed
         self.batch_size = batch_size
-        self.cutoff_dim = cutoff_dim
         self._bits: deque[int] = deque()
-        self._seed = seed
-        self._refill_count = 0
+        self._refills = 0
 
     def uniform(self, lower: float, upper: float) -> float:
-        if upper < lower:
-            raise ValueError("upper must be >= lower")
-        return lower + (upper - lower) * self.random_unit_float()
+        return lower + (upper - lower) * self._integer(53) / (1 << 53)
 
-    def choice(self, values: Sequence[T]) -> T:
-        if not values:
-            raise ValueError("cannot choose from an empty sequence")
-        return values[self._randbelow(len(values))]
+    def randbelow(self, n: int) -> int:
+        while True:
+            candidate = self._integer(n.bit_length())
+            if candidate < n:
+                return candidate
 
     def raw_bit(self) -> int:
         if not self._bits:
-            self._refill_bits()
+            self._refill()
         return self._bits.popleft()
 
-    def random_bits_as_int(self, n_bits: int) -> int:
-        if n_bits <= 0:
-            raise ValueError("n_bits must be positive")
-
+    def _integer(self, bits: int) -> int:
         value = 0
-        for _ in range(n_bits):
+        for _ in range(bits):
             value = (value << 1) | self.raw_bit()
         return value
 
-    def random_unit_float(self) -> float:
-        return self.random_bits_as_int(53) / (1 << 53)
-
-    def _program(self) -> sf.Program:
-        prog = sf.Program(2)
-        with prog.context as q:
+    def _refill(self) -> None:
+        program = sf.Program(2)
+        with program.context as q:
             ops.Fock(1) | q[0]
-            ops.Vacuum() | q[1]
             ops.BSgate(np.pi / 4, 0.0) | (q[0], q[1])
             ops.MeasureFock() | q
-        return prog
 
-    def _refill_bits(self) -> None:
+        # Seed Strawberry Fields through numpy without disturbing the caller's numpy stream.
         numpy_state = np.random.get_state()
-        if self._seed is not None:
-            seed = np.random.SeedSequence((self._seed, self._refill_count))
-            np.random.seed(seed.generate_state(1)[0])
-            self._refill_count += 1
-
+        if self.seed is not None:
+            np.random.seed(
+                np.random.SeedSequence((self.seed, self._refills)).generate_state(1)[0]
+            )
+            self._refills += 1
         try:
-            samples = []
             for _ in range(self.batch_size):
-                engine = sf.Engine(
-                    "fock",
-                    backend_options={"cutoff_dim": self.cutoff_dim},
+                photon_counts = (
+                    sf.Engine("fock", backend_options={"cutoff_dim": 2})
+                    .run(program)
+                    .samples[0]
                 )
-                samples.extend(engine.run(self._program()).samples)
+                self._bits.append(int(photon_counts[1]))
         finally:
             np.random.set_state(numpy_state)
-
-        for sample in samples:
-            measurement = (int(sample[0]), int(sample[1]))
-            if measurement == (1, 0):
-                self._bits.append(0)
-            elif measurement == (0, 1):
-                self._bits.append(1)
-            else:
-                raise RuntimeError(
-                    f"unexpected beam-splitter measurement result: {sample}"
-                )
-
-    def _randbelow(self, n: int) -> int:
-        if n <= 0:
-            raise ValueError("n must be positive")
-
-        n_bits = n.bit_length()
-        while True:
-            candidate = self.random_bits_as_int(n_bits)
-            if candidate < n:
-                return candidate
