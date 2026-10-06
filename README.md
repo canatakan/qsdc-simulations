@@ -22,8 +22,8 @@ make install
 
 - `srikara`: CV QSDC Gaussian-states simulator with analytic and Strawberry Fields backends.
 
-  The payload can optionally be protected by a parity bit per symbol, as in
-  Cao et al.'s Gaussian-mapping QSDC, or by extended Hamming SECDED (8,4,4)
+  The payload can optionally be protected by a parity bit per symbol, after
+  the parity bit of Cao et al.'s Gaussian-mapping QSDC, or by extended Hamming SECDED (8,4,4)
   coding with a depth-3 interleaver. Failed blocks can be retried with an
   explicit bound.
 
@@ -54,9 +54,9 @@ make srikara/test
 ```bash
 srikara-demo message "hello" --backend analytic
 srikara-demo message "hello" --backend sf-sampled --random-source sf-bs-qrng --seed 30
-srikara-demo message "hello" --optimized --noise medium --error-correction secded --max-attempts 3
+srikara-demo message "hello" --optimized --noise lab --error-correction secded --max-attempts 3
 srikara-demo noise "Hi" --error-correction parity --max-attempts 2
-srikara-demo optimized "hello world" --noise high --example 3
+srikara-demo optimized "hello world" --noise metro_10km --example 3
 ```
 
 ### Benchmarks
@@ -89,8 +89,11 @@ The payload is split into blocks (`simulator/transport.py`), whose size
 depends on `error_correction`:
 
 - `none`: one symbol carrying 3 payload bits.
-- `parity`: one symbol carrying 2 payload bits and an odd-parity bit, as in Cao
-  et al. A parity bit detects an odd number of wrong bits but cannot locate
+- `parity`: one symbol carrying 2 payload bits and a parity bit. Cao et al. add an
+  odd parity bit to each 3-bit box but do not map it onto the quadrature; here it
+  is part of the symbol. Blocks alternate between odd and even parity, so the
+  sent symbols cover all eight intervals equally and the mean of m stays zero,
+  which Cao et al. require. A parity bit detects an odd number of wrong bits but cannot locate
   them. With Gray-coded intervals the valid symbols are every second interval,
   so an error into a neighbouring interval is always detected.
 - `secded`: 12 payload bits coded as three interleaved extended Hamming (8, 4)
@@ -142,49 +145,84 @@ series name, an optional label, and its coordinates `at` on those axes.
 from pathlib import Path
 
 from qsdc.protocols.srikara.benchmark.benchmark import Benchmark, Case, Workload, run_benchmark
-from qsdc.protocols.srikara.benchmark.catalog import OPTIMIZED
+from qsdc.protocols.srikara.benchmark.catalog import SIMULATORS
 from qsdc.protocols.srikara.benchmark.report import write_report
 
 benchmark = Benchmark(
     "one_probability",
-    tuple(Case(OPTIMIZED, Workload(payload_bits=1024, one_probability=p), at=(p,)) for p in (0.1, 0.5, 0.9)),
+    tuple(Case(SIMULATORS["optimized"], Workload(payload_bits=1024, one_probability=p), at=(p,)) for p in (0.1, 0.5, 0.9)),
     axes=("Probability of one",),
 )
 print(write_report(run_benchmark(benchmark), Path("results")) / "report.html")
 ```
 
-`catalog.py` defines the presets (`WORKLOADS`, `NOISES`, the cumulative
-`OPTIMIZATION_STEPS`) and 18 built-in studies: 3 reference studies per workload
-and 15 studies of the optimized simulator per noise baseline, so a full run of
-one workload writes 3 + 4 × 15 = 63 reports. `error_correction_comparison`
+The workloads (light, medium and heavy payloads) are defined in
+`benchmark/catalog/__init__.py`; the other presets and the studies are YAML
+files next to it:
+
+- `simulators.yaml`: named simulator configurations, each optionally extending
+  another one (`baseline` is the paper's protocol, `optimized` the best one).
+- `noises.yaml`: noise baselines, each with the source of its values.
+- `studies.yaml`: the studies, each run under the noise baselines it lists
+  (`lab` by default), which become the series of its report. A study lists its
+  cases, or has one or two axes whose
+  values make one case per point. Cases change fields by dotted path, such as
+  `squeeze_r.value` or `noise.forward.transmittance`.
+
+The noise baselines:
+
+| Baseline | Fibre per direction | Excess noise | Detectors | Memory |
+| --- | --- | --- | --- | --- |
+| `clean` | none | 0 | ideal | ideal |
+| `lab` | 1 km spool | 0.002 SNU | η = 0.95, 0.01 SNU | 0.95 |
+| `metro_5km` | 5 km | 0.005 SNU | η = 0.85, 0.05 SNU | 0.9 |
+| `metro_10km` | 10 km | 0.01 SNU | η = 0.8, 0.1 SNU | 0.9 |
+| `record_27km` | 27.27 km, ultralow loss | 0.0015 SNU | η = 0.613, 0.122 SNU | 0.9 |
+
+`record_27km` is the shortest point of Zhang et al., PRL 125, 010502 (2020).
+Phase noise is not modelled yet.
+
+There are 18 built-in studies, so a full run of one workload writes 18 reports.
+Most run under `lab` only, because their conclusion does not depend on the noise
+level. The comparisons where it does (`noise_profiles`, `optimization_comparison`,
+`axis_comparison`, `interval_comparison`, `error_correction_comparison`) run
+under every baseline, so each baseline is one color in the same report.
+`error_correction_comparison`
 compares no coding, parity and SECDED, each with and without retries.
 
 The optimized simulator measures along Alice's displacement (`aligned`), uses
-Gray-coded Gaussian intervals with the same mean energy as the paper's
-(`optimized_equal_energy`, about 18.6 SNU of variance), θ = 3π/2 and
+the paper's intervals with Gray labels (`gray`), θ = 3π/2 and
 r = 0.576, which is 5 dB of squeezing, the top of the paper's 1–5 dB range.
-The optimization steps separate the two parts of the interval change: Gray
-labels on the paper's intervals (`default_gray`) first, then the Gaussian
-layout. Parity error detection and retries come last. The squeezing sweep goes up to
-r = 1.5 (13 dB) as an idealized trend: the simulated squeezed states are pure,
+The optimization steps add parity error detection and then retries.
+
+`interval_comparison` compares the three interval codes: the paper's
+(`default`), the paper's with Gray labels (`gray`), and Cao et al.'s Gaussian
+intervals with Gray labels (`gaussian_gray`), with m drawn from the Gaussian
+inside each interval. Cao et al. give the equiprobable intervals for
+V_A = 8 SNU (their Table I); here they are scaled to the paper's mean energy of
+64/3 ≈ 21.3 SNU, so the comparison shows only the effect of the layout. Cao's
+quadratures also have a vacuum standard deviation of 1 and this simulator's
+1/2, which halves their bounds.
+
+The squeezing sweep goes up to r = 1.5 (13 dB) as an idealized trend: the simulated squeezed states are pure,
 without the anti-squeezing noise that limits real squeezers.
 
 Run the studies with `srikara-benchmark` (in `.venv/bin`):
 
 ```bash
 srikara-benchmark list
-srikara-benchmark run --study optimization_comparison --noise low
+srikara-benchmark run --study optimization_comparison
 srikara-benchmark run --workload light --repetitions 5
 srikara-benchmark run --skip-existing
 srikara-benchmark index
 ```
 
-`run` defaults to every study, all four noise baselines, the `medium` workload
+`run` defaults to every study, the `medium` workload
 and one repetition. `--repetitions N` reruns every case with N independent
 seeds (the first is the configured one), and rates pool all repetitions.
 `--skip-existing` skips studies that already have a report,
 so an interrupted run can be resumed. Reports go to
-`results/<workload>/<reference|noise>/<study>/run_<time>/`:
+`results/<workload>/<study>/run_<time>/`:
 
 - `report.html`: a results table with one row per case, plots, a table of sent
   vs. decoded symbols for each case, and the parameters shared by all cases.
