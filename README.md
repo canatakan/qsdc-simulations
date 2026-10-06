@@ -47,7 +47,7 @@ make srikara/test
 | `basic` | The paper's algebra for one symbol, by hand, plus the effect of theta | `srikara-demo basic` |
 | `message` | A text message through every protocol step, with per-mode noise traces on the Strawberry Fields backends | `srikara-demo message "hello"` |
 | `noise` | The noise model, then a short message through a noisy channel, every mode through every stage | `srikara-demo noise` |
-| `optimized` | A message with the fully optimized settings (SECDED, retries, r = 1.5): one line per block and a short look inside one block | `srikara-demo optimized "hello world"` |
+| `optimized` | A message with the fully optimized settings (SECDED, retries, r = 0.576): one line per block and a short look inside one block | `srikara-demo optimized "hello world"` |
 
 `srikara-demo NAME --help` lists a demo's options. For example:
 
@@ -134,9 +134,18 @@ print(write_report(run_benchmark(benchmark), Path("results")) / "report.html")
 
 `catalog.py` defines the presets (`WORKLOADS`, `NOISES`, the cumulative
 `OPTIMIZATION_STEPS`) and 18 built-in studies: 3 reference studies per workload
-and 15 studies of the optimized simulator per noise baseline. The optimized
-simulator uses optimized axes, v12 intervals and θ = 5π/4. Run the studies
-with `srikara-benchmark` (in `.venv/bin`):
+and 15 studies of the optimized simulator per noise baseline, so a full run of
+one workload writes 3 + 4 × 15 = 63 reports.
+
+The optimized simulator uses optimized axes, v12 intervals, θ = 5π/4 and
+r = 0.576, which is 5 dB of squeezing, the top of the paper's 1–5 dB range.
+The optimization steps add SECDED and then retries; all checks must pass in
+every step. Accepting a few failed checks trades detection for delivery, so it
+appears only in the `block_acceptance` study. The squeezing sweep goes up to
+r = 1.5 (13 dB) as an idealized trend: the simulated squeezed states are pure,
+without the anti-squeezing noise that limits real squeezers.
+
+Run the studies with `srikara-benchmark` (in `.venv/bin`):
 
 ```bash
 srikara-benchmark list
@@ -148,23 +157,50 @@ srikara-benchmark index
 
 `run` defaults to every study, all four noise baselines, the `medium` workload
 and one repetition. `--repetitions N` reruns every case with N independent
-seeds (the first is the configured one); rates pool all repetitions and come
-with 95% intervals. `--skip-existing` skips studies that already have a report,
+seeds (the first is the configured one), and rates pool all repetitions.
+`--skip-existing` skips studies that already have a report,
 so an interrupted run can be resumed. Reports go to
-`results/<workload>/<reference|noise>/<study>/run_<time>/` as `results.json`,
-`runs.csv`, plots and `report.html`; `results/index.html` links the latest
-execution of every study.
+`results/<workload>/<reference|noise>/<study>/run_<time>/`:
 
-Measurements (`benchmark/metrics.py`) are counts; rates are derived from them:
+- `report.html`: a results table with one row per case, plots, a table of sent
+  vs. decoded symbols for each case, and the parameters shared by all cases.
+  The summary cards show totals (cases × repetitions, prepared states,
+  simulation time); delivery and information values appear there only for a
+  single-case study, because the rates of different cases do not add up.
+- `results.json`: every case's configuration, counts, rates and
+  per-repetition counts.
+- `runs.csv`: one row per case, with a column per configuration field, axis,
+  metric and sent → decoded symbol pair.
 
+`results/index.html` lists the latest execution of every study.
+
+Measurements (`benchmark/metrics.py`) are counts; rates are derived from them.
+A payload is split into blocks, and a block is sent again (a retry) when the
+checks reject it or SECDED cannot correct it, while attempts remain.
+
+- Blocks, retries: blocks in the payload, and extra sends of failed blocks.
+- Rejected by checks: sends whose control or decoy checks failed.
+- Uncorrectable: sends that passed the checks, but where SECDED detected an
+  uncorrectable stripe.
 - Bit error rate: wrong bits / bits in released blocks (undefined when nothing
   was released).
-- Raw bit error rate: wrong symbol bits before error correction, over all attempts.
+- Raw bit error rate: wrong symbol bits before error correction, over all
+  sends, rejected ones included; with SECDED this counts parity bits too.
 - Erasure rate: bits in blocks that were never released / payload bits.
-- Delivered: correct bits in released blocks / payload bits.
+- Delivered: correct bits in released blocks / payload bits, which equals
+  (1 − erasure rate)(1 − bit error rate).
 - Delivered bits per state: the same correct bits / all prepared states,
-  retries included.
+  retries included. Without error correction Bob cannot tell which bits are
+  wrong, so compare coded and uncoded cases by information per state.
 - Information per state: mutual information between sent and decoded symbols
-  (before correction, all attempts) / all prepared states. It is bounded by the
-  payload's symbol entropy, so it is below 3/4 for short or biased payloads.
-- Rejection rate: attempts rejected by the checks / all attempts.
+  (before correction, all sends) / all prepared states, the rate an ideal code
+  could reach on the channel. It is bounded by the payload's symbol entropy,
+  so it is below 3/4 for short or biased payloads.
+- Rejection rate: sends rejected by the checks / all sends. It grows with the
+  number of checks per send, i.e. with the block size.
+- Check failure rate: failed checks / all control and decoy checks, which does
+  not depend on the block size. On an honest channel it is the Gaussian tail
+  probability of the tolerance, e.g. 0.27% at 3σ.
+
+With several repetitions, rates are calculated from the counts of all
+repetitions.
