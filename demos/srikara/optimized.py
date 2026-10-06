@@ -23,6 +23,7 @@ from qsdc.protocols.srikara.simulator.protocol import (
     SrikaraSimulator,
     Transmission,
 )
+from qsdc.protocols.srikara.simulator.transport import odd_parity
 
 
 def main() -> None:
@@ -165,12 +166,13 @@ def show_example(number: int, sends: list[Attempt]) -> None:
             f"response {wrong.response:+.3f} -> m = {wrong.decoded_value:+.3f} -> {wrong.decoded_bits}"
         )
         if run.accepted:
-            word = received[0]
+            word, odd = received[0], odd_parity(block.offset)
             ones = word.count("1")
-            verdict = (
-                "odd, passes" if ones % 2 else "even: error detected, block withheld"
+            passed = ones % 2 == odd
+            verdict = "passes" if passed else "error detected, block withheld"
+            print(
+                f"  {'odd' if odd else 'even'} parity of {word}: {ones} ones, {verdict}"
             )
-            print(f"  parity of {word}: {ones} ones, {verdict}")
         print(f"  -> {outcome(attempt)}")
 
 

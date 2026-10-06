@@ -1,3 +1,5 @@
+from itertools import product
+
 import pytest
 
 from qsdc.common.random.classical import ClassicalRandomSource
@@ -38,6 +40,14 @@ def test_blocks_round_trip_any_payload_length(error_correction, length):
     decoded = [decode_block(block, block.symbols, error_correction) for block in blocks]
 
     assert "".join(decoded) == payload
+
+
+def test_alternating_parity_sends_every_symbol():
+    blocks = encode_blocks("0000010110101111", "parity")
+
+    assert sorted(block.symbols[0] for block in blocks) == [
+        "".join(bits) for bits in product("01", repeat=3)
+    ]
 
 
 def test_secded_block_survives_one_corrupted_symbol_and_detects_two():

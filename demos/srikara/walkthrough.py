@@ -30,6 +30,7 @@ from qsdc.protocols.srikara.simulator.protocol import (
 from qsdc.protocols.srikara.simulator.transport import (
     Block,
     encode_blocks,
+    odd_parity,
 )
 
 
@@ -150,7 +151,8 @@ def show_blocks(blocks: list[Block], config: SimulatorConfig) -> None:
     elif config.error_correction == "parity":
         print(
             "Parity: each symbol carries 2 payload bits and a parity bit that makes the\n"
-            "number of ones odd, so an odd number of wrong bits is detected (not located).\n"
+            "number of ones odd in one block and even in the next, so every interval is used\n"
+            "equally. An odd number of wrong bits is detected (not located).\n"
             f"A block that fails the parity check is withheld and sent again. {per_run}."
         )
     else:
@@ -376,9 +378,11 @@ def show_block_result(attempt: Attempt, config: SimulatorConfig) -> None:
                 f"  codeword {lane}: {word} -> nearest {secded_encode(data)} -> data {data} ({note})"
             )
     if config.error_correction == "parity":
-        word = received[0]
-        verdict = "odd, passes" if word.count("1") % 2 else "even: error detected"
-        print(f"  parity of {word}: {word.count('1')} ones, {verdict}")
+        word, odd = received[0], odd_parity(block.offset)
+        expected = "odd" if odd else "even"
+        passed = word.count("1") % 2 == odd
+        verdict = "passes" if passed else "error detected"
+        print(f"  {expected} parity of {word}: {word.count('1')} ones, {verdict}")
     if attempt.decoded_bits is None:
         print("The error correction detected an error; the block is not released.")
         return

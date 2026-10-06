@@ -20,6 +20,11 @@ class Block:
     symbols: tuple[str, ...]
 
 
+def odd_parity(offset: int) -> bool:
+    """Parity alternates between blocks, so the symbols use all eight intervals."""
+    return offset % 4 == 0
+
+
 def encode_blocks(payload: str, error_correction: str) -> list[Block]:
     """A block is one symbol of 3 bits uncoded or 2 bits plus parity; with SECDED it is
     12 bits sent as 8 symbols."""
@@ -33,7 +38,7 @@ def encode_blocks(payload: str, error_correction: str) -> list[Block]:
             Block(
                 i,
                 payload[i : i + 2],
-                (parity_encode(payload[i : i + 2].ljust(2, "0")),),
+                (parity_encode(payload[i : i + 2].ljust(2, "0"), odd_parity(i)),),
             )
             for i in range(0, len(payload), 2)
         ]
@@ -56,7 +61,7 @@ def decode_block(
     if error_correction == "none":
         return "".join(symbols)[: len(block.bits)]
     if error_correction == "parity":
-        data = parity_decode(symbols[0])
+        data = parity_decode(symbols[0], odd_parity(block.offset))
         return None if data is None else data[: len(block.bits)]
 
     data = [secded_decode("".join(lane)) for lane in zip(*symbols)]
