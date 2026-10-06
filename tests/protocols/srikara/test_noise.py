@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from qsdc.common.quadrature import QuadratureAxis
+from qsdc.common.quadrature import Q
 from qsdc.protocols.srikara.benchmark.catalog import NOISES
 from qsdc.protocols.srikara.config import (
     Channel,
@@ -17,7 +17,6 @@ from qsdc.protocols.srikara.simulator.backends import (
 from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
 
 COHERENT = PreparedState(index=0, alpha=1.5 + 0j, squeeze_r=0.0, theta=0.0)
-Q = QuadratureAxis.Q
 
 
 def test_returned_expectation_follows_the_gaussian_channel_formulas():

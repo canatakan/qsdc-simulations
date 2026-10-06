@@ -86,9 +86,14 @@ class SimulatorConfig(Config):
     squeeze_r: Distribution = Uniform(lower=0.115, upper=0.576)
     theta_pi: Distribution = Uniform(lower=0.0, upper=2.0)
     tolerance_sigmas: float = 1.0
-    intervals: Literal["default", "optimized_v4", "optimized_v8", "optimized_v12"] = (
-        "default"
-    )
-    axis_policy: Literal["random", "optimized"] = "random"
+    intervals: Literal[
+        "default",
+        "default_gray",
+        "optimized_v4",
+        "optimized_v8",
+        "optimized_v12",
+        "optimized_equal_energy",
+    ] = "default"
+    axis_policy: Literal["random", "best_qp", "aligned"] = "random"
     error_correction: Literal["none", "parity", "secded"] = "none"
     max_attempts: int = 1

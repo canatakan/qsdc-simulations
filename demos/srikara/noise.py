@@ -57,7 +57,7 @@ def main() -> None:
         intervals="optimized_v8",
         squeeze_r=Uniform(lower=0.25, upper=1.0),
         tolerance_sigmas=4.0,
-        axis_policy="optimized",
+        axis_policy="best_qp",
         seed=args.seed,
         error_correction=args.error_correction,
         max_attempts=args.max_attempts,

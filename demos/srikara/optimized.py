@@ -1,8 +1,8 @@
 """Send a message with the fully optimized Srikara settings and print a compact summary.
 
-The settings are the benchmark's last optimization step: optimized axes, v12 intervals,
-r = 0.576 (5 dB), theta = 5pi/4, a parity bit per symbol and up to 3 sends per block. One
-line per block, then a short look inside one block.
+The settings are the benchmark's last optimization step: aligned measurement,
+equal-energy Gaussian intervals, r = 0.576 (5 dB), theta = 3pi/2, a parity bit per symbol and up to 3 sends per
+block. One line per block, then a short look inside one block.
 
 Examples:
     python demos/srikara/optimized.py "hello world"
@@ -56,7 +56,7 @@ def main() -> None:
 
     header("Optimized Srikara transfer")
     print(
-        f"{config.backend}, noise '{args.noise}', r = {args.squeeze_r:g}, theta = 5pi/4, "
+        f"{config.backend}, noise '{args.noise}', r = {args.squeeze_r:g}, theta = {config.theta_pi}pi, "
         f"{config.intervals} intervals, {config.axis_policy} axis,\n"
         f"parity, all checks must pass, up to {config.max_attempts} sends per block"
     )
@@ -161,7 +161,7 @@ def show_example(number: int, sends: list[Attempt]) -> None:
         )
         print(
             f"  e.g. mode {wrong.index}: Alice sent {wrong.sent_bits} as m = {wrong.value:+.3f}; "
-            f"Bob read {wrong.axis.value} = {wrong.measured:+.3f}, baseline {wrong.baseline:+.3f}, "
+            f"Bob read {wrong.axis.name} = {wrong.measured:+.3f}, baseline {wrong.baseline:+.3f}, "
             f"response {wrong.response:+.3f} -> m = {wrong.decoded_value:+.3f} -> {wrong.decoded_bits}"
         )
         if run.accepted:

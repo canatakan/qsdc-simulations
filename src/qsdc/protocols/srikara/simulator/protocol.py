@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from math import pi
 
-from qsdc.common.quadrature import QuadratureAxis
+from qsdc.common.quadrature import P, Q, Quadrature
 from qsdc.common.random import make_random_source
 from qsdc.common.random.base import RandomSource
 from qsdc.common.random.seed import derive_seed
@@ -23,7 +23,7 @@ from qsdc.protocols.srikara.simulator.transport import (
     encode_blocks,
 )
 
-AXES = (QuadratureAxis.Q, QuadratureAxis.P)
+AXES = (Q, P)
 
 
 @dataclass(frozen=True)
@@ -31,7 +31,7 @@ class Check:
     """A control (Alice) or decoy (Bob) measurement compared with its expected value."""
 
     index: int
-    axis: QuadratureAxis
+    axis: Quadrature
     expected: float
     sigma: float
     measured: float
@@ -43,7 +43,7 @@ class Message:
     index: int
     sent_bits: str
     value: float
-    axis: QuadratureAxis
+    axis: Quadrature
     measured: float
     baseline: float
     response: float
@@ -148,9 +148,7 @@ class SrikaraSimulator:
         )
         return BlockRun(states, route, controls, decoys, messages)
 
-    def _check(
-        self, state: PreparedState, axis: QuadratureAxis, returned: bool
-    ) -> Check:
+    def _check(self, state: PreparedState, axis: Quadrature, returned: bool) -> Check:
         if returned:
             expected = self.backend.expect_returned(state, axis)
             measured = self.backend.measure_returned(state, axis)
@@ -169,12 +167,13 @@ class SrikaraSimulator:
         if self.config.axis_policy == "random":
             axis = rng.choice(AXES)
         else:
-            axis = max(
-                AXES,
-                key=lambda candidate: abs(
-                    self.backend.message_response(state, candidate)
-                ),
-            )
+            response_q = self.backend.message_response(state, Q)
+            response_p = self.backend.message_response(state, P)
+            if self.config.axis_policy == "best_qp":
+                axis = Q if abs(response_q) >= abs(response_p) else P
+            else:
+                # Bob knows s, so he can point his local oscillator along Alice's displacement.
+                axis = Quadrature(complex(response_q, response_p))
         measured = self.backend.measure_returned(state, axis, value * MESSAGE_DIRECTION)
         baseline = self.backend.expect_returned(state, axis).mean
         response = self.backend.message_response(state, axis)

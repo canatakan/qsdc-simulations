@@ -40,10 +40,10 @@ def test_transmission_is_reproducible_from_the_seed():
     )
 
 
-def test_optimized_axis_policy_reads_the_quadrature_with_the_larger_response():
+def test_best_qp_axis_policy_reads_the_quadrature_with_the_larger_response():
     backend = AnalyticBackend()
     transmission = SrikaraSimulator(
-        SimulatorConfig(axis_policy="optimized"), backend
+        SimulatorConfig(axis_policy="best_qp"), backend
     ).transmit(PAYLOAD)
 
     for attempt in transmission.attempts:
@@ -88,6 +88,22 @@ def test_rejected_blocks_are_retried_until_recovered(reject_every_other_run):
     assert [attempt.number for attempt in retried.attempts] == [0, 1] * (
         len(PAYLOAD) // 3
     )
+
+
+def test_aligned_axis_reads_the_full_message_displacement():
+    backend = AnalyticBackend()
+    config = SimulatorConfig(axis_policy="aligned")
+    transmission = SrikaraSimulator(config, backend).transmit(PAYLOAD)
+
+    assert transmission.recovered_bits == PAYLOAD
+    for attempt in transmission.attempts:
+        for message in attempt.run.messages:
+            state = attempt.run.states[message.index]
+            unit = AnalyticBackend.unsqueezed_displacement(
+                1 + 1j, state.squeeze_r, state.theta
+            )
+            assert message.response == pytest.approx(abs(unit))
+            assert message.response >= max(abs(unit.real), abs(unit.imag))
 
 
 def test_theta_five_quarter_pi_gives_the_largest_message_response():

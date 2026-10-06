@@ -10,13 +10,12 @@ from math import cosh, sinh, sqrt
 import numpy as np
 from strawberryfields import Engine, Program, hbar, ops
 
-from qsdc.common.quadrature import QuadratureAxis
+from qsdc.common.quadrature import VACUUM_VARIANCE, Quadrature
 from qsdc.protocols.srikara.config import Detector, NoiseConfig, SimulatorConfig
 from qsdc.protocols.srikara.simulator.encoding import MESSAGE_DIRECTION
 
-# Quadratures are reported in units where the vacuum variance is 1/4.
+# Strawberry Fields quadratures are scaled by sqrt(2 hbar) relative to q = Re alpha.
 SF_SCALE = sqrt(2.0 * hbar)
-VACUUM_VARIANCE = 0.25
 
 
 @dataclass(frozen=True)
@@ -42,26 +41,22 @@ class Backend(ABC):
         """Reseed measurement randomness for one protocol run."""
 
     @abstractmethod
-    def measure_control(self, state: PreparedState, axis: QuadratureAxis) -> float: ...
+    def measure_control(self, state: PreparedState, axis: Quadrature) -> float: ...
 
     @abstractmethod
     def measure_returned(
-        self, state: PreparedState, axis: QuadratureAxis, beta: complex = 0j
+        self, state: PreparedState, axis: Quadrature, beta: complex = 0j
     ) -> float: ...
 
     @abstractmethod
-    def expect_control(
-        self, state: PreparedState, axis: QuadratureAxis
-    ) -> Expectation: ...
+    def expect_control(self, state: PreparedState, axis: Quadrature) -> Expectation: ...
 
     @abstractmethod
-    def expect_returned(
-        self, state: PreparedState, axis: QuadratureAxis
-    ) -> Expectation:
+    def expect_returned(self, state: PreparedState, axis: Quadrature) -> Expectation:
         """Expected measurement of a returned mode without a message, i.e. a decoy."""
 
     @abstractmethod
-    def message_response(self, state: PreparedState, axis: QuadratureAxis) -> float:
+    def message_response(self, state: PreparedState, axis: Quadrature) -> float:
         """Shift of Bob's measurement per unit message value m_A."""
 
 
@@ -86,24 +81,22 @@ class AnalyticBackend(Backend):
             squeeze_r
         )
 
-    def measure_control(self, state: PreparedState, axis: QuadratureAxis) -> float:
+    def measure_control(self, state: PreparedState, axis: Quadrature) -> float:
         return axis.component(state.alpha)
 
     def measure_returned(
-        self, state: PreparedState, axis: QuadratureAxis, beta: complex = 0j
+        self, state: PreparedState, axis: Quadrature, beta: complex = 0j
     ) -> float:
         delta = self.unsqueezed_displacement(beta, state.squeeze_r, state.theta)
         return axis.component(state.alpha + delta)
 
-    def expect_control(self, state: PreparedState, axis: QuadratureAxis) -> Expectation:
+    def expect_control(self, state: PreparedState, axis: Quadrature) -> Expectation:
         return Expectation(axis.component(state.alpha), 0.0)
 
-    def expect_returned(
-        self, state: PreparedState, axis: QuadratureAxis
-    ) -> Expectation:
+    def expect_returned(self, state: PreparedState, axis: Quadrature) -> Expectation:
         return self.expect_control(state, axis)
 
-    def message_response(self, state: PreparedState, axis: QuadratureAxis) -> float:
+    def message_response(self, state: PreparedState, axis: Quadrature) -> float:
         delta = self.unsqueezed_displacement(
             MESSAGE_DIRECTION, state.squeeze_r, state.theta
         )
@@ -123,31 +116,29 @@ class StrawberryFieldsBackend(Backend):
         if self.sampled:
             np.random.seed(seed)
 
-    def measure_control(self, state: PreparedState, axis: QuadratureAxis) -> float:
+    def measure_control(self, state: PreparedState, axis: Quadrature) -> float:
         return self._measure(
             self._control_program(state), axis, self.noise.alice_detector
         )
 
     def measure_returned(
-        self, state: PreparedState, axis: QuadratureAxis, beta: complex = 0j
+        self, state: PreparedState, axis: Quadrature, beta: complex = 0j
     ) -> float:
         return self._measure(
             self._returned_program(state, beta), axis, self.noise.bob_detector
         )
 
-    def expect_control(self, state: PreparedState, axis: QuadratureAxis) -> Expectation:
+    def expect_control(self, state: PreparedState, axis: Quadrature) -> Expectation:
         return self._expect(
             self._control_program(state), axis, self.noise.alice_detector
         )
 
-    def expect_returned(
-        self, state: PreparedState, axis: QuadratureAxis
-    ) -> Expectation:
+    def expect_returned(self, state: PreparedState, axis: Quadrature) -> Expectation:
         return self._expect(
             self._returned_program(state, 0j), axis, self.noise.bob_detector
         )
 
-    def message_response(self, state: PreparedState, axis: QuadratureAxis) -> float:
+    def message_response(self, state: PreparedState, axis: Quadrature) -> float:
         """Mean Bob measures when Alice displaces an alpha = 0 state by 1 + i."""
         key = (state.squeeze_r, state.theta)
         if key not in self._responses:
@@ -157,9 +148,7 @@ class StrawberryFieldsBackend(Backend):
             self._responses[key] = complex(q, p)
         return axis.component(self._responses[key])
 
-    def _measure(
-        self, program: Program, axis: QuadratureAxis, detector: Detector
-    ) -> float:
+    def _measure(self, program: Program, axis: Quadrature, detector: Detector) -> float:
         if not self.sampled:
             return self._expect(program, axis, detector).mean
         with program.context as q:
@@ -172,9 +161,7 @@ class StrawberryFieldsBackend(Backend):
         return value
 
     @staticmethod
-    def _expect(
-        program: Program, axis: QuadratureAxis, detector: Detector
-    ) -> Expectation:
+    def _expect(program: Program, axis: Quadrature, detector: Detector) -> Expectation:
         mean, variance = (
             Engine("gaussian").run(program).state.quad_expectation(0, axis.angle)
         )

@@ -10,7 +10,7 @@ from strawberryfields import Engine, Program, ops
 
 from qsdc.common.bits import bits_to_bytes, hamming_distance
 from qsdc.common.error_correction import secded_decode, secded_encode
-from qsdc.common.quadrature import QuadratureAxis
+from qsdc.common.quadrature import P, Q, Quadrature
 from qsdc.protocols.srikara.config import Detector, SimulatorConfig
 from qsdc.protocols.srikara.simulator.backends import (
     SF_SCALE,
@@ -286,7 +286,7 @@ def show_checks(checks: tuple[Check, ...], config: SimulatorConfig) -> None:
         [
             (
                 c.index,
-                c.axis.value,
+                c.axis.name,
                 f"{c.expected:+.4f}",
                 f"{c.sigma:.4f}",
                 f"±{config.tolerance_sigmas * c.sigma:.4f}",
@@ -334,9 +334,9 @@ def show_messages(
                         states[m.index].theta,
                     )
                 ),
-                response(backend, states[m.index], QuadratureAxis.Q),
-                response(backend, states[m.index], QuadratureAxis.P),
-                m.axis.value,
+                response(backend, states[m.index], Q),
+                response(backend, states[m.index], P),
+                m.axis.name,
                 f"{m.measured:+.4f}",
                 f"{m.baseline:+.4f}",
                 f"{m.decoded_value:+.4f}",
@@ -393,9 +393,7 @@ def show_block_result(attempt: Attempt, config: SimulatorConfig) -> None:
 def trace_check(
     state: PreparedState, check: Check, config: SimulatorConfig, kind: str
 ) -> None:
-    print(
-        f"\n  Noise path of {kind} mode {check.index}, {check.axis.value} quadrature:"
-    )
+    print(f"\n  Noise path of {kind} mode {check.index}, {check.axis.name} quadrature:")
     detector = (
         config.noise.alice_detector if kind == "control" else config.noise.bob_detector
     )
@@ -415,7 +413,7 @@ def trace_message(
     state: PreparedState, message: Message, config: SimulatorConfig
 ) -> None:
     print(
-        f"\n  Noise path of message mode {message.index} ({message.sent_bits}), {message.axis.value} quadrature:"
+        f"\n  Noise path of message mode {message.index} ({message.sent_bits}), {message.axis.name} quadrature:"
     )
     beta = message.value * MESSAGE_DIRECTION
     variance = trace_stages(
@@ -490,7 +488,7 @@ def prepare_stages(
 
 
 def trace_stages(
-    stages: list[tuple[str, object]], axis: QuadratureAxis, detector: Detector
+    stages: list[tuple[str, object]], axis: Quadrature, detector: Detector
 ) -> float:
     """Print the measured quadrature's mean and variance after every stage; return the final variance."""
     rows = []
@@ -613,5 +611,5 @@ def electronic(detector: Detector) -> str:
     )
 
 
-def response(backend: Backend, state: PreparedState, axis: QuadratureAxis) -> str:
+def response(backend: Backend, state: PreparedState, axis: Quadrature) -> str:
     return f"{backend.message_response(state, axis):+.4f}"

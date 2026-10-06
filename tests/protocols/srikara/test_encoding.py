@@ -16,6 +16,13 @@ def test_every_symbol_decodes_from_its_sampled_message_value(intervals):
             assert code.decode(code.sample(bits, rng)) == bits
 
 
+def test_equal_energy_code_spends_the_default_energy():
+    assert INTERVAL_CODES["optimized_equal_energy"].energy_snu == pytest.approx(
+        INTERVAL_CODES["default"].energy_snu
+    )
+    assert INTERVAL_CODES["default"].energy_snu == pytest.approx(64 / 3)
+
+
 def test_unsqueezing_inverts_the_squeeze_displacement_relation():
     beta = AnalyticBackend.squeezed_displacement(0.7 - 1.2j, 0.43, 0.9)
     assert AnalyticBackend.unsqueezed_displacement(beta, 0.43, 0.9) == pytest.approx(

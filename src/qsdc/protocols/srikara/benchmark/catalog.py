@@ -48,17 +48,19 @@ BASELINE = SimulatorConfig(
     tolerance_sigmas=3.0,
     seed=33,
 )
-AXIS_OPTIMIZED = BASELINE.model_copy(update={"axis_policy": "optimized"})
-INTERVALS_OPTIMIZED = AXIS_OPTIMIZED.model_copy(update={"intervals": "optimized_v12"})
-# At theta = 5pi/4 Bob's unsqueezing amplifies Alice's q displacement by cosh r + sqrt(2) sinh r.
-OPTIMIZED = INTERVALS_OPTIMIZED.model_copy(update={"theta_pi": Fixed(value=1.25)})
+BEST_QP = BASELINE.model_copy(update={"axis_policy": "best_qp"})
+ALIGNED = BASELINE.model_copy(update={"axis_policy": "aligned"})
+GRAY = ALIGNED.model_copy(update={"intervals": "default_gray"})
+INTERVALS_OPTIMIZED = ALIGNED.model_copy(update={"intervals": "optimized_equal_energy"})
+OPTIMIZED = INTERVALS_OPTIMIZED.model_copy(update={"theta_pi": Fixed(value=1.5)})
 PARITY = OPTIMIZED.model_copy(update={"error_correction": "parity"})
 RETRY = PARITY.model_copy(update={"max_attempts": 3})
 OPTIMIZATION_STEPS = {
     "Default": BASELINE,
-    "+ Axis optimization": AXIS_OPTIMIZED,
-    "+ Optimized intervals": INTERVALS_OPTIMIZED,
-    "+ Fixed theta = 5pi/4": OPTIMIZED,
+    "+ Aligned measurement": ALIGNED,
+    "+ Gray labels": GRAY,
+    "+ Gaussian intervals": INTERVALS_OPTIMIZED,
+    "+ Fixed theta = 3pi/2": OPTIMIZED,
     "+ Parity error detection": PARITY,
     "+ Retries": RETRY,
 }
@@ -66,7 +68,14 @@ OPTIMIZATION_STEPS = {
 R_VALUES = (0.115, 0.345, 0.576, 0.921, 1.151, 1.5)
 R_RANGES = ((0.115, 0.345), (0.345, 0.576), (0.115, 1.151))
 THETA_PI_VALUES = (0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75)
-INTERVALS = ("default", "optimized_v4", "optimized_v8", "optimized_v12")
+INTERVALS = (
+    "default",
+    "default_gray",
+    "optimized_v4",
+    "optimized_v8",
+    "optimized_v12",
+    "optimized_equal_energy",
+)
 ERROR_CORRECTION = {
     "None": ("none", 1),
     "Parity": ("parity", 1),
@@ -174,7 +183,11 @@ def noise_studies(noise_name: str, workload: Workload) -> list[Benchmark]:
             "axis_comparison",
             tuple(
                 case(step.model_copy(update={"noise": noise}))
-                for step in (BASELINE, AXIS_OPTIMIZED)
+                for step in (
+                    BASELINE,
+                    BEST_QP,
+                    ALIGNED,
+                )
             ),
         ),
         Benchmark(

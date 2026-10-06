@@ -45,8 +45,9 @@ def main() -> None:
     parser.add_argument(
         "--optimized",
         action="store_true",
-        help="the benchmark's optimized settings: optimized axes, v12 intervals, "
-        "r = 0.576 (5 dB) and theta = 5pi/4",
+        help="the benchmark's optimized settings: aligned measurement, equal-energy "
+        "Gaussian intervals, "
+        "r = 0.576 (5 dB) and theta = 3pi/2",
     )
     parser.add_argument(
         "--error-correction",

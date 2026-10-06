@@ -104,7 +104,21 @@ detects an error it cannot correct, is sent again up to `max_attempts` times.
 
 The squeezing angle matters: Alice displaces along the diagonal 1 + i, and
 after Bob's unsqueezing the better quadrature carries it with gain
-cosh r + √2 sinh r at θ = 5π/4 (or 7π/4) but only e^-r at θ = π/2.
+cosh r + √2 sinh r at θ = 5π/4 (or 7π/4) but only e^-r at θ = π/2. With the
+aligned measurement below, the best angle is θ = 3π/2: the displacement is
+stretched by e^r along the diagonal, and Bob reads √2·e^r per unit m_A.
+
+`axis_policy` decides which quadrature Bob measures on a message mode:
+
+- `random`: q or p at random, as in the paper.
+- `best_qp`: whichever of q and p responds more to Alice's displacement.
+- `aligned`: the quadrature along Alice's displacement after unsqueezing, which
+  Bob can compute because he chose s. It reads the full displacement, about 15%
+  more signal than `best_qp` at θ = 5π/4. This goes beyond the paper; it
+  only needs Bob's local oscillator phase set per mode, like any homodyne
+  basis choice.
+
+Control and decoy checks always measure q or p at random.
 
 Backends (`simulator/backends.py`):
 
@@ -145,9 +159,13 @@ and 15 studies of the optimized simulator per noise baseline, so a full run of
 one workload writes 3 + 4 × 15 = 63 reports. `error_correction_comparison`
 compares no coding, parity and SECDED, each with and without retries.
 
-The optimized simulator uses optimized axes, v12 intervals, θ = 5π/4 and
+The optimized simulator measures along Alice's displacement (`aligned`), uses
+Gray-coded Gaussian intervals with the same mean energy as the paper's
+(`optimized_equal_energy`, about 18.6 SNU of variance), θ = 3π/2 and
 r = 0.576, which is 5 dB of squeezing, the top of the paper's 1–5 dB range.
-The optimization steps add parity error detection and then retries. The squeezing sweep goes up to
+The optimization steps separate the two parts of the interval change: Gray
+labels on the paper's intervals (`default_gray`) first, then the Gaussian
+layout. Parity error detection and retries come last. The squeezing sweep goes up to
 r = 1.5 (13 dB) as an idealized trend: the simulated squeezed states are pure,
 without the anti-squeezing noise that limits real squeezers.
 
