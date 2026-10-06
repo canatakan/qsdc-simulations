@@ -42,6 +42,8 @@ SIMULATORS = {
     for name in SIMULATOR_SPECS
 }
 STUDY_SPECS = load("studies")
+GROUPS = STUDY_SPECS["groups"]
+STUDY_GROUPS = {name: spec["group"] for name, spec in STUDY_SPECS["studies"].items()}
 
 
 def studies(workload: Workload) -> list[Benchmark]:

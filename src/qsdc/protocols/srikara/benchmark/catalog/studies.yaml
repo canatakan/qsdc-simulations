@@ -1,8 +1,17 @@
 simulator: optimized
 noise: [lab]
 
+# Groups the report index files the studies under, in display order.
+groups:
+  reference: {title: Reference}
+  signal: {title: Signal parameters}
+  optimizations: {title: Optimizations}
+  protocol: {title: Protocol settings}
+  hardware: {title: Channel and hardware noise}
+
 studies:
   ideal_backend_check:
+    group: reference
     simulator: baseline
     noise: [clean]
     cases:
@@ -10,23 +19,27 @@ studies:
       - set: {backend: sf}
 
   paper_baseline:
+    group: reference
     simulator: baseline
     noise: [clean]
     cases:
       - {}
 
   noise_profiles:
+    group: reference
     noise: [clean, lab, metro_5km, metro_10km, record_27km]
     cases:
       - {}
 
   squeezing_r:
+    group: signal
     axes:
       - name: Fixed squeezing r
         set: [squeeze_r.value]
         values: [0.115, 0.345, 0.576, 0.921, 1.151, 1.5]
 
   squeezing_distributions:
+    group: signal
     cases:
       - set: {squeeze_r: {kind: fixed, value: 0.115}}
       - set: {squeeze_r: {kind: fixed, value: 0.345}}
@@ -39,12 +52,14 @@ studies:
       - set: {squeeze_r: {kind: uniform, lower: 0.115, upper: 1.151}}
 
   theta_fixed:
+    group: signal
     axes:
       - name: Fixed theta / pi
         set: [theta_pi.value]
         values: [0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75]
 
   r_theta_heatmap:
+    group: signal
     axes:
       - name: Fixed squeezing r
         set: [squeeze_r.value]
@@ -54,6 +69,7 @@ studies:
         values: [0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75]
 
   optimization_comparison:
+    group: optimizations
     noise: [clean, lab, metro_5km, metro_10km, record_27km]
     cases:
       - {label: Default, simulator: baseline}
@@ -64,6 +80,7 @@ studies:
       - {label: + Retries, simulator: retry}
 
   axis_comparison:
+    group: optimizations
     noise: [clean, lab, metro_5km, metro_10km, record_27km]
     cases:
       - simulator: baseline
@@ -71,6 +88,7 @@ studies:
       - simulator: aligned
 
   interval_comparison:
+    group: optimizations
     noise: [clean, lab, metro_5km, metro_10km, record_27km]
     cases:
       - set: {intervals: default}
@@ -78,6 +96,7 @@ studies:
       - set: {intervals: gaussian_gray}
 
   error_correction_comparison:
+    group: optimizations
     noise: [clean, lab, metro_5km, metro_10km, record_27km]
     cases:
       - label: None
@@ -92,36 +111,42 @@ studies:
         set: {error_correction: secded, max_attempts: 3}
 
   tolerance_safety:
+    group: protocol
     axes:
       - name: Check tolerance (sigma)
         set: [tolerance_sigmas]
         values: [1.0, 2.0, 3.0, 4.0, 5.0]
 
   one_probability:
+    group: protocol
     axes:
       - name: Probability of one
         set: [workload.one_probability]
         values: [0.1, 0.25, 0.5, 0.75, 0.9]
 
   channel_transmittance:
+    group: hardware
     axes:
       - name: Transmittance per path
         set: [noise.forward.transmittance, noise.backward.transmittance]
         values: [1.0, 0.95, 0.9, 0.8, 0.7, 0.5]
 
   thermal_occupation:
+    group: hardware
     axes:
       - name: Environment nbar
         set: [noise.forward.nbar, noise.backward.nbar]
         values: [0.0, 0.01, 0.05, 0.1, 0.2]
 
   detector_efficiency:
+    group: hardware
     axes:
       - name: Detector efficiency
         set: [noise.alice_detector.efficiency, noise.bob_detector.efficiency]
         values: [1.0, 0.9, 0.8, 0.7, 0.5]
 
   electronic_noise:
+    group: hardware
     axes:
       - name: Electronic variance (SNU)
         set:
@@ -130,6 +155,7 @@ studies:
         values: [0.0, 0.01, 0.05, 0.1, 0.2]
 
   memory_delay:
+    group: hardware
     set: {noise.memory.nbar: 0.01}
     axes:
       - name: Memory duration (s)

@@ -19,7 +19,12 @@ from qsdc.protocols.srikara.benchmark.benchmark import (
     RunResult,
     Workload,
 )
-from qsdc.protocols.srikara.benchmark.catalog import NOISES, WORKLOADS
+from qsdc.protocols.srikara.benchmark.catalog import (
+    GROUPS,
+    NOISES,
+    STUDY_GROUPS,
+    WORKLOADS,
+)
 from qsdc.protocols.srikara.benchmark.metrics import RunMetrics
 from qsdc.protocols.srikara.benchmark.plots import write_plots
 from qsdc.protocols.srikara.config import SimulatorConfig
@@ -35,6 +40,8 @@ TABLE_RATES = (
     "information_per_state",
 )
 FOLDER_ORDER = list(WORKLOADS)
+GROUP_ORDER = list(GROUPS)
+OTHER = {"title": "Other"}
 _templates = Environment(
     loader=FileSystemLoader(TEMPLATES),
     autoescape=True,
@@ -194,7 +201,6 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
     html = _templates.get_template("report.html").render(
         title=benchmark.name.replace("_", " ").capitalize(),
         layout=benchmark.layout,
-        execution=directory.name,
         summary=summary,
         single=result.runs[0].metrics if len(result.runs) == 1 else None,
         seconds=_seconds(summary["simulation_seconds"]),
@@ -208,7 +214,7 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
 
 
 def write_index(root: Path) -> Path:
-    """Link the latest execution of every study found below root, grouped by folder."""
+    """Link the latest execution of every study found below root, by folder and then by group."""
     latest: dict[tuple[Path, str], tuple[Path, dict]] = {}
     executions: Counter[tuple[Path, str]] = Counter()
     for path in sorted(root.rglob("results.json")):
@@ -217,13 +223,22 @@ def write_index(root: Path) -> Path:
         executions[key] += 1
         latest[key] = (path.parent / "report.html", document)
 
-    sections: dict[str, list[dict]] = {}
-    for folder, name in sorted(latest, key=lambda key: (_folder_order(key[0]), key[1])):
+    sections: dict[str, dict[str, dict]] = {}
+    ordered = sorted(
+        latest,
+        key=lambda key: (_folder_order(key[0]), _study_order(key[1]), key[1]),
+    )
+    for folder, name in ordered:
         report, document = latest[folder, name]
         summary = document["summary"]
-        sections.setdefault(str(folder), []).append(
+        group = STUDY_GROUPS.get(name, "other")
+        groups = sections.setdefault(str(folder), {})
+        groups.setdefault(group, {**GROUPS.get(group, OTHER), "rows": []})[
+            "rows"
+        ].append(
             {
                 "name": name.replace("_", " ").capitalize(),
+                "layout": document["benchmark"]["layout"],
                 "href": report.relative_to(root).as_posix(),
                 "executions": executions[folder, name],
                 "runs": summary["runs"],
@@ -294,6 +309,16 @@ def _folder_order(folder: Path) -> list[tuple[int, str]]:
         (FOLDER_ORDER.index(part) if part in FOLDER_ORDER else len(FOLDER_ORDER), part)
         for part in folder.parts
     ]
+
+
+def _study_order(name: str) -> tuple[int, int]:
+    """Position of the study's group, then of the study within the catalog."""
+    group = STUDY_GROUPS.get(name)
+    studies = list(STUDY_GROUPS)
+    return (
+        GROUP_ORDER.index(group) if group in GROUP_ORDER else len(GROUP_ORDER),
+        studies.index(name) if name in studies else len(studies),
+    )
 
 
 def _rate(run: RunResult, rate: str) -> str:
