@@ -47,7 +47,7 @@ make srikara/test
 | `basic` | The paper's algebra for one symbol, by hand, plus the effect of theta | `srikara-demo basic` |
 | `message` | A text message through every protocol step, with per-mode noise traces on the Strawberry Fields backends | `srikara-demo message "hello"` |
 | `noise` | The noise model, then a short message through a noisy channel, every mode through every stage | `srikara-demo noise` |
-| `optimized` | A message with the fully optimized settings (SECDED, retries, r = 0.576): one line per block and a short look inside one block | `srikara-demo optimized "hello world"` |
+| `optimized` | A message with the fully optimized settings (parity, retries, r = 0.576): one line per block and a short look inside one block | `srikara-demo optimized "hello world"` |
 
 `srikara-demo NAME --help` lists a demo's options. For example:
 
@@ -147,7 +147,7 @@ compares no coding, parity and SECDED, each with and without retries.
 
 The optimized simulator uses optimized axes, v12 intervals, θ = 5π/4 and
 r = 0.576, which is 5 dB of squeezing, the top of the paper's 1–5 dB range.
-The optimization steps add SECDED and then retries. The squeezing sweep goes up to
+The optimization steps add parity error detection and then retries. The squeezing sweep goes up to
 r = 1.5 (13 dB) as an idealized trend: the simulated squeezed states are pure,
 without the anti-squeezing noise that limits real squeezers.
 

@@ -1,8 +1,8 @@
 """Send a message with the fully optimized Srikara settings and print a compact summary.
 
 The settings are the benchmark's last optimization step: optimized axes, v12 intervals,
-r = 0.576 (5 dB), theta = 5pi/4, SECDED and up to 3 sends per block. One line per block,
-then a short look inside one block.
+r = 0.576 (5 dB), theta = 5pi/4, a parity bit per symbol and up to 3 sends per block. One
+line per block, then a short look inside one block.
 
 Examples:
     python demos/srikara/optimized.py "hello world"
@@ -16,7 +16,6 @@ import argparse
 from walkthrough import header, table
 
 from qsdc.common.bits import bits_to_bytes, bytes_to_bits, hamming_distance
-from qsdc.common.error_correction import secded_decode, secded_encode
 from qsdc.protocols.srikara.benchmark.catalog import NOISES, RETRY
 from qsdc.protocols.srikara.config import Fixed
 from qsdc.protocols.srikara.simulator.protocol import (
@@ -59,17 +58,17 @@ def main() -> None:
     print(
         f"{config.backend}, noise '{args.noise}', r = {args.squeeze_r:g}, theta = 5pi/4, "
         f"{config.intervals} intervals, {config.axis_policy} axis,\n"
-        f"SECDED, all checks must pass, up to {config.max_attempts} sends per block"
+        f"parity, all checks must pass, up to {config.max_attempts} sends per block"
     )
     states = len(transmission.attempts[0].run.states)
     print(
-        f"\n{message!r} -> {len(payload)} bits -> {len(blocks)} blocks of up to 12 bits, "
-        f"{states} states per send"
+        f"\n{message!r} -> {len(payload)} bits -> {len(blocks)} blocks of 2 bits "
+        f"(+1 parity bit), {states} states per send"
     )
 
     header("Blocks")
     table(
-        ("Block", "Bits", "Send", "Failed checks", "Wrong symbols", "SECDED", "Result"),
+        ("Block", "Bits", "Send", "Failed checks", "Wrong symbols", "Parity", "Result"),
         [
             row
             for number, sends in enumerate(blocks)
@@ -106,24 +105,17 @@ def block_rows(number: int, sends: list[Attempt]) -> list[tuple[object, ...]]:
                 attempt.number + 1,
                 f"{failed}/{len(checks)}",
                 f"{wrong}/{len(run.messages)}",
-                secded_summary(attempt),
+                parity_summary(attempt),
                 outcome(attempt),
             )
         )
     return rows
 
 
-def secded_summary(attempt: Attempt) -> str:
+def parity_summary(attempt: Attempt) -> str:
     if not attempt.run.accepted:
         return "-"
-    words = codewords([m.decoded_bits for m in attempt.run.messages])
-    corrected = sum(
-        data is not None and hamming_distance(word, encoded) > 0
-        for word, data, encoded in words
-    )
-    if any(data is None for _, data, _ in words):
-        return "uncorrectable"
-    return f"{corrected} bit(s) corrected" if corrected else "clean"
+    return "ok" if attempt.decoded_bits is not None else "error detected"
 
 
 def outcome(attempt: Attempt) -> str:
@@ -133,15 +125,6 @@ def outcome(attempt: Attempt) -> str:
         return "withheld, send again"
     errors = hamming_distance(attempt.decoded_bits, attempt.block.bits)
     return "released" if not errors else f"released, {errors} wrong bit(s)"
-
-
-def codewords(symbols: list[str]) -> list[tuple[str, str | None, str]]:
-    """(received word, decoded data, codeword it was decoded to) for every SECDED lane."""
-    words = []
-    for word in ("".join(lane) for lane in zip(*symbols)):
-        data = secded_decode(word)
-        words.append((word, data, secded_encode(data) if data else ""))
-    return words
 
 
 def most_eventful(blocks: list[list[Attempt]]) -> int:
@@ -182,13 +165,12 @@ def show_example(number: int, sends: list[Attempt]) -> None:
             f"response {wrong.response:+.3f} -> m = {wrong.decoded_value:+.3f} -> {wrong.decoded_bits}"
         )
         if run.accepted:
-            for lane, (word, data, encoded) in enumerate(codewords(received)):
-                if data is None:
-                    print(f"  codeword {lane}: {word} has 2+ errors -> block withheld")
-                elif word != encoded:
-                    print(
-                        f"  codeword {lane}: {word} -> corrected to {encoded} -> data {data}"
-                    )
+            word = received[0]
+            ones = word.count("1")
+            verdict = (
+                "odd, passes" if ones % 2 else "even: error detected, block withheld"
+            )
+            print(f"  parity of {word}: {ones} ones, {verdict}")
         print(f"  -> {outcome(attempt)}")
 
 
