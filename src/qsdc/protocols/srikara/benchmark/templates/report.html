@@ -58,6 +58,39 @@
   </section>
 
   <section>
+    <h2>Sent vs. decoded symbols</h2>
+    {% for matrix in matrices %}
+    <details{% if matrices|length == 1 %} open{% endif %}>
+      <summary>#{{ matrix.id }} {{ matrix.condition }}: {{ matrix.correct }} decoded correctly, {{ matrix.information }} bits per symbol</summary>
+      <div class="matrix">
+        <table class="confusion">
+          <thead>
+            <tr><th colspan="2"></th><th class="axis" colspan="{{ matrix.labels|length }}">Decoded by Bob</th></tr>
+            <tr><th colspan="2"></th>{% for label in matrix.labels %}<th class="symbol">{{ label }}</th>{% endfor %}</tr>
+          </thead>
+          <tbody>
+            {% for row in matrix.rows %}
+            {% set sent = loop.index0 %}
+            <tr>
+              {% if loop.first %}<th class="axis vertical" rowspan="{{ matrix.rows|length }}">Sent by Alice</th>{% endif %}
+              <th class="symbol">{{ row.label }}</th>
+              {% for cell in row.cells %}
+              {% if cell.count %}
+              <td class="{{ 'diagonal' if loop.index0 == sent }}{{ ' dark' if cell.share > 0.5 }}" style="--share: {{ '%.3f'|format(cell.share) }}" title="{{ '%.1f'|format(100 * cell.share) }}% of sent {{ row.label }} decoded as {{ matrix.labels[loop.index0] }}">{{ cell.count }}</td>
+              {% else %}
+              <td class="empty{{ ' diagonal' if loop.index0 == sent }}"></td>
+              {% endif %}
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+    {% endfor %}
+  </section>
+
+  <section>
     <h2>Shared parameters</h2>
     <div class="table">
       <table>

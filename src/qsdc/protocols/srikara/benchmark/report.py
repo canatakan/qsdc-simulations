@@ -23,6 +23,7 @@ from qsdc.protocols.srikara.benchmark.catalog import NOISES, WORKLOADS
 from qsdc.protocols.srikara.benchmark.metrics import RunMetrics
 from qsdc.protocols.srikara.benchmark.plots import write_plots
 from qsdc.protocols.srikara.config import SimulatorConfig
+from qsdc.protocols.srikara.simulator.encoding import INTERVAL_CODES
 
 TEMPLATES = Path(__file__).parent / "templates"
 TABLE_RATES = (
@@ -185,6 +186,10 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
         }
         for position, (run, label) in enumerate(zip(result.runs, labels), start=1)
     ]
+    matrices = [
+        {"id": position, "condition": label, **_symbol_matrix(run)}
+        for position, (run, label) in enumerate(zip(result.runs, labels), start=1)
+    ]
     shutil.copy(TEMPLATES / "style.css", directory / "style.css")
     html = _templates.get_template("report.html").render(
         title=benchmark.name.replace("_", " ").capitalize(),
@@ -197,6 +202,7 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
         shared=shared,
         show_series=series,
         table=table,
+        matrices=matrices,
     )
     (directory / "report.html").write_text(html)
 
@@ -232,6 +238,28 @@ def write_index(root: Path) -> Path:
         _templates.get_template("index.html").render(title=root.name, sections=sections)
     )
     return index
+
+
+def _symbol_matrix(run: RunResult) -> dict[str, object]:
+    """Sent vs. decoded symbol counts, in interval order so that neighbours are adjacent."""
+    metrics = run.metrics
+    labels = INTERVAL_CODES[run.case.simulator.intervals].labels
+    counts = [
+        [metrics.symbol_counts[8 * int(s, 2) + int(d, 2)] for d in labels]
+        for s in labels
+    ]
+    rows = []
+    for label, row in zip(labels, counts):
+        total = sum(row) or 1
+        cells = [{"count": count, "share": count / total} for count in row]
+        rows.append({"label": label, "cells": cells})
+    correct = sum(counts[i][i] for i in range(8)) / sum(map(sum, counts))
+    return {
+        "labels": labels,
+        "rows": rows,
+        "correct": f"{correct:.1%}",
+        "information": f"{metrics.information_per_symbol:.3f}",
+    }
 
 
 def _metrics(values: dict) -> RunMetrics:

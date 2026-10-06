@@ -5,6 +5,7 @@
   --muted: #647084;
   --line: #dce2ea;
   --accent: #2563a8;
+  --accent-dark: #173f70;
 }
 
 body {
@@ -60,3 +61,30 @@ thead th { color: var(--muted); font-size: 13px; white-space: nowrap; }
 tbody tr:last-child > * { border-bottom: 0; }
 th.number, td.number { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .links { margin-top: 16px; }
+details { margin: 8px 0; }
+summary { cursor: pointer; padding: 6px 0; }
+.matrix {
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  margin-top: 8px;
+  padding: 16px 20px 16px 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.confusion { width: auto; border-collapse: separate; border-spacing: 3px; }
+.confusion th, .confusion td { border: 0; padding: 0; text-align: center; }
+.confusion td {
+  width: 56px;
+  height: 34px;
+  border-radius: 4px;
+  background: rgba(37, 99, 168, var(--share));
+  font-variant-numeric: tabular-nums;
+}
+.confusion td.empty { background: var(--bg); }
+.confusion td.dark { color: white; }
+.confusion td.diagonal { box-shadow: inset 0 0 0 2px var(--accent-dark); }
+.confusion th.symbol { padding: 0 8px; color: var(--muted); font-weight: 600; }
+.confusion th.axis { padding: 4px; color: var(--muted); font-weight: 400; }
+.confusion th.vertical { writing-mode: vertical-rl; transform: rotate(180deg); }

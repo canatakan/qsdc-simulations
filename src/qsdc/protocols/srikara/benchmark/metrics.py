@@ -68,17 +68,20 @@ class RunMetrics:
         return self.delivered_bits / self.states
 
     @property
-    def information_per_state(self) -> float:
-        """Mutual information between sent and decoded symbols, per prepared state."""
+    def information_per_symbol(self) -> float:
+        """Mutual information I(sent; decoded) of the message symbols, in bits."""
         total = sum(self.symbol_counts)
         sent = [sum(self.symbol_counts[8 * s : 8 * s + 8]) for s in range(8)]
         decoded = [sum(self.symbol_counts[d::8]) for d in range(8)]
-        per_symbol = sum(
+        return sum(
             count / total * log2(count * total / (sent[i // 8] * decoded[i % 8]))
             for i, count in enumerate(self.symbol_counts)
             if count
         )
-        return per_symbol * total / self.states
+
+    @property
+    def information_per_state(self) -> float:
+        return self.information_per_symbol * sum(self.symbol_counts) / self.states
 
     @property
     def rejection_rate(self) -> float:
