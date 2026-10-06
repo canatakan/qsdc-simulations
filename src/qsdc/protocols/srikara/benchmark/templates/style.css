@@ -68,6 +68,7 @@ summary { cursor: pointer; padding: 6px 0; }
 }
 .confusion { width: auto; border-collapse: separate; border-spacing: 3px; }
 .confusion th, .confusion td { border: 0; padding: 0; text-align: center; }
+.confusion th { font-size: 13px; }
 .confusion td {
   width: 56px;
   height: 34px;
@@ -79,5 +80,5 @@ summary { cursor: pointer; padding: 6px 0; }
 .confusion td.dark { color: white; }
 .confusion td.diagonal { box-shadow: inset 0 0 0 2px var(--accent-dark); }
 .confusion th.symbol { padding: 0 8px; color: var(--muted); font-weight: 600; }
-.confusion th.axis { padding: 4px; color: var(--muted); font-weight: 400; }
+.confusion th.axis { padding: 4px; color: var(--muted); font-weight: 600; }
 .confusion th.vertical { writing-mode: vertical-rl; transform: rotate(180deg); }
