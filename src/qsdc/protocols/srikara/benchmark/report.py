@@ -152,9 +152,7 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
     }
     (directory / "results.json").write_text(json.dumps(document, indent=2) + "\n")
 
-    rows = [
-        _flatten({k: v for k, v in run.items() if k != "repetitions"}) for run in runs
-    ]
+    rows = [_csv_row(run, benchmark.axes) for run in runs]
     with (directory / "runs.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(
             handle, fieldnames=list(dict.fromkeys(key for row in rows for key in row))
@@ -265,6 +263,18 @@ def _symbol_matrix(run: RunResult) -> dict[str, object]:
 def _metrics(values: dict) -> RunMetrics:
     counts = {field.name: values[field.name] for field in fields(RunMetrics)}
     return RunMetrics(**{**counts, "symbol_counts": tuple(counts["symbol_counts"])})
+
+
+def _csv_row(run: dict, axes: tuple[str, ...]) -> dict[str, object]:
+    """One CSV row per case, one column per axis and per sent->decoded symbol pair."""
+    metrics = dict(run["metrics"])
+    counts = metrics.pop("symbol_counts")
+    symbols = {
+        f"{s:03b}->{d:03b}": counts[8 * s + d] for s in range(8) for d in range(8)
+    }
+    fields = {k: v for k, v in run.items() if k not in ("at", "metrics", "repetitions")}
+    coordinates = dict(zip(axes, run["at"]))
+    return _flatten({**fields, **coordinates, "metrics": metrics, "symbols": symbols})
 
 
 def _flatten(record: dict, prefix: str = "") -> dict[str, object]:
