@@ -53,15 +53,13 @@ INTERVALS_OPTIMIZED = AXIS_OPTIMIZED.model_copy(update={"intervals": "optimized_
 # At theta = 5pi/4 Bob's unsqueezing amplifies Alice's q displacement by cosh r + sqrt(2) sinh r.
 OPTIMIZED = INTERVALS_OPTIMIZED.model_copy(update={"theta_pi": Fixed(value=1.25)})
 SECDED = OPTIMIZED.model_copy(update={"error_correction": "secded"})
-TOLERANT = SECDED.model_copy(update={"max_failed_fraction": 0.05})
-RETRY = TOLERANT.model_copy(update={"max_attempts": 3})
+RETRY = SECDED.model_copy(update={"max_attempts": 3})
 OPTIMIZATION_STEPS = {
     "Default": BASELINE,
     "+ Axis optimization": AXIS_OPTIMIZED,
     "+ Optimized intervals": INTERVALS_OPTIMIZED,
     "+ Fixed theta = 5pi/4": OPTIMIZED,
     "+ SECDED error correction": SECDED,
-    "+ Allow 5% failed checks": TOLERANT,
     "+ Retries": RETRY,
 }
 

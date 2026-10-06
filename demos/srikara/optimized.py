@@ -60,8 +60,7 @@ def main() -> None:
     print(
         f"{config.backend}, noise '{args.noise}', r = {args.squeeze_r:g}, theta = 5pi/4, "
         f"{config.intervals} intervals, {config.axis_policy} axis,\n"
-        f"SECDED, {config.max_failed_fraction:.0%} of checks may fail, "
-        f"up to {config.max_attempts} sends per block"
+        f"SECDED, all checks must pass, up to {config.max_attempts} sends per block"
     )
     states = len(transmission.attempts[0].run.states)
     print(
