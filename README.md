@@ -85,14 +85,13 @@ transmission = SrikaraSimulator(config).transmit("101001110010")
 assert transmission.recovered_bits == "101001110010"
 ```
 
-The payload is split into blocks of `symbols_per_block` 3-bit symbols
-(`simulator/transport.py`). With SECDED, blocks hold whole stripes: 12 payload
-bits coded as three interleaved extended Hamming (8, 4) codewords, sent as 8
+The payload is split into blocks (`simulator/transport.py`). Without error
+correction a block is one 3-bit symbol; with SECDED it is 12 payload bits
+coded as three interleaved extended Hamming (8, 4) codewords, sent as 8
 symbols. Each block runs the protocol once with 4 states per symbol
-(`simulator/protocol.py`). A run is accepted when at most `max_failed_fraction`
-of its control and decoy checks fall outside `tolerance_sigmas` (the paper's
-rule, the default, is that all pass). A rejected block, or one with a stripe
-SECDED cannot correct, is sent again up to `max_attempts` times.
+(`simulator/protocol.py`). A run is accepted when all of its control and decoy
+checks fall within `tolerance_sigmas`. A rejected block, or one SECDED cannot
+correct, is sent again up to `max_attempts` times.
 `recovered_bits` is only set when every block was recovered.
 
 The squeezing angle matters: Alice displaces along the diagonal 1 + i, and
@@ -133,15 +132,13 @@ print(write_report(run_benchmark(benchmark), Path("results")) / "report.html")
 ```
 
 `catalog.py` defines the presets (`WORKLOADS`, `NOISES`, the cumulative
-`OPTIMIZATION_STEPS`) and 18 built-in studies: 3 reference studies per workload
-and 15 studies of the optimized simulator per noise baseline, so a full run of
-one workload writes 3 + 4 × 15 = 63 reports.
+`OPTIMIZATION_STEPS`) and 17 built-in studies: 3 reference studies per workload
+and 14 studies of the optimized simulator per noise baseline, so a full run of
+one workload writes 3 + 4 × 14 = 59 reports.
 
 The optimized simulator uses optimized axes, v12 intervals, θ = 5π/4 and
 r = 0.576, which is 5 dB of squeezing, the top of the paper's 1–5 dB range.
-The optimization steps add SECDED and then retries; all checks must pass in
-every step. Accepting a few failed checks trades detection for delivery, so it
-appears only in the `block_acceptance` study. The squeezing sweep goes up to
+The optimization steps add SECDED and then retries. The squeezing sweep goes up to
 r = 1.5 (13 dB) as an idealized trend: the simulated squeezed states are pure,
 without the anti-squeezing noise that limits real squeezers.
 
@@ -197,7 +194,7 @@ checks reject it or SECDED cannot correct it, while attempts remain.
   could reach on the channel. It is bounded by the payload's symbol entropy,
   so it is below 3/4 for short or biased payloads.
 - Rejection rate: sends rejected by the checks / all sends. It grows with the
-  number of checks per send, i.e. with the block size.
+  number of checks per send: 3 without error correction, 24 with SECDED.
 - Check failure rate: failed checks / all control and decoy checks, which does
   not depend on the block size. On an honest channel it is the Gaussian tail
   probability of the tolerance, e.g. 0.27% at 3σ.

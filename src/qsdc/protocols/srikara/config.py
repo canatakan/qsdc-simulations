@@ -76,11 +76,7 @@ class NoiseConfig(Config):
 
 
 class SimulatorConfig(Config):
-    """Noise only acts in the Strawberry Fields backends.
-
-    A run is accepted when at most `max_failed_fraction` of its control and decoy checks fall
-    outside `tolerance_sigmas`; the paper's rule, the default, requires all of them to pass.
-    """
+    """Noise only acts in the Strawberry Fields backends."""
 
     backend: Literal["analytic", "sf", "sf-sampled"] = "analytic"
     random_source: Literal["classical", "sf-bs-qrng"] = "classical"
@@ -90,11 +86,9 @@ class SimulatorConfig(Config):
     squeeze_r: Distribution = Uniform(lower=0.115, upper=0.576)
     theta_pi: Distribution = Uniform(lower=0.0, upper=2.0)
     tolerance_sigmas: float = 1.0
-    max_failed_fraction: float = 0.0
     intervals: Literal["default", "optimized_v4", "optimized_v8", "optimized_v12"] = (
         "default"
     )
     axis_policy: Literal["random", "optimized"] = "random"
     error_correction: Literal["none", "secded"] = "none"
-    symbols_per_block: int = 1
     max_attempts: int = 1

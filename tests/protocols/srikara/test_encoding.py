@@ -24,17 +24,13 @@ def test_unsqueezing_inverts_the_squeeze_displacement_relation():
 
 
 @pytest.mark.parametrize("error_correction", ["none", "secded"])
-@pytest.mark.parametrize("symbols_per_block", [1, 8, 16])
 @pytest.mark.parametrize("length", [1, 11, 12, 13, 24])
-def test_blocks_round_trip_any_payload_length(
-    error_correction, symbols_per_block, length
-):
+def test_blocks_round_trip_any_payload_length(error_correction, length):
     payload = PAYLOAD[:length]
-    blocks = encode_blocks(payload, error_correction, symbols_per_block)
+    blocks = encode_blocks(payload, error_correction)
     decoded = [decode_block(block, block.symbols, error_correction) for block in blocks]
 
     assert "".join(decoded) == payload
-    assert all(len(block.symbols) <= max(symbols_per_block, 8) for block in blocks)
 
 
 def test_secded_block_survives_one_corrupted_symbol_and_detects_two():

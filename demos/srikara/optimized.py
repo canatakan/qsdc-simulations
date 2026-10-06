@@ -24,7 +24,6 @@ from qsdc.protocols.srikara.simulator.protocol import (
     SrikaraSimulator,
     Transmission,
 )
-from qsdc.protocols.srikara.simulator.transport import STRIPE_SYMBOLS
 
 
 def main() -> None:
@@ -139,11 +138,9 @@ def outcome(attempt: Attempt) -> str:
 def codewords(symbols: list[str]) -> list[tuple[str, str | None, str]]:
     """(received word, decoded data, codeword it was decoded to) for every SECDED lane."""
     words = []
-    for start in range(0, len(symbols), STRIPE_SYMBOLS):
-        stripe = symbols[start : start + STRIPE_SYMBOLS]
-        for word in ("".join(lane) for lane in zip(*stripe)):
-            data = secded_decode(word)
-            words.append((word, data, secded_encode(data) if data else ""))
+    for word in ("".join(lane) for lane in zip(*symbols)):
+        data = secded_decode(word)
+        words.append((word, data, secded_encode(data) if data else ""))
     return words
 
 

@@ -67,13 +67,6 @@ R_VALUES = (0.115, 0.345, 0.576, 0.921, 1.151, 1.5)
 R_RANGES = ((0.115, 0.345), (0.345, 0.576), (0.115, 1.151))
 THETA_PI_VALUES = (0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75)
 INTERVALS = ("default", "optimized_v4", "optimized_v8", "optimized_v12")
-BLOCK_SYMBOLS = (8, 16, 32, 64)
-ACCEPTANCE_RULES = {
-    "uncoded, all checks pass": ("none", 0.0),
-    "uncoded, 5% may fail": ("none", 0.05),
-    "SECDED, all checks pass": ("secded", 0.0),
-    "SECDED, 5% may fail": ("secded", 0.05),
-}
 TOLERANCES = (1.0, 2.0, 3.0, 4.0, 5.0)
 ONE_PROBABILITIES = (0.1, 0.25, 0.5, 0.75, 0.9)
 TRANSMITTANCES = (1.0, 0.95, 0.9, 0.8, 0.7, 0.5)
@@ -180,23 +173,6 @@ def noise_studies(noise_name: str, workload: Workload) -> list[Benchmark]:
         Benchmark(
             "interval_comparison",
             tuple(case(vary(intervals=intervals)) for intervals in INTERVALS),
-        ),
-        Benchmark(
-            "block_acceptance",
-            tuple(
-                case(
-                    vary(
-                        error_correction=error_correction,
-                        max_failed_fraction=failed,
-                        symbols_per_block=symbols,
-                    ),
-                    series=series,
-                    at=(symbols,),
-                )
-                for series, (error_correction, failed) in ACCEPTANCE_RULES.items()
-                for symbols in BLOCK_SYMBOLS
-            ),
-            axes=("Symbols per block",),
         ),
         Benchmark(
             "tolerance_safety",

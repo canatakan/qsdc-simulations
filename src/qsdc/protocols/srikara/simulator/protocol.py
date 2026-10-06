@@ -58,7 +58,10 @@ class BlockRun:
     controls: tuple[Check, ...]
     decoys: tuple[Check, ...]
     messages: tuple[Message, ...]
-    accepted: bool
+
+    @property
+    def accepted(self) -> bool:
+        return all(check.passed for check in self.controls + self.decoys)
 
 
 @dataclass(frozen=True)
@@ -98,7 +101,7 @@ class SrikaraSimulator:
         config = self.config
         attempts = []
         for block_index, block in enumerate(
-            encode_blocks(payload, config.error_correction, config.symbols_per_block)
+            encode_blocks(payload, config.error_correction)
         ):
             for number in range(config.max_attempts):
                 seed = derive_seed(config.seed, block_index, number)
@@ -143,10 +146,7 @@ class SrikaraSimulator:
             self._message(states[i], bits, value, rng)
             for i, bits, value in zip(route.message, symbols, values)
         )
-        checks = controls + decoys
-        failed = sum(not check.passed for check in checks)
-        accepted = failed <= config.max_failed_fraction * len(checks)
-        return BlockRun(states, route, controls, decoys, messages, accepted)
+        return BlockRun(states, route, controls, decoys, messages)
 
     def _check(
         self, state: PreparedState, axis: QuadratureAxis, returned: bool

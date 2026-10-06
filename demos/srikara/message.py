@@ -43,12 +43,6 @@ def main() -> None:
     )
     parser.add_argument("--tolerance-sigmas", type=float, default=3.0)
     parser.add_argument(
-        "--max-failed-fraction",
-        type=float,
-        default=0.0,
-        help="share of checks that may fail",
-    )
-    parser.add_argument(
         "--optimized",
         action="store_true",
         help="the benchmark's optimized settings: optimized axes, v12 intervals, "
@@ -59,7 +53,6 @@ def main() -> None:
         action="store_true",
         help="protect the payload with interleaved SECDED",
     )
-    parser.add_argument("--symbols-per-block", type=int, default=1)
     parser.add_argument(
         "--max-attempts", type=int, default=1, help="attempts per block"
     )
@@ -75,9 +68,7 @@ def main() -> None:
         seed=args.seed,
         noise=NOISES[args.noise],
         tolerance_sigmas=args.tolerance_sigmas,
-        max_failed_fraction=args.max_failed_fraction,
         error_correction="secded" if args.secded else "none",
-        symbols_per_block=args.symbols_per_block,
         max_attempts=args.max_attempts,
     )
     if args.optimized:

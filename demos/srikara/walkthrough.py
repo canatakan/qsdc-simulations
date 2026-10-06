@@ -28,7 +28,6 @@ from qsdc.protocols.srikara.simulator.protocol import (
     Transmission,
 )
 from qsdc.protocols.srikara.simulator.transport import (
-    STRIPE_SYMBOLS,
     Block,
     encode_blocks,
 )
@@ -44,7 +43,7 @@ def show_transmission(
     """Print everything from the text message to the recovered text."""
     show_settings(config)
     show_payload(text, payload)
-    blocks = encode_blocks(payload, config.error_correction, config.symbols_per_block)
+    blocks = encode_blocks(payload, config.error_correction)
     show_blocks(blocks, config)
     block_numbers = {block.offset: number for number, block in enumerate(blocks)}
     for attempt in transmission.attempts:
@@ -73,9 +72,7 @@ def show_settings(config: SimulatorConfig) -> None:
         ),
         ("Bob's decoding axis", config.axis_policy),
         ("Check tolerance", f"{config.tolerance_sigmas:g} sigma"),
-        ("Checks allowed to fail", f"{config.max_failed_fraction:.0%} of each run"),
         ("Error correction", config.error_correction),
-        ("Symbols per block", str(config.symbols_per_block)),
         ("Attempts per block", str(config.max_attempts)),
     ]
     table(("Setting", "Value"), rows)
@@ -149,9 +146,7 @@ def show_blocks(blocks: list[Block], config: SimulatorConfig) -> None:
     header("2. Transport blocks")
     per_run = f"{4 * len(blocks[0].symbols)} states per protocol run"
     if config.error_correction == "none":
-        print(
-            f"Each block carries {config.symbols_per_block} 3-bit symbol(s); {per_run}."
-        )
+        print(f"Each block carries one 3-bit symbol; {per_run}.")
     else:
         print(
             "SECDED: every 12 payload bits become three extended Hamming (8, 4) codewords.\n"
@@ -159,23 +154,16 @@ def show_blocks(blocks: list[Block], config: SimulatorConfig) -> None:
             f"only one bit, which it can correct. {per_run}."
         )
     for number, block in enumerate(blocks):
-        padding = 3 * len(block.symbols) - len(block.bits)
-        if config.error_correction == "secded":
-            padding = 12 * (len(block.symbols) // STRIPE_SYMBOLS) - len(block.bits)
+        padding = (3 if config.error_correction == "none" else 12) - len(block.bits)
         print(
             f"\nBlock {number}: payload bits {block.offset}-{block.offset + len(block.bits) - 1} "
             f"= {block.bits}" + (f" (+{padding} zero padding bits)" if padding else "")
         )
         if config.error_correction == "secded":
-            padded = block.bits.ljust(len(block.bits) + padding, "0")
-            for stripe in range(len(block.symbols) // STRIPE_SYMBOLS):
-                data = padded[12 * stripe : 12 * stripe + 12]
-                nibbles = [data[i : i + 4] for i in range(0, 12, 4)]
-                print(f"  stripe {stripe}:")
-                for lane, nibble in enumerate(nibbles):
-                    print(
-                        f"    codeword {lane}: data {nibble} -> {secded_encode(nibble)}"
-                    )
+            padded = block.bits.ljust(12, "0")
+            for lane in range(3):
+                nibble = padded[4 * lane : 4 * lane + 4]
+                print(f"  codeword {lane}: data {nibble} -> {secded_encode(nibble)}")
         print(f"  symbols sent: {' '.join(block.symbols)}")
 
 
@@ -263,9 +251,8 @@ def show_attempt(
     step("8. Acceptance")
     checks = run.controls + run.decoys
     failed = sum(not check.passed for check in checks)
-    allowed = int(config.max_failed_fraction * len(checks))
     verdict = "accepted" if run.accepted else "REJECTED: the block is discarded"
-    print(f"{failed} of {len(checks)} checks failed; {allowed} may fail -> {verdict}")
+    print(f"{failed} of {len(checks)} checks failed; all must pass -> {verdict}")
 
     step("9. Bob unsqueezes the message modes and decodes m_A")
     show_messages(run.messages, run.states, config)
@@ -369,21 +356,18 @@ def show_block_result(attempt: Attempt, config: SimulatorConfig) -> None:
         return
     print(f"Received symbols: {' '.join(received)}")
     if config.error_correction == "secded":
-        for stripe in range(0, len(received), STRIPE_SYMBOLS):
-            symbols = received[stripe : stripe + STRIPE_SYMBOLS]
-            print(f"  stripe {stripe // STRIPE_SYMBOLS}:")
-            for lane, word in enumerate("".join(column) for column in zip(*symbols)):
-                data = secded_decode(word)
-                if data is None:
-                    print(
-                        f"    codeword {lane}: {word} -> two or more errors detected, uncorrectable"
-                    )
-                    continue
-                flips = hamming_distance(word, secded_encode(data))
-                note = "clean" if not flips else "1 bit corrected"
+        for lane, word in enumerate("".join(column) for column in zip(*received)):
+            data = secded_decode(word)
+            if data is None:
                 print(
-                    f"    codeword {lane}: {word} -> nearest {secded_encode(data)} -> data {data} ({note})"
+                    f"  codeword {lane}: {word} -> two or more errors detected, uncorrectable"
                 )
+                continue
+            flips = hamming_distance(word, secded_encode(data))
+            note = "clean" if not flips else "1 bit corrected"
+            print(
+                f"  codeword {lane}: {word} -> nearest {secded_encode(data)} -> data {data} ({note})"
+            )
     if attempt.decoded_bits is None:
         print("SECDED could not correct the block; it is not released.")
         return

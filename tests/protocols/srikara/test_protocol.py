@@ -90,35 +90,6 @@ def test_rejected_blocks_are_retried_until_recovered(reject_every_other_run):
     )
 
 
-class FailFirstCheck(AnalyticBackend):
-    """Every run has exactly one control measurement out of tolerance."""
-
-    def begin_run(self, seed):
-        self.failed = False
-
-    def measure_control(self, state, axis):
-        value = super().measure_control(state, axis)
-        if not self.failed:
-            self.failed = True
-            value += 1.0
-        return value
-
-
-def test_tolerant_acceptance_lets_a_large_block_survive_one_failed_check():
-    # The payload fits one 9-symbol block: 27 checks, of which 5% allows one to fail.
-    strict = SimulatorConfig(symbols_per_block=16)
-    tolerant = strict.model_copy(update={"max_failed_fraction": 0.05})
-
-    assert (
-        SrikaraSimulator(strict, FailFirstCheck()).transmit(PAYLOAD).recovered_bits
-        is None
-    )
-    assert (
-        SrikaraSimulator(tolerant, FailFirstCheck()).transmit(PAYLOAD).recovered_bits
-        == PAYLOAD
-    )
-
-
 def test_theta_five_quarter_pi_gives_the_largest_message_response():
     backend, r = AnalyticBackend(), 0.576
     best = {}

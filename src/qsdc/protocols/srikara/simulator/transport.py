@@ -7,10 +7,6 @@ from dataclasses import dataclass
 
 from qsdc.common.error_correction import secded_decode, secded_encode
 
-# SECDED stripe: 12 payload bits as three (8, 4) codewords, interleaved into 8 symbols.
-STRIPE_BITS = 12
-STRIPE_SYMBOLS = 8
-
 
 @dataclass(frozen=True)
 class Block:
@@ -19,50 +15,33 @@ class Block:
     symbols: tuple[str, ...]
 
 
-def encode_blocks(
-    payload: str, error_correction: str, symbols_per_block: int = 1
-) -> list[Block]:
-    """Uncoded blocks carry `symbols_per_block` symbols; SECDED blocks carry whole stripes."""
+def encode_blocks(payload: str, error_correction: str) -> list[Block]:
+    """Uncoded blocks carry one 3-bit symbol; SECDED blocks carry 12 bits as 8 symbols."""
     if error_correction == "none":
-        size = 3 * symbols_per_block
-        encode = _symbols
-    else:
-        size = STRIPE_BITS * max(1, symbols_per_block // STRIPE_SYMBOLS)
-        encode = _secded_symbols
+        return [
+            Block(i, payload[i : i + 3], (payload[i : i + 3].ljust(3, "0"),))
+            for i in range(0, len(payload), 3)
+        ]
+
     blocks = []
-    for offset in range(0, len(payload), size):
-        bits = payload[offset : offset + size]
-        blocks.append(Block(offset, bits, encode(bits)))
+    for offset in range(0, len(payload), 12):
+        bits = payload[offset : offset + 12]
+        padded = bits.ljust(12, "0")
+        codewords = [secded_encode(padded[i : i + 4]) for i in range(0, 12, 4)]
+        # Symbol k carries bit k of all three codewords: one bad symbol costs each one bit.
+        symbols = tuple("".join(column) for column in zip(*codewords))
+        blocks.append(Block(offset, bits, symbols))
     return blocks
 
 
 def decode_block(
     block: Block, symbols: Sequence[str], error_correction: str
 ) -> str | None:
-    """Recover the block's payload bits, or None if SECDED detects an uncorrectable stripe."""
+    """Recover the block's payload bits, or None if SECDED detects an uncorrectable error."""
     if error_correction == "none":
         return "".join(symbols)[: len(block.bits)]
 
-    data = []
-    for start in range(0, len(symbols), STRIPE_SYMBOLS):
-        stripe = symbols[start : start + STRIPE_SYMBOLS]
-        data += [secded_decode("".join(lane)) for lane in zip(*stripe)]
+    data = [secded_decode("".join(lane)) for lane in zip(*symbols)]
     if None in data:
         return None
     return "".join(data)[: len(block.bits)]
-
-
-def _symbols(bits: str) -> tuple[str, ...]:
-    padded = bits.ljust(-(-len(bits) // 3) * 3, "0")
-    return tuple(padded[i : i + 3] for i in range(0, len(padded), 3))
-
-
-def _secded_symbols(bits: str) -> tuple[str, ...]:
-    padded = bits.ljust(-(-len(bits) // STRIPE_BITS) * STRIPE_BITS, "0")
-    symbols: list[str] = []
-    for start in range(0, len(padded), STRIPE_BITS):
-        stripe = padded[start : start + STRIPE_BITS]
-        codewords = [secded_encode(stripe[i : i + 4]) for i in range(0, 12, 4)]
-        # Symbol k carries bit k of all three codewords: one bad symbol costs each one bit.
-        symbols += ["".join(column) for column in zip(*codewords)]
-    return tuple(symbols)
