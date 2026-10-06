@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, fields
-from math import log2, sqrt
-from statistics import stdev
-
-from scipy.stats import t
+from math import log2
 
 from qsdc.common.bits import hamming_distance
 from qsdc.protocols.srikara.simulator.protocol import Transmission
@@ -127,12 +124,3 @@ def pool(metrics: Sequence[RunMetrics]) -> RunMetrics:
     }
     counts = tuple(sum(column) for column in zip(*(m.symbol_counts for m in metrics)))
     return RunMetrics(**totals, symbol_counts=counts)
-
-
-def confidence(metrics: Sequence[RunMetrics], rate: str) -> float | None:
-    """Half-width of the 95% Student-t interval of a rate across repetitions."""
-    values = [getattr(m, rate) for m in metrics]
-    values = [value for value in values if value is not None]
-    if len(values) < 2:
-        return None
-    return t.ppf(0.975, len(values) - 1) * stdev(values) / sqrt(len(values))

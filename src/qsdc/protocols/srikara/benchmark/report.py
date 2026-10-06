@@ -20,7 +20,7 @@ from qsdc.protocols.srikara.benchmark.benchmark import (
     Workload,
 )
 from qsdc.protocols.srikara.benchmark.catalog import NOISES, WORKLOADS
-from qsdc.protocols.srikara.benchmark.metrics import RATES, RunMetrics, pool
+from qsdc.protocols.srikara.benchmark.metrics import RunMetrics, pool
 from qsdc.protocols.srikara.benchmark.plots import write_plots
 from qsdc.protocols.srikara.config import SimulatorConfig
 
@@ -142,7 +142,6 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
             "simulator": run.case.simulator.model_dump(mode="json"),
             "workload": run.case.workload.model_dump(mode="json"),
             "metrics": run.metrics.as_dict(),
-            "confidence": {rate: run.confidence(rate) for rate in RATES},
             "repetitions": [metrics.as_dict() for metrics in run.repetitions],
         }
         for position, run in enumerate(result.runs, start=1)
@@ -263,16 +262,10 @@ def _folder_order(folder: Path) -> list[tuple[int, str]]:
 
 
 def _rate(run: RunResult, rate: str) -> str:
-    """A pooled rate, with its 95% interval when there were several repetitions."""
-    value, interval = getattr(run.metrics, rate), run.confidence(rate)
+    value = getattr(run.metrics, rate)
     if value is None:
         return "—"
-    text = f"{value:.4f}" if rate.endswith("per_state") else f"{value:.2%}"
-    if interval is None:
-        return text
-    return text + (
-        f" ± {interval:.4f}" if rate.endswith("per_state") else f" ± {interval:.2%}"
-    )
+    return f"{value:.4f}" if rate.endswith("per_state") else f"{value:.2%}"
 
 
 def _seconds(seconds: float) -> str:

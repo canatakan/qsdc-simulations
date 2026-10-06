@@ -55,7 +55,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "--repetitions",
         type=int,
         default=1,
-        help="independent seeds per case, for confidence intervals (default: 1)",
+        help="independent seeds per case, pooled into each result (default: 1)",
     )
     run.add_argument(
         "--skip-existing",

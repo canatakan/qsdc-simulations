@@ -8,12 +8,7 @@ from time import perf_counter
 from qsdc.common.bits import weighted_random_bits
 from qsdc.common.random.classical import ClassicalRandomSource
 from qsdc.common.random.seed import derive_seed
-from qsdc.protocols.srikara.benchmark.metrics import (
-    RunMetrics,
-    confidence,
-    measure,
-    pool,
-)
+from qsdc.protocols.srikara.benchmark.metrics import RunMetrics, measure, pool
 from qsdc.protocols.srikara.config import Config, SimulatorConfig
 from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
 
@@ -59,9 +54,6 @@ class RunResult:
     case: Case
     metrics: RunMetrics  # pooled over repetitions
     repetitions: tuple[RunMetrics, ...]
-
-    def confidence(self, rate: str) -> float | None:
-        return confidence(self.repetitions, rate)
 
 
 @dataclass(frozen=True)

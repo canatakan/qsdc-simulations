@@ -52,16 +52,12 @@ def _comparison(result: BenchmarkResult, labels: list[str]) -> Figure:
     positions = np.arange(len(runs))
     for axis, (metric, title) in zip(axes.flat, PLOTTED.items()):
         values = [_value(run, metric) for run in runs]
-        errors = [_error(run, metric) for run in runs]
-        bars = axis.barh(
-            positions, np.nan_to_num(values), xerr=errors, color=colors, capsize=3
-        )
+        bars = axis.barh(positions, np.nan_to_num(values), color=colors)
         axis.bar_label(
             bars, labels=[_format(metric, value) for value in values], padding=3
         )
         axis.set_yticks(positions, labels)
-        upper = np.nanmax([0.0, *(np.add(values, errors))])
-        axis.set_xlim(0.0, min(_ceiling(metric), max(0.01, 1.25 * upper)))
+        axis.set_xlim(0.0, max(0.01, 1.25 * np.nanmax([0.0, *values])))
         _style(axis, title, metric, axis.xaxis)
     axes[0, 0].invert_yaxis()
     figure.suptitle(_title(result), fontsize=16, fontweight="bold")
@@ -76,17 +72,14 @@ def _sweep(result: BenchmarkResult) -> Figure:
     for axis, (metric, title) in zip(axes.flat, PLOTTED.items()):
         for name in series:
             points = sorted(
-                (*run.case.at, _value(run, metric), _error(run, metric))
+                (*run.case.at, _value(run, metric))
                 for run in runs
                 if run.case.series == name
             )
-            x, y, error = zip(*points)
-            axis.errorbar(
-                x, y, yerr=error, marker="o", linewidth=2.0, capsize=3, label=name
-            )
+            axis.plot(*zip(*points), marker="o", linewidth=2.0, label=name)
         axis.set_xlabel(result.benchmark.axes[0])
         axis.set_xticks(sorted({run.case.at[0] for run in runs}))
-        axis.set_ylim(0.0, min(_ceiling(metric), max(0.01, axis.get_ylim()[1])))
+        axis.set_ylim(0.0, max(0.01, axis.get_ylim()[1]))
         _style(axis, title, metric, axis.yaxis)
         if len(series) > 1:
             axis.legend(frameon=False)
@@ -166,15 +159,6 @@ def _title(result: BenchmarkResult) -> str:
 def _value(run: RunResult, metric: str) -> float:
     value = getattr(run.metrics, metric)
     return np.nan if value is None else value
-
-
-def _ceiling(metric: str) -> float:
-    """Rates cannot exceed 1, however wide their confidence intervals are."""
-    return np.inf if metric.endswith("per_state") else 1.05
-
-
-def _error(run: RunResult, metric: str) -> float:
-    return run.confidence(metric) or 0.0
 
 
 def _format(metric: str, value: float) -> str:

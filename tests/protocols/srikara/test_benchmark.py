@@ -112,8 +112,6 @@ def test_repetitions_use_new_seeds_and_pool_their_counts():
     assert len({m.raw_error_bits for m in repeated.repetitions}) > 1
     assert repeated.metrics.payload_bits == 90
     assert repeated.metrics == pool(repeated.repetitions)
-    assert repeated.confidence("raw_bit_error_rate") > 0
-    assert single.confidence("raw_bit_error_rate") is None
 
 
 def test_heatmap_report_has_one_figure_per_series(tmp_path):
