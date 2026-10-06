@@ -10,6 +10,7 @@ from matplotlib import colormaps
 from matplotlib.axes import Axes
 from matplotlib.axis import Axis
 from matplotlib.figure import Figure
+from matplotlib.patches import Patch
 from matplotlib.ticker import PercentFormatter
 
 from qsdc.protocols.srikara.benchmark.benchmark import BenchmarkResult, RunResult
@@ -60,6 +61,16 @@ def _comparison(result: BenchmarkResult, labels: list[str]) -> Figure:
         axis.set_xlim(0.0, max(0.01, 1.25 * np.nanmax([0.0, *values])))
         _style(axis, title, metric, axis.xaxis)
     axes[0, 0].invert_yaxis()
+    if len(series) > 1:
+        figure.legend(
+            handles=[
+                Patch(color=colormaps["tab10"](i % 10), label=name)
+                for i, name in enumerate(series)
+            ],
+            loc="outside lower center",
+            ncols=len(series),
+            frameon=False,
+        )
     figure.suptitle(_title(result), fontsize=16, fontweight="bold")
     return figure
 
