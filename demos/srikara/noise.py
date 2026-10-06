@@ -54,7 +54,7 @@ def main() -> None:
     config = SimulatorConfig(
         backend="sf-sampled",
         noise=NOISE,
-        intervals="optimized_v8",
+        intervals="gaussian_gray",
         squeeze_r=Uniform(lower=0.25, upper=1.0),
         tolerance_sigmas=4.0,
         axis_policy="best_qp",

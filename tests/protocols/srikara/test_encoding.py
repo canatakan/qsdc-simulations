@@ -18,11 +18,16 @@ def test_every_symbol_decodes_from_its_sampled_message_value(intervals):
             assert code.decode(code.sample(bits, rng)) == bits
 
 
-def test_equal_energy_code_spends_the_default_energy():
-    assert INTERVAL_CODES["optimized_equal_energy"].energy_snu == pytest.approx(
-        INTERVAL_CODES["default"].energy_snu
-    )
-    assert INTERVAL_CODES["default"].energy_snu == pytest.approx(64 / 3)
+def test_gaussian_intervals_spend_the_default_energy():
+    rng = ClassicalRandomSource(2)
+    energy = {}
+    for name in ("default", "gaussian_gray"):
+        code = INTERVAL_CODES[name]
+        values = [code.sample(bits, rng) for bits in code.labels for _ in range(2000)]
+        energy[name] = sum(v * v for v in values) / len(values)
+
+    assert energy["default"] == pytest.approx(16 / 3, rel=0.03)
+    assert energy["gaussian_gray"] == pytest.approx(16 / 3, rel=0.05)
 
 
 def test_unsqueezing_inverts_the_squeeze_displacement_relation():

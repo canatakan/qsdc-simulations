@@ -50,16 +50,14 @@ BASELINE = SimulatorConfig(
 )
 BEST_QP = BASELINE.model_copy(update={"axis_policy": "best_qp"})
 ALIGNED = BASELINE.model_copy(update={"axis_policy": "aligned"})
-GRAY = ALIGNED.model_copy(update={"intervals": "default_gray"})
-INTERVALS_OPTIMIZED = ALIGNED.model_copy(update={"intervals": "optimized_equal_energy"})
-OPTIMIZED = INTERVALS_OPTIMIZED.model_copy(update={"theta_pi": Fixed(value=1.5)})
+GRAY = ALIGNED.model_copy(update={"intervals": "gray"})
+OPTIMIZED = GRAY.model_copy(update={"theta_pi": Fixed(value=1.5)})
 PARITY = OPTIMIZED.model_copy(update={"error_correction": "parity"})
 RETRY = PARITY.model_copy(update={"max_attempts": 3})
 OPTIMIZATION_STEPS = {
     "Default": BASELINE,
     "+ Aligned measurement": ALIGNED,
     "+ Gray labels": GRAY,
-    "+ Gaussian intervals": INTERVALS_OPTIMIZED,
     "+ Fixed theta = 3pi/2": OPTIMIZED,
     "+ Parity error detection": PARITY,
     "+ Retries": RETRY,
@@ -70,11 +68,8 @@ R_RANGES = ((0.115, 0.345), (0.345, 0.576), (0.115, 1.151))
 THETA_PI_VALUES = (0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75)
 INTERVALS = (
     "default",
-    "default_gray",
-    "optimized_v4",
-    "optimized_v8",
-    "optimized_v12",
-    "optimized_equal_energy",
+    "gray",
+    "gaussian_gray",
 )
 ERROR_CORRECTION = {
     "None": ("none", 1),

@@ -67,10 +67,7 @@ def show_settings(config: SimulatorConfig) -> None:
         ),
         ("Squeezing r", str(config.squeeze_r)),
         ("Squeezing angle theta / pi", str(config.theta_pi)),
-        (
-            "Message intervals",
-            f"{config.intervals} (outer intervals sampled over {code.tail_width:.4g})",
-        ),
+        ("Message intervals", config.intervals),
         ("Bob's decoding axis", config.axis_policy),
         ("Check tolerance", f"{config.tolerance_sigmas:g} sigma"),
         ("Error correction", config.error_correction),
@@ -78,7 +75,7 @@ def show_settings(config: SimulatorConfig) -> None:
     ]
     table(("Setting", "Value"), rows)
 
-    print("\nInterval code (Alice picks m_A uniformly inside the symbol's interval):")
+    print("\nInterval code (Alice picks m_A inside the symbol's interval):")
     table(
         ("Bits", "Interval of m_A"),
         [(bits, interval(*code.interval(bits))) for bits in code.labels],

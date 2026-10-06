@@ -45,8 +45,8 @@ def main() -> None:
     parser.add_argument(
         "--optimized",
         action="store_true",
-        help="the benchmark's optimized settings: aligned measurement, equal-energy "
-        "Gaussian intervals, "
+        help="the benchmark's optimized settings: aligned measurement, Gray-labelled "
+        "intervals, "
         "r = 0.576 (5 dB) and theta = 3pi/2",
     )
     parser.add_argument(

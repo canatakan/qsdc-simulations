@@ -88,11 +88,8 @@ class SimulatorConfig(Config):
     tolerance_sigmas: float = 1.0
     intervals: Literal[
         "default",
-        "default_gray",
-        "optimized_v4",
-        "optimized_v8",
-        "optimized_v12",
-        "optimized_equal_energy",
+        "gray",
+        "gaussian_gray",
     ] = "default"
     axis_policy: Literal["random", "best_qp", "aligned"] = "random"
     error_correction: Literal["none", "parity", "secded"] = "none"

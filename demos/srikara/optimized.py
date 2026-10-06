@@ -1,8 +1,8 @@
 """Send a message with the fully optimized Srikara settings and print a compact summary.
 
 The settings are the benchmark's last optimization step: aligned measurement,
-equal-energy Gaussian intervals, r = 0.576 (5 dB), theta = 3pi/2, a parity bit per symbol and up to 3 sends per
-block. One line per block, then a short look inside one block.
+Gray-labelled intervals, r = 0.576 (5 dB), theta = 3pi/2, a parity bit per symbol and up
+to 3 sends per block. One line per block, then a short look inside one block.
 
 Examples:
     python demos/srikara/optimized.py "hello world"
