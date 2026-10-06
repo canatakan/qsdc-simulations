@@ -36,7 +36,6 @@ class RunMetrics:
     failed_checks: int
     uncorrectable: int  # sends that passed the checks, but the code detected an error
     seconds: float
-    # 8 x 8 counts of (sent, decoded) symbols over all attempts, row-major.
     symbol_counts: tuple[int, ...]
 
     @property

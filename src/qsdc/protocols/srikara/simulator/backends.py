@@ -14,7 +14,6 @@ from qsdc.common.quadrature import VACUUM_VARIANCE, Quadrature
 from qsdc.protocols.srikara.config import Detector, NoiseConfig, SimulatorConfig
 from qsdc.protocols.srikara.simulator.encoding import MESSAGE_DIRECTION
 
-# Strawberry Fields quadratures are scaled by sqrt(2 hbar) relative to q = Re alpha.
 SF_SCALE = sqrt(2.0 * hbar)
 
 
@@ -109,7 +108,6 @@ class StrawberryFieldsBackend(Backend):
     def __init__(self, noise: NoiseConfig, sampled: bool):
         self.noise = noise
         self.sampled = sampled
-        # The unit response depends only on the squeezing, so it is simulated once per s.
         self._responses: dict[tuple[float, float], complex] = {}
 
     def begin_run(self, seed: int) -> None:

@@ -6,8 +6,7 @@ from cmath import phase
 from dataclasses import dataclass
 from math import pi
 
-# Quadratures are measured in units where the vacuum variance is 1/4 (q = Re alpha), so one
-# shot-noise unit (SNU) of variance is 1/4.
+# q = Re alpha, so one shot-noise unit (SNU) of variance is 1/4.
 VACUUM_VARIANCE = 0.25
 
 

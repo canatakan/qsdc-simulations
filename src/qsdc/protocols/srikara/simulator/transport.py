@@ -48,7 +48,6 @@ def encode_blocks(payload: str, error_correction: str) -> list[Block]:
         bits = payload[offset : offset + 12]
         padded = bits.ljust(12, "0")
         codewords = [secded_encode(padded[i : i + 4]) for i in range(0, 12, 4)]
-        # Symbol k carries bit k of all three codewords: one bad symbol costs each one bit.
         symbols = tuple("".join(column) for column in zip(*codewords))
         blocks.append(Block(offset, bits, symbols))
     return blocks

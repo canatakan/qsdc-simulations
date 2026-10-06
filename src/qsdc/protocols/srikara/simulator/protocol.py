@@ -69,7 +69,6 @@ class Attempt:
     block: Block
     number: int
     run: BlockRun
-    # None when the checks reject the run or SECDED detects uncorrectable errors.
     decoded_bits: str | None
 
 
@@ -172,7 +171,6 @@ class SrikaraSimulator:
             if self.config.axis_policy == "best_qp":
                 axis = Q if abs(response_q) >= abs(response_p) else P
             else:
-                # Bob knows s, so he can point his local oscillator along Alice's displacement.
                 axis = Quadrature(complex(response_q, response_p))
         measured = self.backend.measure_returned(state, axis, value * MESSAGE_DIRECTION)
         baseline = self.backend.expect_returned(state, axis).mean

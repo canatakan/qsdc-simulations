@@ -52,9 +52,6 @@ def show_transmission(
     show_result(text, payload, transmission)
 
 
-# Settings and payload ---------------------------------------------------------------
-
-
 def show_settings(config: SimulatorConfig) -> None:
     header("Simulator settings")
     code = INTERVAL_CODES[config.intervals]
@@ -171,9 +168,6 @@ def show_blocks(blocks: list[Block], config: SimulatorConfig) -> None:
                 nibble = padded[4 * lane : 4 * lane + 4]
                 print(f"  codeword {lane}: data {nibble} -> {secded_encode(nibble)}")
         print(f"  symbols sent: {' '.join(block.symbols)}")
-
-
-# One protocol run -------------------------------------------------------------------
 
 
 def show_attempt(
@@ -388,9 +382,6 @@ def show_block_result(attempt: Attempt, config: SimulatorConfig) -> None:
     print(f"Sent bits:     {block.bits}  ({errors} wrong)")
 
 
-# Noise traces -----------------------------------------------------------------------
-
-
 def trace_check(
     state: PreparedState, check: Check, config: SimulatorConfig, kind: str
 ) -> None:
@@ -520,9 +511,6 @@ def trace_stages(
     return final
 
 
-# Result -----------------------------------------------------------------------------
-
-
 def show_result(text: str, payload: str, transmission: Transmission) -> None:
     header("11. Reassembled message")
     attempts = transmission.attempts
@@ -562,9 +550,6 @@ def show_result(text: str, payload: str, transmission: Transmission) -> None:
     print(
         f"Recovered text: {received!r} ({'exact' if received == text else 'corrupted'})"
     )
-
-
-# Formatting -------------------------------------------------------------------------
 
 
 def header(title: str) -> None:
