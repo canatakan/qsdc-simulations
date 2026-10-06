@@ -1,0 +1,30 @@
+baseline:
+  backend: sf-sampled
+  squeeze_r: {kind: fixed, value: 0.576}
+  theta_pi: {kind: uniform, lower: 0.0, upper: 2.0}
+  tolerance_sigmas: 3.0
+  seed: 33
+
+best_qp:
+  extends: baseline
+  axis_policy: best_qp
+
+aligned:
+  extends: baseline
+  axis_policy: aligned
+
+gray:
+  extends: aligned
+  intervals: gray
+
+optimized:
+  extends: gray
+  theta_pi: {kind: fixed, value: 1.5}
+
+parity:
+  extends: optimized
+  error_correction: parity
+
+retry:
+  extends: parity
+  max_attempts: 3

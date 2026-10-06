@@ -11,7 +11,7 @@ from qsdc.protocols.srikara.benchmark.benchmark import (
     Workload,
     run_benchmark,
 )
-from qsdc.protocols.srikara.benchmark.catalog import NOISES, WORKLOADS, noise_studies
+from qsdc.protocols.srikara.benchmark.catalog import NOISES, WORKLOADS, studies
 from qsdc.protocols.srikara.benchmark.metrics import measure, pool
 from qsdc.protocols.srikara.benchmark.report import load_result, rerender, write_report
 from qsdc.protocols.srikara.config import SimulatorConfig
@@ -36,7 +36,6 @@ def test_noiseless_channel_carries_three_bits_per_message_state():
     every_symbol = "000001010011100101110111"
     metrics = measure(SrikaraSimulator(SimulatorConfig()).transmit(every_symbol), 0.0)
 
-    # One state in four carries a message.
     assert metrics.information_per_state == pytest.approx(3 / 4)
 
 
@@ -64,9 +63,7 @@ def test_partial_delivery_counts_erasures_and_retry_states(reject_every_other_ru
         retried.rejection_rate,
         retried.delivered_bits_per_state,
     ) == (32, 0.5, 12 / 32)
-    # Every one of the 4 blocks is rejected once, then retried successfully.
     assert (retried.blocks, retried.retries, retried.rejected) == (4, 4, 4)
-    # Each 1-symbol send has 2 control checks and 1 decoy; rejected sends fail both controls.
     assert (retried.checks, retried.failed_checks) == (24, 8)
 
 
@@ -81,24 +78,35 @@ def test_bit_error_rate_is_undefined_when_nothing_is_released(eavesdropper):
 
 
 def test_noise_sweeps_change_only_their_component():
-    medium = NOISES["medium"]
-    studies = {
-        study.name: study for study in noise_studies("medium", WORKLOADS["light"])
-    }
+    lab = NOISES["lab"]
+    by_name = {study.name: study for study in studies(WORKLOADS["light"])}
 
-    for case in studies["channel_transmittance"].cases:
+    for case in by_name["channel_transmittance"].cases:
         noise = case.simulator.noise
         assert noise.forward.transmittance == noise.backward.transmittance == case.at[0]
-        assert noise.forward.nbar == medium.forward.nbar
-        assert noise.alice_detector == medium.alice_detector
-    for case in studies["detector_efficiency"].cases:
+        assert noise.forward.nbar == lab.forward.nbar
+        assert noise.alice_detector == lab.alice_detector
+    for case in by_name["detector_efficiency"].cases:
         noise = case.simulator.noise
         assert noise.bob_detector.efficiency == case.at[0]
         assert (
             noise.bob_detector.electronic_variance
-            == medium.bob_detector.electronic_variance
+            == lab.bob_detector.electronic_variance
         )
-        assert noise.forward == medium.forward
+        assert noise.forward == lab.forward
+
+
+def test_noise_dependent_comparisons_run_every_case_under_every_baseline():
+    ladder = {study.name: study for study in studies(WORKLOADS["light"])}[
+        "optimization_comparison"
+    ]
+    steps = len(ladder.cases) // len(NOISES)
+
+    assert [case.series for case in ladder.cases] == [
+        noise for noise in NOISES for _ in range(steps)
+    ]
+    for case in ladder.cases:
+        assert case.simulator.noise == NOISES[case.series]
 
 
 def test_repetitions_use_new_seeds_and_pool_their_counts():
@@ -107,7 +115,6 @@ def test_repetitions_use_new_seeds_and_pool_their_counts():
     [single] = run_benchmark(Benchmark("once", (case,))).runs
     [repeated] = run_benchmark(Benchmark("thrice", (case,)), repetitions=3).runs
 
-    # Repetition 0 is the configured run; timing is the only difference.
     assert replace(repeated.repetitions[0], seconds=0) == replace(
         single.metrics, seconds=0
     )
@@ -150,8 +157,6 @@ def test_cli_runs_a_study_into_a_browsable_report(tmp_path, monkeypatch):
             "run",
             "--study",
             "squeezing_distributions",
-            "--noise",
-            "low",
             "--workload",
             "light",
             "--output-root",
@@ -159,7 +164,7 @@ def test_cli_runs_a_study_into_a_browsable_report(tmp_path, monkeypatch):
         ]
     )
 
-    [results] = (tmp_path / "light" / "low" / "squeezing_distributions").glob(
+    [results] = (tmp_path / "light" / "squeezing_distributions").glob(
         "run_*/results.json"
     )
     document = json.loads(results.read_text())
@@ -172,7 +177,7 @@ def test_cli_runs_a_study_into_a_browsable_report(tmp_path, monkeypatch):
     assert (
         "Squeezing r: U[0.115, 1.151]" in (results.parent / "report.html").read_text()
     )
-    assert "light/low/squeezing_distributions" in (tmp_path / "index.html").read_text()
+    assert "light/squeezing_distributions" in (tmp_path / "index.html").read_text()
 
 
 def test_reports_can_be_rerendered_without_simulating(tmp_path):

@@ -6,7 +6,7 @@ stages (preparation, channels, memory, Alice's displacement, unsqueezing, detect
 Examples:
     python demos/srikara/message.py "hello"
     python demos/srikara/message.py "hi" --backend analytic
-    python demos/srikara/message.py "hello" --optimized --noise medium --error-correction secded --max-attempts 3
+    python demos/srikara/message.py "hello" --optimized --noise lab --error-correction secded --max-attempts 3
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import argparse
 from walkthrough import show_transmission
 
 from qsdc.common.bits import bytes_to_bits
-from qsdc.protocols.srikara.benchmark.catalog import NOISES, OPTIMIZED
+from qsdc.protocols.srikara.benchmark.catalog import NOISES, SIMULATORS
 from qsdc.protocols.srikara.config import SimulatorConfig
 from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
 
@@ -74,12 +74,13 @@ def main() -> None:
         max_attempts=args.max_attempts,
     )
     if args.optimized:
+        optimized = SIMULATORS["optimized"]
         config = config.model_copy(
             update={
-                "axis_policy": OPTIMIZED.axis_policy,
-                "intervals": OPTIMIZED.intervals,
-                "squeeze_r": OPTIMIZED.squeeze_r,
-                "theta_pi": OPTIMIZED.theta_pi,
+                "axis_policy": optimized.axis_policy,
+                "intervals": optimized.intervals,
+                "squeeze_r": optimized.squeeze_r,
+                "theta_pi": optimized.theta_pi,
             }
         )
     payload = bytes_to_bits(message.encode())

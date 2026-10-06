@@ -13,6 +13,7 @@ dependencies = [
   "matplotlib",
   "numpy",
   "pydantic>=2.13,<3",
+  "PyYAML>=6,<7",
   "strawberryfields",
 ]
 

@@ -7,42 +7,26 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from qsdc.protocols.srikara.benchmark.benchmark import run_benchmark
-from qsdc.protocols.srikara.benchmark.catalog import (
-    NOISES,
-    WORKLOADS,
-    noise_studies,
-    reference_studies,
-)
+from qsdc.protocols.srikara.benchmark.catalog import WORKLOADS, studies
 from qsdc.protocols.srikara.benchmark.report import (
     rerender,
     write_index,
     write_report,
 )
 
-STUDIES = reference_studies(WORKLOADS["light"]) + noise_studies(
-    "clean", WORKLOADS["light"]
-)
+STUDIES = studies(WORKLOADS["light"])
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("list", help="list the built-in studies")
-    run = commands.add_parser(
-        "run", help="run studies into <output-root>/<workload>/<reference|noise>/"
-    )
+    run = commands.add_parser("run", help="run studies into <output-root>/<workload>/")
     run.add_argument(
         "--study",
         action="append",
         choices=[study.name for study in STUDIES],
         help="repeatable; default: all",
-    )
-    run.add_argument(
-        "--noise",
-        nargs="+",
-        choices=list(NOISES),
-        default=list(NOISES),
-        help="default: all",
     )
     run.add_argument(
         "--workload",
@@ -78,24 +62,17 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     if args.command == "run":
         for workload_name in args.workload:
-            workload = WORKLOADS[workload_name]
-            groups = {"reference": reference_studies(workload)}
-            groups.update(
-                {noise: noise_studies(noise, workload) for noise in args.noise}
-            )
-            for group, studies in groups.items():
-                for study in studies:
-                    root = args.output_root / workload_name / group
-                    if args.study and study.name not in args.study:
-                        continue
-                    done = any((root / study.name).glob("run_*/results.json"))
-                    if args.skip_existing and done:
-                        print(f"{workload_name}/{group}/{study.name}: already done")
-                        continue
-                    print(f"{workload_name}/{group}/{study.name}")
-                    result = run_benchmark(study, args.repetitions)
-                    report = write_report(result, root)
-                    print(f"  {report / 'report.html'}")
+            root = args.output_root / workload_name
+            for study in studies(WORKLOADS[workload_name]):
+                if args.study and study.name not in args.study:
+                    continue
+                done = any((root / study.name).glob("run_*/results.json"))
+                if args.skip_existing and done:
+                    print(f"{workload_name}/{study.name}: already done")
+                    continue
+                print(f"{workload_name}/{study.name}")
+                report = write_report(run_benchmark(study, args.repetitions), root)
+                print(f"  {report / 'report.html'}")
     if args.command == "rerender":
         for results in sorted(args.output_root.rglob("results.json")):
             rerender(results)

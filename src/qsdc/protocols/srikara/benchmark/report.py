@@ -34,7 +34,7 @@ TABLE_RATES = (
     "delivered_bits_per_state",
     "information_per_state",
 )
-FOLDER_ORDER = [*WORKLOADS, "reference", *NOISES]
+FOLDER_ORDER = list(WORKLOADS)
 _templates = Environment(
     loader=FileSystemLoader(TEMPLATES),
     autoescape=True,
@@ -72,6 +72,8 @@ def run_labels(benchmark: Benchmark) -> list[str]:
     """Each case's own label, or else the parameters that differ between the cases."""
     values = [parameters(case) for case in benchmark.cases]
     varying = [key for key in values[0] if len({value[key] for value in values}) > 1]
+    if len({case.series for case in benchmark.cases}) > 1:
+        varying = [key for key in varying if key != "Noise"]
     return [
         case.label
         or ", ".join(f"{key}: {value[key]}" for key in varying)

@@ -62,7 +62,7 @@ def test_sampled_measurements_scatter_around_the_expectation():
 
 def test_calibrated_checks_accept_an_honest_noisy_channel():
     config = SimulatorConfig(
-        backend="sf-sampled", noise=NOISES["high"], tolerance_sigmas=4.0
+        backend="sf-sampled", noise=NOISES["metro_10km"], tolerance_sigmas=4.0
     )
     transmission = SrikaraSimulator(config).transmit("101001110010" * 3)
 

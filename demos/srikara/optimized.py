@@ -6,7 +6,7 @@ to 3 sends per block. One line per block, then a short look inside one block.
 
 Examples:
     python demos/srikara/optimized.py "hello world"
-    python demos/srikara/optimized.py "hello world" --noise high --example 2
+    python demos/srikara/optimized.py "hello world" --noise metro_10km --example 2
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import argparse
 from walkthrough import header, table
 
 from qsdc.common.bits import bits_to_bytes, bytes_to_bits, hamming_distance
-from qsdc.protocols.srikara.benchmark.catalog import NOISES, RETRY
+from qsdc.protocols.srikara.benchmark.catalog import NOISES, SIMULATORS
 from qsdc.protocols.srikara.config import Fixed
 from qsdc.protocols.srikara.simulator.protocol import (
     Attempt,
@@ -24,6 +24,8 @@ from qsdc.protocols.srikara.simulator.protocol import (
     Transmission,
 )
 from qsdc.protocols.srikara.simulator.transport import odd_parity
+
+RETRY = SIMULATORS["retry"]
 
 
 def main() -> None:
@@ -33,7 +35,7 @@ def main() -> None:
     parser.add_argument(
         "message", nargs="?", help="text to send; prompted for if omitted"
     )
-    parser.add_argument("--noise", choices=list(NOISES), default="medium")
+    parser.add_argument("--noise", choices=list(NOISES), default="lab")
     parser.add_argument("--squeeze-r", type=float, default=RETRY.squeeze_r.value)
     parser.add_argument("--seed", type=int, default=RETRY.seed)
     parser.add_argument(

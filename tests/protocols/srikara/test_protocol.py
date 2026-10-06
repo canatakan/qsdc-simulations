@@ -29,7 +29,7 @@ def test_ideal_backends_deliver_the_payload(backend, error_correction):
 
 def test_transmission_is_reproducible_from_the_seed():
     config = SimulatorConfig(
-        backend="sf-sampled", noise=NOISES["medium"], tolerance_sigmas=3.0
+        backend="sf-sampled", noise=NOISES["lab"], tolerance_sigmas=3.0
     )
     first = SrikaraSimulator(config).transmit(PAYLOAD)
 
