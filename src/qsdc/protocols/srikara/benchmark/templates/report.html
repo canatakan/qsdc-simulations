@@ -14,10 +14,13 @@
   </header>
 
   <section class="cards">
-    <article><h3>Runs</h3><p>{{ summary.runs }} × {{ summary.repetitions }}</p></article>
-    <article><h3>Payload delivered</h3><p>{{ "%.2f"|format(100 * summary.delivered_fraction) }}%</p></article>
-    <article><h3>Delivered bits / state</h3><p>{{ "%.4f"|format(summary.delivered_bits_per_state) }}</p></article>
-    <article><h3>Information / state</h3><p>{{ "%.4f"|format(summary.information_per_state) }}</p></article>
+    <article><h3>Cases × repetitions</h3><p>{{ summary.runs }} × {{ summary.repetitions }}</p></article>
+    <article><h3>Prepared states</h3><p>{{ "{:,}".format(summary.states) }}</p></article>
+    {% if single %}
+    <article><h3>Payload delivered</h3><p>{{ "%.2f"|format(100 * single.delivered_fraction) }}%</p></article>
+    <article><h3>Delivered bits / state</h3><p>{{ "%.4f"|format(single.delivered_bits_per_state) }}</p></article>
+    <article><h3>Information / state</h3><p>{{ "%.4f"|format(single.information_per_state) }}</p></article>
+    {% endif %}
     <article><h3>Simulation time</h3><p>{{ seconds }}</p></article>
   </section>
 

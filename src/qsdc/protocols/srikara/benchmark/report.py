@@ -20,7 +20,7 @@ from qsdc.protocols.srikara.benchmark.benchmark import (
     Workload,
 )
 from qsdc.protocols.srikara.benchmark.catalog import NOISES, WORKLOADS
-from qsdc.protocols.srikara.benchmark.metrics import RunMetrics, pool
+from qsdc.protocols.srikara.benchmark.metrics import RunMetrics
 from qsdc.protocols.srikara.benchmark.plots import write_plots
 from qsdc.protocols.srikara.config import SimulatorConfig
 
@@ -121,17 +121,11 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
     labels = run_labels(benchmark)
     plots = write_plots(result, labels, directory / "plots")
 
-    total = pool([run.metrics for run in result.runs])
     summary = {
         "runs": len(result.runs),
         "repetitions": len(result.runs[0].repetitions),
-        "payload_bits": total.payload_bits,
-        "delivered_bits": total.delivered_bits,
-        "delivered_fraction": total.delivered_fraction,
-        "states": total.states,
-        "delivered_bits_per_state": total.delivered_bits_per_state,
-        "information_per_state": total.information_per_state,
-        "simulation_seconds": total.seconds,
+        "states": sum(run.metrics.states for run in result.runs),
+        "simulation_seconds": sum(run.metrics.seconds for run in result.runs),
     }
     runs = [
         {
@@ -197,6 +191,7 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
         layout=benchmark.layout,
         execution=directory.name,
         summary=summary,
+        single=result.runs[0].metrics if len(result.runs) == 1 else None,
         seconds=_seconds(summary["simulation_seconds"]),
         plots=plots,
         shared=shared,
@@ -226,8 +221,7 @@ def write_index(root: Path) -> Path:
                 "href": report.relative_to(root).as_posix(),
                 "executions": executions[folder, name],
                 "runs": summary["runs"],
-                "delivered": f"{summary['delivered_fraction']:.2%}",
-                "per_state": f"{summary['delivered_bits_per_state']:.4f}",
+                "repetitions": summary["repetitions"],
                 "seconds": _seconds(summary["simulation_seconds"]),
             }
         )

@@ -139,12 +139,8 @@ def test_heatmap_report_has_one_figure_per_series(tmp_path):
         "heatmap_1.png",
         "heatmap_2.png",
     ]
-    assert (
-        json.loads((report / "results.json").read_text())["summary"][
-            "delivered_fraction"
-        ]
-        == 1.0
-    )
+    runs = json.loads((report / "results.json").read_text())["runs"]
+    assert {run["metrics"]["delivered_fraction"] for run in runs} == {1.0}
 
 
 def test_cli_runs_a_study_into_a_browsable_report(tmp_path, monkeypatch):

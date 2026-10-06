@@ -18,7 +18,7 @@
     <div class="table">
       <table>
         <thead>
-          <tr><th>Study</th><th class="number">Executions</th><th class="number">Cases</th><th class="number">Payload delivered</th><th class="number">Bits / state</th><th class="number">Time</th></tr>
+          <tr><th>Study</th><th class="number">Executions</th><th class="number">Cases</th><th class="number">Repetitions</th><th class="number">Time</th></tr>
         </thead>
         <tbody>
           {% for row in rows %}
@@ -26,8 +26,7 @@
             <td><a href="{{ row.href }}">{{ row.name }}</a></td>
             <td class="number">{{ row.executions }}</td>
             <td class="number">{{ row.runs }}</td>
-            <td class="number">{{ row.delivered }}</td>
-            <td class="number">{{ row.per_state }}</td>
+            <td class="number">{{ row.repetitions }}</td>
             <td class="number">{{ row.seconds }}</td>
           </tr>
           {% endfor %}
