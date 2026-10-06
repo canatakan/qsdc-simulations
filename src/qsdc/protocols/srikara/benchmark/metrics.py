@@ -17,6 +17,7 @@ RATES = (
     "delivered_bits_per_state",
     "information_per_state",
     "rejection_rate",
+    "check_failure_rate",
 )
 
 
@@ -31,6 +32,8 @@ class RunMetrics:
     blocks: int
     retries: int  # extra sends of blocks that failed; every block is sent at least once
     rejected: int  # sends that failed the control or decoy checks
+    checks: int  # control and decoy checks, over all sends
+    failed_checks: int
     uncorrectable: (
         int  # sends that passed the checks but held an uncorrectable SECDED stripe
     )
@@ -81,6 +84,10 @@ class RunMetrics:
     def rejection_rate(self) -> float:
         return self.rejected / (self.blocks + self.retries)
 
+    @property
+    def check_failure_rate(self) -> float:
+        return self.failed_checks / self.checks
+
     def as_dict(self) -> dict[str, object]:
         rates = {rate: getattr(self, rate) for rate in RATES}
         return {**asdict(self), "delivered_bits": self.delivered_bits, **rates}
@@ -90,6 +97,11 @@ def measure(transmission: Transmission, seconds: float) -> RunMetrics:
     finals = transmission.final_attempts
     released = [attempt for attempt in finals if attempt.decoded_bits is not None]
     messages = [m for attempt in transmission.attempts for m in attempt.run.messages]
+    checks = [
+        check
+        for attempt in transmission.attempts
+        for check in attempt.run.controls + attempt.run.decoys
+    ]
     symbol_counts = [0] * 64
     for m in messages:
         symbol_counts[8 * int(m.sent_bits, 2) + int(m.decoded_bits, 2)] += 1
@@ -107,6 +119,8 @@ def measure(transmission: Transmission, seconds: float) -> RunMetrics:
         blocks=len(finals),
         retries=len(transmission.attempts) - len(finals),
         rejected=sum(not a.run.accepted for a in transmission.attempts),
+        checks=len(checks),
+        failed_checks=sum(not check.passed for check in checks),
         uncorrectable=sum(
             a.run.accepted and a.decoded_bits is None for a in transmission.attempts
         ),

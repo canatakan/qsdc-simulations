@@ -66,6 +66,8 @@ def test_partial_delivery_counts_erasures_and_retry_states(reject_every_other_ru
     ) == (32, 0.5, 12 / 32)
     # Every one of the 4 blocks is rejected once, then retried successfully.
     assert (retried.blocks, retried.retries, retried.rejected) == (4, 4, 4)
+    # Each 1-symbol send has 2 control checks and 1 decoy; rejected sends fail both controls.
+    assert (retried.checks, retried.failed_checks) == (24, 8)
 
 
 def test_bit_error_rate_is_undefined_when_nothing_is_released(eavesdropper):
