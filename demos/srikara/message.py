@@ -16,8 +16,8 @@ import argparse
 from walkthrough import show_transmission
 
 from qsdc.common.bits import bytes_to_bits
-from qsdc.protocols.srikara.benchmark.catalog import NOISES
-from qsdc.protocols.srikara.config import Fixed, SimulatorConfig
+from qsdc.protocols.srikara.benchmark.catalog import NOISES, OPTIMIZED
+from qsdc.protocols.srikara.config import SimulatorConfig
 from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
 
 
@@ -51,7 +51,8 @@ def main() -> None:
     parser.add_argument(
         "--optimized",
         action="store_true",
-        help="optimized axes, v12 intervals, r = 0.864 and theta = 5pi/4",
+        help="the benchmark's optimized settings: optimized axes, v12 intervals, "
+        "r = 0.576 (5 dB) and theta = 5pi/4",
     )
     parser.add_argument(
         "--secded",
@@ -82,10 +83,10 @@ def main() -> None:
     if args.optimized:
         config = config.model_copy(
             update={
-                "axis_policy": "optimized",
-                "intervals": "optimized_v12",
-                "squeeze_r": Fixed(value=0.864),
-                "theta_pi": Fixed(value=1.25),
+                "axis_policy": OPTIMIZED.axis_policy,
+                "intervals": OPTIMIZED.intervals,
+                "squeeze_r": OPTIMIZED.squeeze_r,
+                "theta_pi": OPTIMIZED.theta_pi,
             }
         )
     payload = bytes_to_bits(message.encode())

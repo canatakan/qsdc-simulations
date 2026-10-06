@@ -1,8 +1,8 @@
 """Send a message with the fully optimized Srikara settings and print a compact summary.
 
-The settings are the benchmark's last optimization step (optimized axes, v12 intervals,
-theta = 5pi/4, SECDED, 5% of checks may fail, up to 3 sends per block) with r = 1.5, the
-best squeezing measured. One line per block, then a short look inside one block.
+The settings are the benchmark's last optimization step: optimized axes, v12 intervals,
+r = 0.576 (5 dB), theta = 5pi/4, SECDED and up to 3 sends per block. One line per block,
+then a short look inside one block.
 
 Examples:
     python demos/srikara/optimized.py "hello world"
@@ -35,7 +35,7 @@ def main() -> None:
         "message", nargs="?", help="text to send; prompted for if omitted"
     )
     parser.add_argument("--noise", choices=list(NOISES), default="medium")
-    parser.add_argument("--squeeze-r", type=float, default=1.5)
+    parser.add_argument("--squeeze-r", type=float, default=RETRY.squeeze_r.value)
     parser.add_argument("--seed", type=int, default=RETRY.seed)
     parser.add_argument(
         "--example",
