@@ -34,9 +34,7 @@ class RunMetrics:
     rejected: int  # sends that failed the control or decoy checks
     checks: int  # control and decoy checks, over all sends
     failed_checks: int
-    uncorrectable: (
-        int  # sends that passed the checks but held an uncorrectable SECDED stripe
-    )
+    uncorrectable: int  # sends that passed the checks, but the code detected an error
     seconds: float
     # 8 x 8 counts of (sent, decoded) symbols over all attempts, row-major.
     symbol_counts: tuple[int, ...]

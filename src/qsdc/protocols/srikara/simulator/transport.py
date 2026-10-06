@@ -1,11 +1,16 @@
-"""Split a payload into protocol blocks, optionally protected by interleaved SECDED codewords."""
+"""Split a payload into protocol blocks, optionally protected by parity or SECDED."""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from qsdc.common.error_correction import secded_decode, secded_encode
+from qsdc.common.error_correction import (
+    parity_decode,
+    parity_encode,
+    secded_decode,
+    secded_encode,
+)
 
 
 @dataclass(frozen=True)
@@ -16,11 +21,21 @@ class Block:
 
 
 def encode_blocks(payload: str, error_correction: str) -> list[Block]:
-    """Uncoded blocks carry one 3-bit symbol; SECDED blocks carry 12 bits as 8 symbols."""
+    """A block is one symbol of 3 bits uncoded or 2 bits plus parity; with SECDED it is
+    12 bits sent as 8 symbols."""
     if error_correction == "none":
         return [
             Block(i, payload[i : i + 3], (payload[i : i + 3].ljust(3, "0"),))
             for i in range(0, len(payload), 3)
+        ]
+    if error_correction == "parity":
+        return [
+            Block(
+                i,
+                payload[i : i + 2],
+                (parity_encode(payload[i : i + 2].ljust(2, "0")),),
+            )
+            for i in range(0, len(payload), 2)
         ]
 
     blocks = []
@@ -37,9 +52,12 @@ def encode_blocks(payload: str, error_correction: str) -> list[Block]:
 def decode_block(
     block: Block, symbols: Sequence[str], error_correction: str
 ) -> str | None:
-    """Recover the block's payload bits, or None if SECDED detects an uncorrectable error."""
+    """Recover the block's payload bits, or None if the code detects an uncorrectable error."""
     if error_correction == "none":
         return "".join(symbols)[: len(block.bits)]
+    if error_correction == "parity":
+        data = parity_decode(symbols[0])
+        return None if data is None else data[: len(block.bits)]
 
     data = [secded_decode("".join(lane)) for lane in zip(*symbols)]
     if None in data:

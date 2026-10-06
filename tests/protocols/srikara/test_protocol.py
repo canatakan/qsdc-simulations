@@ -11,7 +11,7 @@ PAYLOAD = "101001110010011010001101110"
 
 
 @pytest.mark.parametrize("backend", ["analytic", "sf"])
-@pytest.mark.parametrize("error_correction", ["none", "secded"])
+@pytest.mark.parametrize("error_correction", ["none", "parity", "secded"])
 def test_ideal_backends_deliver_the_payload(backend, error_correction):
     config = SimulatorConfig(backend=backend, error_correction=error_correction)
     transmission = SrikaraSimulator(config).transmit(PAYLOAD)

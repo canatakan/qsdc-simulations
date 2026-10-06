@@ -6,7 +6,7 @@ stages (preparation, channels, memory, Alice's displacement, unsqueezing, detect
 Examples:
     python demos/srikara/message.py "hello"
     python demos/srikara/message.py "hi" --backend analytic
-    python demos/srikara/message.py "hello" --optimized --noise medium --secded --max-attempts 3
+    python demos/srikara/message.py "hello" --optimized --noise medium --error-correction secded --max-attempts 3
 """
 
 from __future__ import annotations
@@ -49,9 +49,10 @@ def main() -> None:
         "r = 0.576 (5 dB) and theta = 5pi/4",
     )
     parser.add_argument(
-        "--secded",
-        action="store_true",
-        help="protect the payload with interleaved SECDED",
+        "--error-correction",
+        choices=("none", "parity", "secded"),
+        default="none",
+        help="parity: 2 payload bits + 1 parity bit per symbol; secded: interleaved SECDED",
     )
     parser.add_argument(
         "--max-attempts", type=int, default=1, help="attempts per block"
@@ -68,7 +69,7 @@ def main() -> None:
         seed=args.seed,
         noise=NOISES[args.noise],
         tolerance_sigmas=args.tolerance_sigmas,
-        error_correction="secded" if args.secded else "none",
+        error_correction=args.error_correction,
         max_attempts=args.max_attempts,
     )
     if args.optimized:

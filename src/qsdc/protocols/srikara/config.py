@@ -90,5 +90,5 @@ class SimulatorConfig(Config):
         "default"
     )
     axis_policy: Literal["random", "optimized"] = "random"
-    error_correction: Literal["none", "secded"] = "none"
+    error_correction: Literal["none", "parity", "secded"] = "none"
     max_attempts: int = 1

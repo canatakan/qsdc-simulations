@@ -147,6 +147,12 @@ def show_blocks(blocks: list[Block], config: SimulatorConfig) -> None:
     per_run = f"{4 * len(blocks[0].symbols)} states per protocol run"
     if config.error_correction == "none":
         print(f"Each block carries one 3-bit symbol; {per_run}.")
+    elif config.error_correction == "parity":
+        print(
+            "Parity: each symbol carries 2 payload bits and a parity bit that makes the\n"
+            "number of ones odd, so an odd number of wrong bits is detected (not located).\n"
+            f"A block that fails the parity check is withheld and sent again. {per_run}."
+        )
     else:
         print(
             "SECDED: every 12 payload bits become three extended Hamming (8, 4) codewords.\n"
@@ -154,7 +160,8 @@ def show_blocks(blocks: list[Block], config: SimulatorConfig) -> None:
             f"only one bit, which it can correct. {per_run}."
         )
     for number, block in enumerate(blocks):
-        padding = (3 if config.error_correction == "none" else 12) - len(block.bits)
+        size = {"none": 3, "parity": 2, "secded": 12}[config.error_correction]
+        padding = size - len(block.bits)
         print(
             f"\nBlock {number}: payload bits {block.offset}-{block.offset + len(block.bits) - 1} "
             f"= {block.bits}" + (f" (+{padding} zero padding bits)" if padding else "")
@@ -368,8 +375,12 @@ def show_block_result(attempt: Attempt, config: SimulatorConfig) -> None:
             print(
                 f"  codeword {lane}: {word} -> nearest {secded_encode(data)} -> data {data} ({note})"
             )
+    if config.error_correction == "parity":
+        word = received[0]
+        verdict = "odd, passes" if word.count("1") % 2 else "even: error detected"
+        print(f"  parity of {word}: {word.count('1')} ones, {verdict}")
     if attempt.decoded_bits is None:
-        print("SECDED could not correct the block; it is not released.")
+        print("The error correction detected an error; the block is not released.")
         return
     errors = hamming_distance(attempt.decoded_bits, block.bits)
     print(f"Released bits: {attempt.decoded_bits}")

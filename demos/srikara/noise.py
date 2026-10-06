@@ -2,7 +2,7 @@
 
 Examples:
     python demos/srikara/noise.py
-    python demos/srikara/noise.py "Hi" --secded --max-attempts 2
+    python demos/srikara/noise.py "Hi" --error-correction parity --max-attempts 2
 """
 
 from __future__ import annotations
@@ -41,9 +41,10 @@ def main() -> None:
     )
     parser.add_argument("--seed", type=int, default=4)
     parser.add_argument(
-        "--secded",
-        action="store_true",
-        help="protect the payload with interleaved SECDED",
+        "--error-correction",
+        choices=("none", "parity", "secded"),
+        default="none",
+        help="parity: 2 payload bits + 1 parity bit per symbol; secded: interleaved SECDED",
     )
     parser.add_argument(
         "--max-attempts", type=int, default=1, help="attempts per block"
@@ -58,7 +59,7 @@ def main() -> None:
         tolerance_sigmas=4.0,
         axis_policy="optimized",
         seed=args.seed,
-        error_correction="secded" if args.secded else "none",
+        error_correction=args.error_correction,
         max_attempts=args.max_attempts,
     )
     explain_noise()

@@ -73,7 +73,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     if args.command == "list":
         for study in STUDIES:
-            print(f"{study.name:26} {study.layout:11} {len(study.cases)} runs")
+            print(f"{study.name:28} {study.layout:11} {len(study.cases)} runs")
         return
 
     if args.command == "run":

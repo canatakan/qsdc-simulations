@@ -1,6 +1,11 @@
 from itertools import combinations, product
 
-from qsdc.common.error_correction import secded_decode, secded_encode
+from qsdc.common.error_correction import (
+    parity_decode,
+    parity_encode,
+    secded_decode,
+    secded_encode,
+)
 
 DATA = ["".join(bits) for bits in product("01", repeat=4)]
 
@@ -25,3 +30,11 @@ def test_secded_detects_every_double_bit_error():
             secded_decode(flip(codeword, *pair)) is None
             for pair in combinations(range(8), 2)
         )
+
+
+def test_parity_detects_every_single_bit_error():
+    for data in ("".join(bits) for bits in product("01", repeat=2)):
+        word = parity_encode(data)
+        assert word.count("1") % 2 == 1
+        assert parity_decode(word) == data
+        assert all(parity_decode(flip(word, i)) is None for i in range(3))

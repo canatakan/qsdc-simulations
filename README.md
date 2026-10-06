@@ -22,10 +22,10 @@ make install
 
 - `srikara`: CV QSDC Gaussian-states simulator with analytic and Strawberry Fields backends.
 
-  The simulator optionally applies pure-Python extended Hamming
-  SECDED (8,4,4) coding with a depth-3 interleaver. Each 12-bit payload stripe
-  becomes an independently accepted 32-state transport block. Failed blocks
-  can be retried with an explicit bound.
+  The payload can optionally be protected by a parity bit per symbol, as in
+  Cao et al.'s Gaussian-mapping QSDC, or by extended Hamming SECDED (8,4,4)
+  coding with a depth-3 interleaver. Failed blocks can be retried with an
+  explicit bound.
 
   > Reference: S. Srikara, K. Thapliyal, and A. Pathak, Continuous variable direct secure quantum communication using gaussian states, Quantum Inf. Process. 19, 1 (2020).
 
@@ -54,8 +54,8 @@ make srikara/test
 ```bash
 srikara-demo message "hello" --backend analytic
 srikara-demo message "hello" --backend sf-sampled --random-source sf-bs-qrng --seed 30
-srikara-demo message "hello" --optimized --noise medium --secded --max-attempts 3
-srikara-demo noise "Hi" --secded
+srikara-demo message "hello" --optimized --noise medium --error-correction secded --max-attempts 3
+srikara-demo noise "Hi" --error-correction parity --max-attempts 2
 srikara-demo optimized "hello world" --noise high --example 3
 ```
 
@@ -85,13 +85,21 @@ transmission = SrikaraSimulator(config).transmit("101001110010")
 assert transmission.recovered_bits == "101001110010"
 ```
 
-The payload is split into blocks (`simulator/transport.py`). Without error
-correction a block is one 3-bit symbol; with SECDED it is 12 payload bits
-coded as three interleaved extended Hamming (8, 4) codewords, sent as 8
-symbols. Each block runs the protocol once with 4 states per symbol
+The payload is split into blocks (`simulator/transport.py`), whose size
+depends on `error_correction`:
+
+- `none`: one symbol carrying 3 payload bits.
+- `parity`: one symbol carrying 2 payload bits and an odd-parity bit, as in Cao
+  et al. A parity bit detects an odd number of wrong bits but cannot locate
+  them. With Gray-coded intervals the valid symbols are every second interval,
+  so an error into a neighbouring interval is always detected.
+- `secded`: 12 payload bits coded as three interleaved extended Hamming (8, 4)
+  codewords, sent as 8 symbols. One wrong symbol is corrected.
+
+Each block runs the protocol once with 4 states per symbol
 (`simulator/protocol.py`). A run is accepted when all of its control and decoy
-checks fall within `tolerance_sigmas`. A rejected block, or one SECDED cannot
-correct, is sent again up to `max_attempts` times.
+checks fall within `tolerance_sigmas`. A rejected block, or one whose code
+detects an error it cannot correct, is sent again up to `max_attempts` times.
 `recovered_bits` is only set when every block was recovered.
 
 The squeezing angle matters: Alice displaces along the diagonal 1 + i, and
@@ -132,9 +140,10 @@ print(write_report(run_benchmark(benchmark), Path("results")) / "report.html")
 ```
 
 `catalog.py` defines the presets (`WORKLOADS`, `NOISES`, the cumulative
-`OPTIMIZATION_STEPS`) and 17 built-in studies: 3 reference studies per workload
-and 14 studies of the optimized simulator per noise baseline, so a full run of
-one workload writes 3 + 4 × 14 = 59 reports.
+`OPTIMIZATION_STEPS`) and 18 built-in studies: 3 reference studies per workload
+and 15 studies of the optimized simulator per noise baseline, so a full run of
+one workload writes 3 + 4 × 15 = 63 reports. `error_correction_comparison`
+compares no coding, parity and SECDED, each with and without retries.
 
 The optimized simulator uses optimized axes, v12 intervals, θ = 5π/4 and
 r = 0.576, which is 5 dB of squeezing, the top of the paper's 1–5 dB range.
@@ -173,16 +182,18 @@ so an interrupted run can be resumed. Reports go to
 
 Measurements (`benchmark/metrics.py`) are counts; rates are derived from them.
 A payload is split into blocks, and a block is sent again (a retry) when the
-checks reject it or SECDED cannot correct it, while attempts remain.
+checks reject it or its code detects an error it cannot correct, while
+attempts remain.
 
 - Blocks, retries: blocks in the payload, and extra sends of failed blocks.
 - Rejected by checks: sends whose control or decoy checks failed.
-- Uncorrectable: sends that passed the checks, but where SECDED detected an
-  uncorrectable stripe.
+- Uncorrectable: sends that passed the checks, but where parity or SECDED
+  detected an error it could not correct.
 - Bit error rate: wrong bits / bits in released blocks (undefined when nothing
   was released).
 - Raw bit error rate: wrong symbol bits before error correction, over all
-  sends, rejected ones included; with SECDED this counts parity bits too.
+  sends, rejected ones included; with parity or SECDED this counts the code
+  bits too.
 - Erasure rate: bits in blocks that were never released / payload bits.
 - Delivered: correct bits in released blocks / payload bits, which equals
   (1 − erasure rate)(1 − bit error rate).
@@ -191,8 +202,9 @@ checks reject it or SECDED cannot correct it, while attempts remain.
   wrong, so compare coded and uncoded cases by information per state.
 - Information per state: mutual information between sent and decoded symbols
   (before correction, all sends) / all prepared states, the rate an ideal code
-  could reach on the channel. It is bounded by the payload's symbol entropy,
-  so it is below 3/4 for short or biased payloads.
+  could reach on the channel. It is bounded by the entropy of the symbols
+  sent, so it is below 3/4 for short or biased payloads, and at most 1/2 with
+  parity, which only ever sends 4 of the 8 symbols.
 - Rejection rate: sends rejected by the checks / all sends. It grows with the
   number of checks per send: 3 without error correction, 24 with SECDED.
 - Check failure rate: failed checks / all control and decoy checks, which does

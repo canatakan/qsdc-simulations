@@ -23,7 +23,7 @@ def test_unsqueezing_inverts_the_squeeze_displacement_relation():
     )
 
 
-@pytest.mark.parametrize("error_correction", ["none", "secded"])
+@pytest.mark.parametrize("error_correction", ["none", "parity", "secded"])
 @pytest.mark.parametrize("length", [1, 11, 12, 13, 24])
 def test_blocks_round_trip_any_payload_length(error_correction, length):
     payload = PAYLOAD[:length]

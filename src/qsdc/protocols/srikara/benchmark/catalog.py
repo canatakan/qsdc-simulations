@@ -67,6 +67,13 @@ R_VALUES = (0.115, 0.345, 0.576, 0.921, 1.151, 1.5)
 R_RANGES = ((0.115, 0.345), (0.345, 0.576), (0.115, 1.151))
 THETA_PI_VALUES = (0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75)
 INTERVALS = ("default", "optimized_v4", "optimized_v8", "optimized_v12")
+ERROR_CORRECTION = {
+    "None": ("none", 1),
+    "Parity": ("parity", 1),
+    "Parity + retries": ("parity", 3),
+    "SECDED": ("secded", 1),
+    "SECDED + retries": ("secded", 3),
+}
 TOLERANCES = (1.0, 2.0, 3.0, 4.0, 5.0)
 ONE_PROBABILITIES = (0.1, 0.25, 0.5, 0.75, 0.9)
 TRANSMITTANCES = (1.0, 0.95, 0.9, 0.8, 0.7, 0.5)
@@ -173,6 +180,13 @@ def noise_studies(noise_name: str, workload: Workload) -> list[Benchmark]:
         Benchmark(
             "interval_comparison",
             tuple(case(vary(intervals=intervals)) for intervals in INTERVALS),
+        ),
+        Benchmark(
+            "error_correction_comparison",
+            tuple(
+                case(vary(error_correction=code, max_attempts=attempts), label=label)
+                for label, (code, attempts) in ERROR_CORRECTION.items()
+            ),
         ),
         Benchmark(
             "tolerance_safety",
