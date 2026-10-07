@@ -152,10 +152,10 @@ class StrawberryFieldsBackend(Backend):
         with program.context as q:
             ops.MeasureHomodyne(axis.angle) | q[0]
         value = float(Engine("gaussian").run(program).samples[0, 0]) / SF_SCALE
-        if detector.electronic_variance:
-            value += np.random.normal(
-                0.0, sqrt(detector.electronic_variance * VACUUM_VARIANCE)
-            )
+        # Drawn even without electronic noise, so every case uses the same random stream.
+        value += np.random.normal(
+            0.0, sqrt(detector.electronic_variance * VACUUM_VARIANCE)
+        )
         return value
 
     @staticmethod
