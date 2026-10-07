@@ -63,7 +63,7 @@ srikara-demo optimized "hello world" --noise metro_10km --example 3
 
 ```bash
 srikara-benchmark list
-srikara-benchmark run --study theta_fixed --workload light
+srikara-benchmark run --study theta_fixed
 srikara-benchmark rerender
 ```
 
@@ -156,9 +156,8 @@ benchmark = Benchmark(
 print(write_report(run_benchmark(benchmark), Path("results")) / "report.html")
 ```
 
-The workloads (light, medium and heavy payloads) are defined in
-`benchmark/catalog/__init__.py`; the other presets and the studies are YAML
-files next to it:
+Every case sends a random payload of 10,000 bits (`Workload`). The presets
+and the studies are YAML files in `benchmark/catalog/`:
 
 - `simulators.yaml`: named simulator configurations, each optionally extending
   another one (`baseline` is the paper's protocol, `optimized` the best one).
@@ -182,7 +181,7 @@ The noise baselines:
 `record_27km` is the shortest point of Zhang et al., PRL 125, 010502 (2020).
 Phase noise is not modelled yet.
 
-There are 18 built-in studies, so a full run of one workload writes 18 reports.
+There are 18 built-in studies, so a full run writes 18 reports.
 Most run under `lab` only, because their conclusion does not depend on the noise
 level. The comparisons where it does (`noise_profiles`, `optimization_comparison`,
 `axis_comparison`, `interval_comparison`, `error_correction_comparison`) run
@@ -212,17 +211,17 @@ Run the studies with `srikara-benchmark` (in `.venv/bin`):
 ```bash
 srikara-benchmark list
 srikara-benchmark run --study optimization_comparison
-srikara-benchmark run --workload light --repetitions 5
+srikara-benchmark run --repetitions 3
 srikara-benchmark run --skip-existing
 srikara-benchmark index
 ```
 
-`run` defaults to every study, the `medium` workload
+`run` defaults to every study
 and one repetition. `--repetitions N` reruns every case with N independent
 seeds (the first is the configured one), and rates pool all repetitions.
 `--skip-existing` skips studies that already have a report,
 so an interrupted run can be resumed. Reports go to
-`results/<workload>/<study>/run_<time>/`:
+`results/<study>/run_<time>/`:
 
 - `report.html`: a results table with one row per case, plots, a table of sent
   vs. decoded symbols for each case, and the parameters shared by all cases.

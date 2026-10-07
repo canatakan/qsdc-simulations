@@ -6,34 +6,28 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
-from qsdc.protocols.srikara.benchmark.benchmark import run_benchmark
-from qsdc.protocols.srikara.benchmark.catalog import WORKLOADS, studies
+from qsdc.protocols.srikara.benchmark.benchmark import Workload, run_benchmark
+from qsdc.protocols.srikara.benchmark.catalog import studies
 from qsdc.protocols.srikara.benchmark.report import (
     rerender,
     write_index,
     write_report,
 )
 
-STUDIES = studies(WORKLOADS["light"])
+WORKLOAD = Workload()
+STUDIES = studies(WORKLOAD)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("list", help="list the built-in studies")
-    run = commands.add_parser("run", help="run studies into <output-root>/<workload>/")
+    run = commands.add_parser("run", help="run studies into <output-root>/<study>/")
     run.add_argument(
         "--study",
         action="append",
         choices=[study.name for study in STUDIES],
         help="repeatable; default: all",
-    )
-    run.add_argument(
-        "--workload",
-        nargs="+",
-        choices=list(WORKLOADS),
-        default=["medium"],
-        help="default: medium",
     )
     run.add_argument(
         "--repetitions",
@@ -61,18 +55,18 @@ def main(argv: Sequence[str] | None = None) -> None:
         return
 
     if args.command == "run":
-        for workload_name in args.workload:
-            root = args.output_root / workload_name
-            for study in studies(WORKLOADS[workload_name]):
-                if args.study and study.name not in args.study:
-                    continue
-                done = any((root / study.name).glob("run_*/results.json"))
-                if args.skip_existing and done:
-                    print(f"{workload_name}/{study.name}: already done")
-                    continue
-                print(f"{workload_name}/{study.name}")
-                report = write_report(run_benchmark(study, args.repetitions), root)
-                print(f"  {report / 'report.html'}")
+        for study in studies(WORKLOAD):
+            if args.study and study.name not in args.study:
+                continue
+            done = any((args.output_root / study.name).glob("run_*/results.json"))
+            if args.skip_existing and done:
+                print(f"{study.name}: already done")
+                continue
+            print(study.name)
+            report = write_report(
+                run_benchmark(study, args.repetitions), args.output_root
+            )
+            print(f"  {report / 'report.html'}")
     if args.command == "rerender":
         for results in sorted(args.output_root.rglob("results.json")):
             rerender(results)

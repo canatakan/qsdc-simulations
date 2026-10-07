@@ -11,7 +11,7 @@ from qsdc.protocols.srikara.benchmark.benchmark import (
     Workload,
     run_benchmark,
 )
-from qsdc.protocols.srikara.benchmark.catalog import NOISES, WORKLOADS, studies
+from qsdc.protocols.srikara.benchmark.catalog import NOISES, studies
 from qsdc.protocols.srikara.benchmark.metrics import measure, pool
 from qsdc.protocols.srikara.benchmark.report import load_result, rerender, write_report
 from qsdc.protocols.srikara.config import SimulatorConfig
@@ -79,7 +79,7 @@ def test_bit_error_rate_is_undefined_when_nothing_is_released(eavesdropper):
 
 def test_noise_sweeps_change_only_their_component():
     lab = NOISES["lab"]
-    by_name = {study.name: study for study in studies(WORKLOADS["light"])}
+    by_name = {study.name: study for study in studies(Workload())}
 
     for case in by_name["channel_transmittance"].cases:
         noise = case.simulator.noise
@@ -97,7 +97,7 @@ def test_noise_sweeps_change_only_their_component():
 
 
 def test_noise_dependent_comparisons_run_every_case_under_every_baseline():
-    ladder = {study.name: study for study in studies(WORKLOADS["light"])}[
+    ladder = {study.name: study for study in studies(Workload())}[
         "optimization_comparison"
     ]
     steps = len(ladder.cases) // len(NOISES)
@@ -151,22 +151,18 @@ def test_heatmap_report_has_one_figure_per_series(tmp_path):
 
 
 def test_cli_runs_a_study_into_a_browsable_report(tmp_path, monkeypatch):
-    monkeypatch.setitem(WORKLOADS, "light", Workload(payload_bits=6))
+    monkeypatch.setattr(cli, "WORKLOAD", Workload(payload_bits=6))
     cli.main(
         [
             "run",
             "--study",
             "squeezing_distributions",
-            "--workload",
-            "light",
             "--output-root",
             str(tmp_path),
         ]
     )
 
-    [results] = (tmp_path / "light" / "squeezing_distributions").glob(
-        "run_*/results.json"
-    )
+    [results] = (tmp_path / "squeezing_distributions").glob("run_*/results.json")
     document = json.loads(results.read_text())
     assert document["benchmark"]["layout"] == "comparison"
     assert len(document["runs"]) == 9
@@ -177,7 +173,7 @@ def test_cli_runs_a_study_into_a_browsable_report(tmp_path, monkeypatch):
     assert (
         "Squeezing r: U[0.115, 1.151]" in (results.parent / "report.html").read_text()
     )
-    assert "light/squeezing_distributions" in (tmp_path / "index.html").read_text()
+    assert "squeezing_distributions/run_" in (tmp_path / "index.html").read_text()
 
 
 def test_reports_can_be_rerendered_without_simulating(tmp_path):

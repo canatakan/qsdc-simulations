@@ -1,4 +1,4 @@
-"""The built-in workloads, and the simulators, noise baselines and studies of the YAML files here."""
+"""The built-in simulators, noise baselines and studies, read from the YAML files here."""
 
 from __future__ import annotations
 
@@ -28,11 +28,6 @@ def assign(document: dict, path: str, value: object) -> None:
     document[key] = value
 
 
-WORKLOADS = {
-    "light": Workload(payload_bits=1024),
-    "medium": Workload(payload_bits=10_000),
-    "heavy": Workload(payload_bits=1_000_000),
-}
 NOISES = {
     name: NoiseConfig.model_validate(spec) for name, spec in load("noises").items()
 }

@@ -14,7 +14,7 @@ from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
 
 
 class Workload(Config):
-    payload_bits: int = 1024
+    payload_bits: int = 10_000
     one_probability: float = 0.5
     seed: int = 33
 

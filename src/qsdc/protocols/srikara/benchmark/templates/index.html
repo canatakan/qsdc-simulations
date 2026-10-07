@@ -11,11 +11,9 @@
   <header>
     <h1>{{ title }}</h1>
   </header>
-  {% for folder, groups in sections.items() %}
+  {% for group in groups.values() %}
   <section>
-    <h2>{{ folder }}</h2>
-    {% for group in groups.values() %}
-    <h3>{{ group.title }}</h3>
+    <h2>{{ group.title }}</h2>
     <div class="table">
       <table>
         <thead>
@@ -35,7 +33,6 @@
         </tbody>
       </table>
     </div>
-    {% endfor %}
   </section>
   {% else %}
   <p>No benchmark results yet.</p>
