@@ -136,7 +136,7 @@ studies:
     axes:
       - name: Environment nbar
         set: [noise.forward.nbar, noise.backward.nbar]
-        values: [0.0, 0.01, 0.05, 0.1, 0.2]
+        values: [0.0, 0.1, 0.25, 0.5, 1.0]
 
   detector_efficiency:
     group: hardware
@@ -154,10 +154,9 @@ studies:
           - noise.bob_detector.electronic_variance
         values: [0.0, 0.01, 0.05, 0.1, 0.2]
 
-  memory_delay:
+  memory_efficiency:
     group: hardware
-    set: {noise.memory.nbar: 0.01}
     axes:
-      - name: Memory duration (s)
-        set: [noise.memory.seconds]
-        values: [0.0, 0.1, 0.25, 0.5, 1.0]
+      - name: Memory transmittance
+        set: [noise.memory.efficiency]
+        values: [1.0, 0.95, 0.9, 0.8, 0.7]
