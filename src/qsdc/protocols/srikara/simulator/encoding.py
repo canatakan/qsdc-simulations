@@ -7,7 +7,7 @@ from math import inf, sqrt
 from statistics import NormalDist
 
 from qsdc.common.quadrature import VACUUM_VARIANCE
-from qsdc.common.random.base import RandomSource
+from qsdc.common.random import RandomSource
 
 MESSAGE_DIRECTION = 1 + 1j
 BINARY_LABELS = ("000", "001", "010", "011", "100", "101", "110", "111")

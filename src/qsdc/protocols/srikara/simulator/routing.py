@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from qsdc.common.random.base import RandomSource
+from qsdc.common.random import RandomSource
 
 
 @dataclass(frozen=True)

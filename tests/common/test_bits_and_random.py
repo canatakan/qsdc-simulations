@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from qsdc.common.bits import bits_to_bytes, bytes_to_bits, weighted_random_bits
-from qsdc.common.random import make_random_source
+from qsdc.common.bits import bits_to_bytes, bytes_to_bits
+from qsdc.common.random import make_random_source, weighted_random_bits
 
 
 def test_bytes_round_trip_through_bits():

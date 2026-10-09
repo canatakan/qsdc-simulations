@@ -5,7 +5,7 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from qsdc.common.random.base import RandomSource
+from qsdc.common.random import RandomSource
 
 
 class Config(BaseModel):

@@ -4,9 +4,7 @@ from dataclasses import dataclass
 from math import pi, sqrt
 
 from qsdc.common.quadrature import VACUUM_VARIANCE, P, Q, Quadrature
-from qsdc.common.random import make_random_source
-from qsdc.common.random.base import RandomSource
-from qsdc.common.random.seed import derive_seed
+from qsdc.common.random import RandomSource, derive_seed, make_random_source
 from qsdc.protocols.srikara.config import SimulatorConfig
 from qsdc.protocols.srikara.simulator.backends import (
     Backend,

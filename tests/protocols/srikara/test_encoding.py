@@ -2,7 +2,7 @@ from itertools import product
 
 import pytest
 
-from qsdc.common.random.classical import ClassicalRandomSource
+from qsdc.common.random import ClassicalRandomSource
 from qsdc.protocols.srikara.simulator.backends import AnalyticBackend
 from qsdc.protocols.srikara.simulator.encoding import INTERVAL_CODES
 from qsdc.protocols.srikara.simulator.transport import decode_block, encode_blocks
