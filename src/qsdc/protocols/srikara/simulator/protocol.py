@@ -1,5 +1,3 @@
-"""The Srikara protocol: each payload block is sent in its own run of 4 states per symbol."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -28,8 +26,6 @@ AXES = (Q, P)
 
 @dataclass(frozen=True)
 class Check:
-    """A control (Alice) or decoy (Bob) measurement compared with its expected value."""
-
     index: int
     axis: Quadrature
     expected: float
@@ -84,7 +80,6 @@ class Transmission:
 
     @property
     def recovered_bits(self) -> str | None:
-        """The payload, released only when every block was recovered."""
         decoded = [attempt.decoded_bits for attempt in self.final_attempts]
         return None if None in decoded else "".join(decoded)
 
@@ -96,7 +91,6 @@ class SrikaraSimulator:
         self.code = INTERVAL_CODES[config.intervals]
 
     def transmit(self, payload: str) -> Transmission:
-        """Send each block until it is recovered or runs out of attempts."""
         config = self.config
         attempts = []
         for block_index, block in enumerate(

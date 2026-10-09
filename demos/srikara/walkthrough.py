@@ -1,5 +1,3 @@
-"""Step-by-step printout of a Srikara transmission, shared by the message and noise demos."""
-
 from __future__ import annotations
 
 import textwrap
@@ -41,7 +39,6 @@ def show_transmission(
     transmission: Transmission,
     trace_noise: bool,
 ) -> None:
-    """Print everything from the text message to the recovered text."""
     show_settings(config)
     show_payload(text, payload)
     blocks = encode_blocks(payload, config.error_correction)
@@ -482,7 +479,6 @@ def prepare_stages(
 def trace_stages(
     stages: list[tuple[str, object]], axis: Quadrature, detector: Detector
 ) -> float:
-    """Print the measured quadrature's mean and variance after every stage; return the final variance."""
     rows = []
     for count in range(1, len(stages) + 1):
         program = Program(1)

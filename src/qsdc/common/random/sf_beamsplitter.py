@@ -10,8 +10,6 @@ from qsdc.common.random.base import RandomSource
 
 
 class SFBeamSplitterQRNG(RandomSource):
-    """Beam-splitter QRNG: a single photon on a 50:50 splitter yields one random bit per shot."""
-
     name = "sf-bs-qrng"
 
     def __init__(self, seed: int | None = None, batch_size: int = 1024):
@@ -47,7 +45,6 @@ class SFBeamSplitterQRNG(RandomSource):
             ops.BSgate(np.pi / 4, 0.0) | (q[0], q[1])
             ops.MeasureFock() | q
 
-        # Seed Strawberry Fields through numpy without disturbing the caller's numpy stream.
         numpy_state = np.random.get_state()
         if self.seed is not None:
             np.random.seed(

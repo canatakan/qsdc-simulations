@@ -1,5 +1,3 @@
-"""Split a payload into protocol blocks, optionally protected by parity or SECDED."""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -21,13 +19,10 @@ class Block:
 
 
 def odd_parity(offset: int) -> bool:
-    """Parity alternates between blocks, so the symbols use all eight intervals."""
     return offset % 4 == 0
 
 
 def encode_blocks(payload: str, error_correction: str) -> list[Block]:
-    """A block is one symbol of 3 bits uncoded or 2 bits plus parity; with SECDED it is
-    12 bits sent as 8 symbols."""
     if error_correction == "none":
         return [
             Block(i, payload[i : i + 3], (payload[i : i + 3].ljust(3, "0"),))
@@ -56,7 +51,6 @@ def encode_blocks(payload: str, error_correction: str) -> list[Block]:
 def decode_block(
     block: Block, symbols: Sequence[str], error_correction: str
 ) -> str | None:
-    """Recover the block's payload bits, or None if the code detects an uncorrectable error."""
     if error_correction == "none":
         return "".join(symbols)[: len(block.bits)]
     if error_correction == "parity":

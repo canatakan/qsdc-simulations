@@ -1,5 +1,3 @@
-"""Counts measured from one transmission; rates derive from them so the two cannot disagree."""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -24,23 +22,22 @@ RATES = (
 @dataclass(frozen=True)
 class RunMetrics:
     payload_bits: int
-    error_bits: int  # wrong bits in released blocks
-    erased_bits: int  # payload bits of blocks that were never released
-    raw_bits: int  # symbol bits Bob decoded before error correction, all attempts
+    error_bits: int
+    erased_bits: int
+    raw_bits: int
     raw_error_bits: int
     states: int
     blocks: int
-    retries: int  # extra sends of blocks that failed; every block is sent at least once
-    rejected: int  # sends that failed the control or decoy checks
-    checks: int  # control and decoy checks, over all sends
+    retries: int
+    rejected: int
+    checks: int
     failed_checks: int
-    uncorrectable: int  # sends that passed the checks, but the code detected an error
+    uncorrectable: int
     seconds: float
     symbol_counts: tuple[int, ...]
 
     @property
     def delivered_bits(self) -> int:
-        """Correct payload bits among the released blocks."""
         return self.payload_bits - self.erased_bits - self.error_bits
 
     @property
@@ -66,7 +63,6 @@ class RunMetrics:
 
     @property
     def information_per_symbol(self) -> float:
-        """Mutual information I(sent; decoded) of the message symbols, in bits."""
         total = sum(self.symbol_counts)
         sent = [sum(self.symbol_counts[8 * s : 8 * s + 8]) for s in range(8)]
         decoded = [sum(self.symbol_counts[d::8]) for d in range(8)]
@@ -130,7 +126,6 @@ def measure(transmission: Transmission, seconds: float) -> RunMetrics:
 
 
 def pool(metrics: Sequence[RunMetrics]) -> RunMetrics:
-    """Add up the counts of several repetitions, so pooled rates weight every bit equally."""
     totals = {
         field.name: sum(getattr(m, field.name) for m in metrics)
         for field in fields(RunMetrics)

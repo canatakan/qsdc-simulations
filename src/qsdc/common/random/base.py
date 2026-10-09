@@ -8,8 +8,6 @@ T = TypeVar("T")
 
 
 class RandomSource(ABC):
-    """Randomness used by the protocols; choice and shuffle match Python's `random` for equal draws."""
-
     name: str
 
     @abstractmethod

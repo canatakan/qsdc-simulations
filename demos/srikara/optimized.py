@@ -131,8 +131,6 @@ def outcome(attempt: Attempt) -> str:
 
 
 def most_eventful(blocks: list[list[Attempt]]) -> int:
-    """The block with the most sends, then the most corrected symbols."""
-
     def score(sends: list[Attempt]) -> tuple[int, int]:
         last = sends[-1].run.messages
         return len(sends), sum(m.decoded_bits != m.sent_bits for m in last)

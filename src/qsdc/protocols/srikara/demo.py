@@ -1,5 +1,3 @@
-"""`srikara-demo NAME [options]`: run one of the scripts in demos/srikara/ of this checkout."""
-
 from __future__ import annotations
 
 import runpy

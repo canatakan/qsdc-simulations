@@ -1,20 +1,14 @@
-"""Analytic backends that misbehave in controlled ways, passed to tests as classes."""
-
 import pytest
 
 from qsdc.protocols.srikara.simulator.backends import AnalyticBackend
 
 
 class Eavesdropper(AnalyticBackend):
-    """Disturbs every mode on its way back to Bob."""
-
     def measure_returned(self, state, axis, beta=0j):
         return super().measure_returned(state, axis, beta) + 0.5
 
 
 class CorruptFirstMessage(AnalyticBackend):
-    """Moves the first message of every run three intervals away from Alice's value."""
-
     def begin_run(self, seed):
         self.corrupted = False
 

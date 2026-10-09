@@ -1,5 +1,3 @@
-"""Homodyne measurements from the paper's closed-form algebra or from Strawberry Fields circuits."""
-
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -19,8 +17,6 @@ SF_SCALE = sqrt(2.0 * hbar)
 
 @dataclass(frozen=True)
 class PreparedState:
-    """Bob's state S(s)D(alpha)|0> with s = r exp(i theta)."""
-
     index: int
     alpha: complex
     squeeze_r: float
@@ -34,10 +30,7 @@ class Expectation:
 
 
 class Backend(ABC):
-    """Alice measures control modes; Bob measures the modes that come back from Alice."""
-
-    def begin_run(self, seed: int) -> None:
-        """Reseed measurement randomness for one protocol run."""
+    def begin_run(self, seed: int) -> None: ...
 
     @abstractmethod
     def measure_control(self, state: PreparedState, axis: Quadrature) -> float: ...
@@ -51,22 +44,20 @@ class Backend(ABC):
     def expect_control(self, state: PreparedState, axis: Quadrature) -> Expectation: ...
 
     @abstractmethod
-    def expect_returned(self, state: PreparedState, axis: Quadrature) -> Expectation:
-        """Expected measurement of a returned mode without a message, i.e. a decoy."""
+    def expect_returned(
+        self, state: PreparedState, axis: Quadrature
+    ) -> Expectation: ...
 
     @abstractmethod
-    def message_response(self, state: PreparedState, axis: Quadrature) -> float:
-        """Shift of Bob's measurement per unit message value m_A."""
+    def message_response(self, state: PreparedState, axis: Quadrature) -> float: ...
 
 
 class AnalyticBackend(Backend):
-    """The paper's noiseless algebra: after S(-s), a mode Alice displaced is D(alpha + Delta)|0>."""
-
     @staticmethod
     def squeezed_displacement(
         alpha: complex, squeeze_r: float, theta: float
     ) -> complex:
-        """beta in S(s)D(alpha) = D(beta)S(s): alpha cosh r + exp(i theta) alpha* sinh r."""
+        """beta = alpha cosh r + e^{i theta} alpha* sinh r"""
         return alpha * cosh(squeeze_r) + exp(1j * theta) * alpha.conjugate() * sinh(
             squeeze_r
         )
@@ -75,7 +66,7 @@ class AnalyticBackend(Backend):
     def unsqueezed_displacement(
         beta: complex, squeeze_r: float, theta: float
     ) -> complex:
-        """Delta, the displacement D(beta) seen after S(-s): beta cosh r - exp(i theta) beta* sinh r."""
+        """Delta = beta cosh r - e^{i theta} beta* sinh r"""
         return beta * cosh(squeeze_r) - exp(1j * theta) * beta.conjugate() * sinh(
             squeeze_r
         )
@@ -103,8 +94,6 @@ class AnalyticBackend(Backend):
 
 
 class StrawberryFieldsBackend(Backend):
-    """Gaussian circuits with the configured noise, read out as exact means or sampled homodyne values."""
-
     def __init__(self, noise: NoiseConfig, sampled: bool):
         self.noise = noise
         self.sampled = sampled
@@ -137,7 +126,6 @@ class StrawberryFieldsBackend(Backend):
         )
 
     def message_response(self, state: PreparedState, axis: Quadrature) -> float:
-        """Mean Bob measures when Alice displaces an alpha = 0 state by 1 + i."""
         key = (state.squeeze_r, state.theta)
         if key not in self._responses:
             unit = PreparedState(state.index, 0j, state.squeeze_r, state.theta)
@@ -189,7 +177,6 @@ class StrawberryFieldsBackend(Backend):
         return program
 
     def _send(self, state: PreparedState, mode: object) -> None:
-        """Bob prepares S(s)D(alpha)|0> and sends it through the forward channel."""
         forward = self.noise.forward
         ops.Dgate(*polar(state.alpha)) | mode
         # Strawberry Fields' squeezing sign convention is opposite to the paper's.

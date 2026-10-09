@@ -1,5 +1,3 @@
-"""Alice's 3-bit symbols as real message values m_A, displaced by beta_A = m_A (1 + i)."""
-
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -18,8 +16,6 @@ GRAY_LABELS = ("000", "001", "011", "010", "110", "100", "101", "111")
 
 @dataclass(frozen=True)
 class IntervalCode(ABC):
-    """Eight labelled intervals of the real line."""
-
     labels: tuple[str, ...]
     bounds: tuple[float, ...]
 
@@ -36,8 +32,6 @@ class IntervalCode(ABC):
 
 @dataclass(frozen=True)
 class UniformIntervalCode(IntervalCode):
-    """Values uniform in the interval; the unbounded outer ones are sampled over tail_width."""
-
     tail_width: float
 
     def sample(self, bits: str, rng: RandomSource) -> float:
@@ -51,8 +45,6 @@ class UniformIntervalCode(IntervalCode):
 
 @dataclass(frozen=True)
 class GaussianIntervalCode(IntervalCode):
-    """Values drawn from a Gaussian with standard deviation sigma, restricted to the interval."""
-
     sigma: float
 
     def sample(self, bits: str, rng: RandomSource) -> float:

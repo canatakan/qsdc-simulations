@@ -1,5 +1,3 @@
-"""Bit-string helpers."""
-
 from __future__ import annotations
 
 from qsdc.common.random.base import RandomSource

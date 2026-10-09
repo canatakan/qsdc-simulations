@@ -1,5 +1,3 @@
-"""Print a hand-checkable one-symbol CV QSDC calculation (r = 0, so every step is exact)."""
-
 from __future__ import annotations
 
 from math import cosh, exp, pi, sinh, sqrt
@@ -64,7 +62,6 @@ def main() -> None:
 
 
 def squeezed_example(beta_a: complex) -> None:
-    """The same symbol with real squeezing: Bob reads one quadrature and divides by its response."""
     header("7. The same symbol with squeezing, r = 0.5")
     r = 0.5
     print("Bob measures one quadrature of alpha + Delta and divides by the response")

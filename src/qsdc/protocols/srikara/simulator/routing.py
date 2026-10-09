@@ -14,7 +14,6 @@ class ModeRoute:
 
 
 def route_modes(n_states: int, rng: RandomSource) -> ModeRoute:
-    """Alice checks a random half of the modes and splits the delayed half into messages and decoys."""
     shuffled = rng.shuffled(range(n_states))
     control, delayed = shuffled[: n_states // 2], shuffled[n_states // 2 :]
     released = rng.shuffled(delayed)

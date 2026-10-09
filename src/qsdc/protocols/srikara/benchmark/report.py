@@ -1,5 +1,3 @@
-"""Write a benchmark result as results.json, runs.csv, plots and report.html, and index all reports."""
-
 from __future__ import annotations
 
 import csv
@@ -70,7 +68,6 @@ def parameters(case: Case) -> dict[str, str]:
 
 
 def run_labels(benchmark: Benchmark) -> list[str]:
-    """Each case's own label, or else the parameters that differ between the cases."""
     values = [parameters(case) for case in benchmark.cases]
     varying = [key for key in values[0] if len({value[key] for value in values}) > 1]
     if len({case.series for case in benchmark.cases}) > 1:
@@ -84,14 +81,12 @@ def run_labels(benchmark: Benchmark) -> list[str]:
 
 
 def write_report(result: BenchmarkResult, root: Path) -> Path:
-    """Write one new execution directory under root/<benchmark name>/."""
     directory = root / result.benchmark.name / f"run_{time_ns()}"
     _write(result, directory)
     return directory
 
 
 def rerender(results: Path) -> None:
-    """Rebuild an execution's plots, CSV and HTML from its results.json, without simulating."""
     shutil.rmtree(results.parent / "plots", ignore_errors=True)
     _write(load_result(results), results.parent)
 
@@ -208,7 +203,6 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
 
 
 def write_index(root: Path) -> Path:
-    """Link the latest execution of every study found below root, by group."""
     latest: dict[str, tuple[Path, dict]] = {}
     executions: Counter[str] = Counter()
     for path in sorted(root.rglob("results.json")):
@@ -245,7 +239,6 @@ def write_index(root: Path) -> Path:
 
 
 def _symbol_matrix(run: RunResult) -> dict[str, object]:
-    """Sent vs. decoded symbol counts, in interval order so that neighbours are adjacent."""
     metrics = run.metrics
     labels = INTERVAL_CODES[run.case.simulator.intervals].labels
     counts = [
@@ -272,7 +265,6 @@ def _metrics(values: dict) -> RunMetrics:
 
 
 def _csv_row(run: dict, axes: tuple[str, ...]) -> dict[str, object]:
-    """One CSV row per case, one column per axis and per sent->decoded symbol pair."""
     metrics = dict(run["metrics"])
     counts = metrics.pop("symbol_counts")
     symbols = {
@@ -294,7 +286,6 @@ def _flatten(record: dict, prefix: str = "") -> dict[str, object]:
 
 
 def _study_order(name: str) -> tuple[int, int]:
-    """Position of the study's group, then of the study within the catalog."""
     group = STUDY_GROUPS.get(name)
     studies = list(STUDY_GROUPS)
     return (

@@ -1,5 +1,3 @@
-"""Benchmark studies: cases that each transmit one payload, arranged along zero to two axes."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -30,7 +28,7 @@ class Case:
     workload: Workload
     series: str = "default"
     label: str | None = None
-    at: tuple[float, ...] = ()  # coordinates on the benchmark's axes
+    at: tuple[float, ...] = ()
 
 
 LAYOUTS = ("comparison", "sweep", "heatmap")
@@ -38,8 +36,6 @@ LAYOUTS = ("comparison", "sweep", "heatmap")
 
 @dataclass(frozen=True)
 class Benchmark:
-    """Cases drawn along the named axes: none for a comparison, one for a sweep, two for a heatmap."""
-
     name: str
     cases: tuple[Case, ...]
     axes: tuple[str, ...] = ()
@@ -52,7 +48,7 @@ class Benchmark:
 @dataclass(frozen=True)
 class RunResult:
     case: Case
-    metrics: RunMetrics  # pooled over repetitions
+    metrics: RunMetrics
     repetitions: tuple[RunMetrics, ...]
 
 
@@ -64,11 +60,6 @@ class BenchmarkResult:
 
 
 def run_benchmark(benchmark: Benchmark, repetitions: int = 1) -> BenchmarkResult:
-    """Transmit every case `repetitions` times with independent seeds.
-
-    Repetition 0 uses the configured seeds. Within a repetition, cases with the same workload
-    send the same payload.
-    """
     started = perf_counter()
     payloads: dict[Workload, str] = {}
     runs = []

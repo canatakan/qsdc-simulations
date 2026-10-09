@@ -1,5 +1,3 @@
-"""Configuration of one Srikara simulator; every default is the noiseless paper setting."""
-
 from __future__ import annotations
 
 from math import exp
@@ -41,15 +39,11 @@ Distribution = Annotated[Union[Fixed, Uniform], Field(discriminator="kind")]
 
 
 class Channel(Config):
-    """Thermal loss channel: transmittance and mean thermal photon number of the environment."""
-
     transmittance: float = 1.0
     nbar: float = 0.0
 
 
 class Memory(Config):
-    """Alice's delay line, a thermal loss channel with efficiency * exp(-seconds / lifetime)."""
-
     seconds: float = 0.0
     lifetime_seconds: float = 1.0
     efficiency: float = 1.0
@@ -61,8 +55,6 @@ class Memory(Config):
 
 
 class Detector(Config):
-    """Homodyne detector efficiency and electronic noise variance in shot-noise units."""
-
     efficiency: float = 1.0
     electronic_variance: float = 0.0
 
@@ -76,8 +68,6 @@ class NoiseConfig(Config):
 
 
 class SimulatorConfig(Config):
-    """Noise only acts in the Strawberry Fields backends."""
-
     backend: Literal["analytic", "sf", "sf-sampled"] = "analytic"
     random_source: Literal["classical", "sf-bs-qrng"] = "classical"
     seed: int = 11

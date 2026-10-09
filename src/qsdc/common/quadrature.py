@@ -1,5 +1,3 @@
-"""The quadrature a homodyne detector measures, set by the phase of its local oscillator."""
-
 from __future__ import annotations
 
 from cmath import phase

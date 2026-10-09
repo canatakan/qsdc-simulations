@@ -1,6 +1,3 @@
-"""Binary codes: one parity bit (detects an odd number of errors) and extended
-Hamming (8, 4) SECDED (corrects one error and detects two per codeword)."""
-
 from __future__ import annotations
 
 from itertools import product
@@ -9,12 +6,10 @@ from qsdc.common.bits import hamming_distance
 
 
 def parity_encode(data: str, odd: bool = True) -> str:
-    """Append a parity bit that makes the number of ones odd, or even."""
     return data + str(data.count("1") % 2 ^ odd)
 
 
 def parity_decode(word: str, odd: bool = True) -> str | None:
-    """Return the data bits, or None if the parity shows an error."""
     return word[:-1] if word.count("1") % 2 == odd else None
 
 
@@ -30,7 +25,6 @@ CODEWORDS = {
 
 
 def secded_decode(word: str) -> str | None:
-    """Return the data bits of the codeword within distance one, or None if there is none."""
     for codeword, data in CODEWORDS.items():
         if hamming_distance(word, codeword) <= 1:
             return data

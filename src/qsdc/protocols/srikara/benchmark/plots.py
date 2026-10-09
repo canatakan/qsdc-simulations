@@ -1,5 +1,3 @@
-"""Bars for comparisons, lines for sweeps, and one heatmap figure per series."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -99,7 +97,6 @@ def _sweep(result: BenchmarkResult) -> Figure:
 
 
 def _heatmaps(result: BenchmarkResult) -> list[Figure]:
-    """One figure per series, with color scales shared across series."""
     runs = result.runs
     limits = {
         metric: _limits([_value(run, metric) for run in runs])

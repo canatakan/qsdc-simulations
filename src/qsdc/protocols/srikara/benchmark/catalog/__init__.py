@@ -1,5 +1,3 @@
-"""The built-in simulators, noise baselines and studies, read from the YAML files here."""
-
 from __future__ import annotations
 
 from itertools import product
