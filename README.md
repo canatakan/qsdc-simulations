@@ -31,32 +31,26 @@ make install
 
 ## Commands
 
-`make install` installs the package with two commands, `srikara-demo` and
-`srikara-benchmark`, into `.venv/bin`. Use them after
-`source .venv/bin/activate`, or call them as `.venv/bin/srikara-demo`.
+`make install` installs the package with the `srikara-benchmark` command into
+`.venv/bin`. Use it after `source .venv/bin/activate`, or call it as
+`.venv/bin/srikara-benchmark`. The demo is a plain script under `demos/`.
 
 ```bash
 make test
 make srikara/test
 ```
 
-### Demos
+### Demo
 
-| Demo | What it shows | Command |
-| --- | --- | --- |
-| `basic` | The paper's algebra for one symbol, by hand, plus the effect of theta | `srikara-demo basic` |
-| `message` | A text message through every protocol step, with per-mode noise traces on the Strawberry Fields backends | `srikara-demo message "hello"` |
-| `noise` | The noise model, then a short message through a noisy channel, every mode through every stage | `srikara-demo noise` |
-| `optimized` | A message with the fully optimized settings (parity, retries, r = 0.576): one line per block and a short look inside one block | `srikara-demo optimized "hello world"` |
-
-`srikara-demo NAME --help` lists a demo's options. For example:
+`demos/srikara/demo.py` sends a text message, prints one line per send and every protocol
+step of one block. `--simulator` picks a configuration from the benchmark catalog,
+`--noise` a noise baseline, `--block` the block to show and `--trace` adds the noise
+path of its modes. `python demos/srikara/demo.py --help` lists all options.
 
 ```bash
-srikara-demo message "hello" --backend analytic
-srikara-demo message "hello" --backend sf-sampled --random-source sf-bs-qrng --seed 30
-srikara-demo message "hello" --optimized --noise lab --error-correction secded --max-attempts 3
-srikara-demo noise "Hi" --error-correction parity --max-attempts 2
-srikara-demo optimized "hello world" --noise metro_10km --example 3
+python demos/srikara/demo.py "hello"
+python demos/srikara/demo.py "hello" --simulator baseline --noise clean
+python demos/srikara/demo.py "hello" --noise metro_10km --block 3 --trace
 ```
 
 ### Benchmarks
