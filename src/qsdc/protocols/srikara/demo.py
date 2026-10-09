@@ -12,9 +12,9 @@ Simulators (from the benchmark catalog):
     retry      + up to 3 sends per block (optimized + EC, the default)
 
 Examples:
-    python demos/srikara/demo.py "hello"
-    python demos/srikara/demo.py "hello" --simulator baseline --noise clean
-    python demos/srikara/demo.py "hello" --noise metro_10km --block 3 --trace
+    srikara-demo "hello"
+    srikara-demo "hello" --simulator baseline --noise clean
+    srikara-demo "hello" --noise metro_10km --block 3 --trace
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ from qsdc.protocols.srikara.simulator.transport import odd_parity
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        prog="demos/srikara/demo.py",
+        prog="srikara-demo",
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

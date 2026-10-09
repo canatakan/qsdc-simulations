@@ -4,7 +4,7 @@ Independent QSDC protocol simulators organized by protocol/paper reference.
 
 Importable code lives under `src/qsdc`, reusable utilities live under
 `src/qsdc/common`, protocol implementations live under
-`src/qsdc/protocols/<protocol>`, demos live under `demos/<protocol>`, and paper
+`src/qsdc/protocols/<protocol>`, demos live next to each protocol as `demo.py`, and paper
 notes live under `docs/protocols/<protocol>`.
 
 ## Setup
@@ -31,9 +31,9 @@ make install
 
 ## Commands
 
-`make install` installs the package with the `srikara-benchmark` command into
-`.venv/bin`. Use it after `source .venv/bin/activate`, or call it as
-`.venv/bin/srikara-benchmark`. The demo is a plain script under `demos/`.
+`make install` installs the package with two commands, `srikara-demo` and
+`srikara-benchmark`, into `.venv/bin`. Use them after
+`source .venv/bin/activate`, or call them as `.venv/bin/srikara-demo`.
 
 ```bash
 make test
@@ -42,15 +42,15 @@ make srikara/test
 
 ### Demo
 
-`demos/srikara/demo.py` sends a text message, prints one line per send and every protocol
+`srikara-demo` sends a text message, prints one line per send and every protocol
 step of one block. `--simulator` picks a configuration from the benchmark catalog,
 `--noise` a noise baseline, `--block` the block to show and `--trace` adds the noise
-path of its modes. `python demos/srikara/demo.py --help` lists all options.
+path of its modes. `srikara-demo --help` lists all options.
 
 ```bash
-python demos/srikara/demo.py "hello"
-python demos/srikara/demo.py "hello" --simulator baseline --noise clean
-python demos/srikara/demo.py "hello" --noise metro_10km --block 3 --trace
+srikara-demo "hello"
+srikara-demo "hello" --simulator baseline --noise clean
+srikara-demo "hello" --noise metro_10km --block 3 --trace
 ```
 
 ### Benchmarks
