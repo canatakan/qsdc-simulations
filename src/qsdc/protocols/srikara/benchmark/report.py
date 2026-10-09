@@ -51,7 +51,7 @@ def parameters(case: Case) -> dict[str, str]:
     return {
         "Backend": simulator.backend,
         "Random source": simulator.random_source,
-        "Alpha bound": f"{simulator.alpha_bound:g}",
+        "Alpha variance (SNU)": f"{simulator.alpha_variance_snu:g}",
         "Squeezing r": str(simulator.squeeze_r),
         "Theta / pi": str(simulator.theta_pi),
         "Tolerance (sigma)": f"{simulator.tolerance_sigmas:g}",

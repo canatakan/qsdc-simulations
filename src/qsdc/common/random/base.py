@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from math import cos, log, pi, sqrt
 from typing import TypeVar
 
 T = TypeVar("T")
@@ -15,6 +16,10 @@ class RandomSource(ABC):
 
     @abstractmethod
     def randbelow(self, n: int) -> int: ...
+
+    def gauss(self, sigma: float) -> float:
+        radius = sqrt(-2.0 * log(1.0 - self.uniform(0.0, 1.0)))
+        return sigma * radius * cos(2.0 * pi * self.uniform(0.0, 1.0))
 
     def choice(self, values: Sequence[T]) -> T:
         return values[self.randbelow(len(values))]

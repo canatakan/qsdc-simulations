@@ -57,7 +57,7 @@ def show_settings(config: SimulatorConfig) -> None:
         ("Protocol random source", f"{config.random_source} (seed {config.seed})"),
         (
             "Displacement alpha",
-            f"Re, Im uniform in [-{config.alpha_bound:g}, {config.alpha_bound:g}]",
+            f"Re, Im Gaussian with variance {config.alpha_variance_snu:g} SNU",
         ),
         ("Squeezing r", str(config.squeeze_r)),
         ("Squeezing angle theta / pi", str(config.theta_pi)),

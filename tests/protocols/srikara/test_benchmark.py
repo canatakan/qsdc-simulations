@@ -129,7 +129,7 @@ def test_heatmap_report_has_one_figure_per_series(tmp_path):
         "grid",
         tuple(
             Case(
-                SimulatorConfig(alpha_bound=a, tolerance_sigmas=t),
+                SimulatorConfig(alpha_variance_snu=a, tolerance_sigmas=t),
                 workload,
                 series=f"tolerance {t}",
                 at=(a, r),

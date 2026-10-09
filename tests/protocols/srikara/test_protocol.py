@@ -106,6 +106,14 @@ def test_aligned_axis_reads_the_full_message_displacement():
             assert message.response >= max(abs(unit.real), abs(unit.imag))
 
 
+def test_bob_draws_alpha_with_the_configured_variance():
+    run = SrikaraSimulator(SimulatorConfig()).run_block(("000",) * 1000, seed=3)
+    alphas = [state.alpha for state in run.states]
+    variance = sum(a.real**2 + a.imag**2 for a in alphas) / (2 * len(alphas))
+
+    assert variance == pytest.approx(64 / 3 / 4, rel=0.05)
+
+
 def test_theta_five_quarter_pi_gives_the_largest_message_response():
     backend, r = AnalyticBackend(), 0.576
     best = {}

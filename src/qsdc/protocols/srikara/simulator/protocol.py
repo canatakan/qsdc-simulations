@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import pi
+from math import pi, sqrt
 
-from qsdc.common.quadrature import P, Q, Quadrature
+from qsdc.common.quadrature import VACUUM_VARIANCE, P, Q, Quadrature
 from qsdc.common.random import make_random_source
 from qsdc.common.random.base import RandomSource
 from qsdc.common.random.seed import derive_seed
@@ -114,13 +114,11 @@ class SrikaraSimulator:
         self.backend.begin_run(seed)
 
         n_states = 4 * len(symbols)
+        sigma = sqrt(config.alpha_variance_snu * VACUUM_VARIANCE)
         states = tuple(
             PreparedState(
                 index,
-                complex(
-                    rng.uniform(-config.alpha_bound, config.alpha_bound),
-                    rng.uniform(-config.alpha_bound, config.alpha_bound),
-                ),
+                complex(rng.gauss(sigma), rng.gauss(sigma)),
                 config.squeeze_r.sample(rng),
                 pi * config.theta_pi.sample(rng),
             )

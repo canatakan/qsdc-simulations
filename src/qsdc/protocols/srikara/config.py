@@ -72,7 +72,7 @@ class SimulatorConfig(Config):
     random_source: Literal["classical", "sf-bs-qrng"] = "classical"
     seed: int = 11
     noise: NoiseConfig = NoiseConfig()
-    alpha_bound: float = 2.0
+    alpha_variance_snu: float = 64 / 3
     squeeze_r: Distribution = Uniform(lower=0.115, upper=0.576)
     theta_pi: Distribution = Uniform(lower=0.0, upper=2.0)
     tolerance_sigmas: float = 1.0
