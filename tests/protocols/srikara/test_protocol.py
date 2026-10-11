@@ -5,7 +5,7 @@ import pytest
 from qsdc.protocols.srikara.benchmark.catalog import NOISES
 from qsdc.protocols.srikara.config import SimulatorConfig
 from qsdc.protocols.srikara.simulator.backends import AnalyticBackend, PreparedState
-from qsdc.protocols.srikara.simulator.protocol import AXES, SrikaraSimulator
+from qsdc.protocols.srikara.simulator.protocol import AXES, Simulator
 
 PAYLOAD = "101001110010011010001101110"
 
@@ -14,7 +14,7 @@ PAYLOAD = "101001110010011010001101110"
 @pytest.mark.parametrize("error_correction", ["none", "parity", "secded"])
 def test_ideal_backends_deliver_the_payload(backend, error_correction):
     config = SimulatorConfig(backend=backend, error_correction=error_correction)
-    transmission = SrikaraSimulator(config).transmit(PAYLOAD)
+    transmission = Simulator(config).transmit(PAYLOAD)
 
     assert transmission.recovered_bits == PAYLOAD
     for attempt in transmission.attempts:
@@ -31,20 +31,17 @@ def test_transmission_is_reproducible_from_the_seed():
     config = SimulatorConfig(
         backend="sf-sampled", noise=NOISES["lab"], tolerance_sigmas=3.0
     )
-    first = SrikaraSimulator(config).transmit(PAYLOAD)
+    first = Simulator(config).transmit(PAYLOAD)
 
-    assert SrikaraSimulator(config).transmit(PAYLOAD) == first
-    assert (
-        SrikaraSimulator(config.model_copy(update={"seed": 12})).transmit(PAYLOAD)
-        != first
-    )
+    assert Simulator(config).transmit(PAYLOAD) == first
+    assert Simulator(config.model_copy(update={"seed": 12})).transmit(PAYLOAD) != first
 
 
 def test_best_qp_axis_policy_reads_the_quadrature_with_the_larger_response():
     backend = AnalyticBackend()
-    transmission = SrikaraSimulator(
-        SimulatorConfig(axis_policy="best_qp"), backend
-    ).transmit(PAYLOAD)
+    transmission = Simulator(SimulatorConfig(axis_policy="best_qp"), backend).transmit(
+        PAYLOAD
+    )
 
     for attempt in transmission.attempts:
         for message in attempt.run.messages:
@@ -55,7 +52,7 @@ def test_best_qp_axis_policy_reads_the_quadrature_with_the_larger_response():
 
 
 def test_decoy_checks_reject_a_disturbed_channel(eavesdropper):
-    transmission = SrikaraSimulator(SimulatorConfig(), eavesdropper()).transmit(PAYLOAD)
+    transmission = Simulator(SimulatorConfig(), eavesdropper()).transmit(PAYLOAD)
 
     for attempt in transmission.attempts:
         assert all(check.passed for check in attempt.run.controls)
@@ -64,10 +61,8 @@ def test_decoy_checks_reject_a_disturbed_channel(eavesdropper):
 
 
 def test_secded_corrects_one_wrong_symbol_per_block(corrupt_first_message):
-    uncoded = SrikaraSimulator(SimulatorConfig(), corrupt_first_message()).transmit(
-        PAYLOAD
-    )
-    coded = SrikaraSimulator(
+    uncoded = Simulator(SimulatorConfig(), corrupt_first_message()).transmit(PAYLOAD)
+    coded = Simulator(
         SimulatorConfig(error_correction="secded"), corrupt_first_message()
     ).transmit(PAYLOAD)
 
@@ -76,10 +71,8 @@ def test_secded_corrects_one_wrong_symbol_per_block(corrupt_first_message):
 
 
 def test_rejected_blocks_are_retried_until_recovered(reject_every_other_run):
-    single = SrikaraSimulator(SimulatorConfig(), reject_every_other_run()).transmit(
-        PAYLOAD
-    )
-    retried = SrikaraSimulator(
+    single = Simulator(SimulatorConfig(), reject_every_other_run()).transmit(PAYLOAD)
+    retried = Simulator(
         SimulatorConfig(max_attempts=2), reject_every_other_run()
     ).transmit(PAYLOAD)
 
@@ -93,7 +86,7 @@ def test_rejected_blocks_are_retried_until_recovered(reject_every_other_run):
 def test_aligned_axis_reads_the_full_message_displacement():
     backend = AnalyticBackend()
     config = SimulatorConfig(axis_policy="aligned")
-    transmission = SrikaraSimulator(config, backend).transmit(PAYLOAD)
+    transmission = Simulator(config, backend).transmit(PAYLOAD)
 
     assert transmission.recovered_bits == PAYLOAD
     for attempt in transmission.attempts:
@@ -107,7 +100,7 @@ def test_aligned_axis_reads_the_full_message_displacement():
 
 
 def test_bob_draws_alpha_with_the_configured_variance():
-    run = SrikaraSimulator(SimulatorConfig()).run_block(("000",) * 1000, seed=3)
+    run = Simulator(SimulatorConfig()).run_block(("000",) * 1000, seed=3)
     alphas = [state.alpha for state in run.states]
     variance = sum(a.real**2 + a.imag**2 for a in alphas) / (2 * len(alphas))
 

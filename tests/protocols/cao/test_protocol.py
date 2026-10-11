@@ -8,7 +8,7 @@ from qsdc.common.random import ClassicalRandomSource, weighted_random_bits
 from qsdc.protocols.cao.config import SimulatorConfig
 from qsdc.protocols.cao.constants import EPR_BOUND
 from qsdc.protocols.cao.simulator.backends import AnalyticBackend
-from qsdc.protocols.cao.simulator.protocol import CaoSimulator
+from qsdc.protocols.cao.simulator.protocol import Simulator
 
 
 class NoiselessBackend(AnalyticBackend):
@@ -67,7 +67,7 @@ def test_joint_measurement_reads_alice_s_displacement():
 
 def test_noiseless_round_trip():
     payload = bytes_to_bits(b"Gaussian mapping")
-    simulator = CaoSimulator(SimulatorConfig(), NoiselessBackend(0.0))
+    simulator = Simulator(SimulatorConfig(), NoiselessBackend(0.0))
 
     transmission = simulator.transmit(payload)
 
@@ -82,7 +82,7 @@ def test_a_detected_error_is_retried():
     payload = "10"
     config = SimulatorConfig(max_attempts=2)
 
-    transmission = CaoSimulator(config, InvertFirstSignal(0.0)).transmit(payload)
+    transmission = Simulator(config, InvertFirstSignal(0.0)).transmit(payload)
 
     first, second = transmission.attempts
     assert first.run.accepted and first.decoded_bits is None
@@ -94,7 +94,7 @@ def test_intercepting_the_detection_light_is_detected():
     payload = weighted_random_bits(200, 0.5, ClassicalRandomSource(1))
     config = SimulatorConfig(check_pairs=16, max_attempts=3)
 
-    transmission = CaoSimulator(config, InterceptedBackend(config.squeeze_r)).transmit(
+    transmission = Simulator(config, InterceptedBackend(config.squeeze_r)).transmit(
         payload
     )
 
@@ -107,7 +107,7 @@ def test_honest_channel_passes_the_checks():
     payload = weighted_random_bits(400, 0.5, ClassicalRandomSource(1))
     config = SimulatorConfig(check_pairs=16)
 
-    transmission = CaoSimulator(config).transmit(payload)
+    transmission = Simulator(config).transmit(payload)
 
     accepted = [attempt.run.accepted for attempt in transmission.attempts]
     assert fmean(accepted) > 0.9
@@ -115,7 +115,7 @@ def test_honest_channel_passes_the_checks():
 
 def test_each_block_uses_its_pairs_once():
     config = SimulatorConfig()
-    run = CaoSimulator(config, NoiselessBackend(0.0)).transmit("10").attempts[0].run
+    run = Simulator(config, NoiselessBackend(0.0)).transmit("10").attempts[0].run
     indices = [check.index for check in run.channel.checks + run.authentication.checks]
     indices += [signal.index for signal in run.signals]
 
@@ -127,8 +127,8 @@ def test_transmission_is_reproducible():
     payload = weighted_random_bits(60, 0.5, ClassicalRandomSource(2))
     config = SimulatorConfig(max_attempts=3)
 
-    first = CaoSimulator(config).transmit(payload)
-    second = CaoSimulator(config).transmit(payload)
+    first = Simulator(config).transmit(payload)
+    second = Simulator(config).transmit(payload)
 
     assert first == second
 

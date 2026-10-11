@@ -7,7 +7,7 @@ from qsdc.common.config.base import Config
 from qsdc.common.random import ClassicalRandomSource, derive_seed, weighted_random_bits
 from qsdc.protocols.srikara.benchmark.metrics import RunMetrics, measure, pool
 from qsdc.protocols.srikara.config import SimulatorConfig
-from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
+from qsdc.protocols.srikara.simulator.protocol import Simulator
 
 
 class Workload(Config):
@@ -80,7 +80,7 @@ def run_benchmark(benchmark: Benchmark, repetitions: int = 1) -> BenchmarkResult
             if workload not in payloads:
                 payloads[workload] = workload.payload()
             case_started = perf_counter()
-            transmission = SrikaraSimulator(simulator).transmit(payloads[workload])
+            transmission = Simulator(simulator).transmit(payloads[workload])
             samples.append(measure(transmission, perf_counter() - case_started))
         runs.append(RunResult(case, pool(samples), tuple(samples)))
     return BenchmarkResult(benchmark, tuple(runs), perf_counter() - started)

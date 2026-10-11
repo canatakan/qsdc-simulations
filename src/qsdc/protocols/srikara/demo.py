@@ -43,7 +43,7 @@ from qsdc.protocols.srikara.simulator.protocol import (
     Attempt,
     Check,
     Message,
-    SrikaraSimulator,
+    Simulator,
     Transmission,
 )
 from qsdc.protocols.srikara.simulator.transport import odd_parity
@@ -75,7 +75,7 @@ def main() -> None:
             update[field] = getattr(args, field)
     config = SIMULATORS[args.simulator].model_copy(update=update)
     payload = bytes_to_bits(args.message.encode())
-    transmission = SrikaraSimulator(config).transmit(payload)
+    transmission = Simulator(config).transmit(payload)
     blocks = group_by_block(transmission)
 
     show_settings(config, args.simulator, args.noise)

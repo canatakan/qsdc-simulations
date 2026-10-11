@@ -9,7 +9,7 @@ from strawberryfields import ops
 from qsdc.common.random import ClassicalRandomSource, weighted_random_bits
 from qsdc.protocols.cao.config import NOISES, SimulatorConfig
 from qsdc.protocols.cao.simulator.backends import AnalyticBackend
-from qsdc.protocols.cao.simulator.protocol import CaoSimulator
+from qsdc.protocols.cao.simulator.protocol import Simulator
 
 SQUEEZE_R = 1.0
 NOISE = NOISES["metro_10km"]
@@ -76,7 +76,7 @@ def test_the_gain_estimate_follows_the_loss():
     config = SimulatorConfig(noise=NOISE, check_pairs=16, max_attempts=3)
     payload = weighted_random_bits(200, 0.5, ClassicalRandomSource(4))
 
-    transmission = CaoSimulator(config).transmit(payload)
+    transmission = Simulator(config).transmit(payload)
 
     gains = [a.run.gain for a in transmission.attempts if a.run.gain is not None]
     assert fmean(gains) == pytest.approx(GAIN, rel=0.03)

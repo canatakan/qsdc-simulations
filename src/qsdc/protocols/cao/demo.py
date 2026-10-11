@@ -22,7 +22,7 @@ from qsdc.protocols.cao.constants import EPR_BOUND
 from qsdc.protocols.cao.simulator.mapping import interval_code, restore_block
 from qsdc.protocols.cao.simulator.protocol import (
     Attempt,
-    CaoSimulator,
+    Simulator,
     Stage,
     Transmission,
 )
@@ -50,7 +50,7 @@ def main() -> None:
     update = {f: getattr(args, f) for f in fields if getattr(args, f) is not None}
     config = SimulatorConfig(noise=NOISES[args.noise], **update)
     payload = bytes_to_bits(args.message.encode())
-    transmission = CaoSimulator(config).transmit(payload)
+    transmission = Simulator(config).transmit(payload)
     blocks = group_by_block(transmission)
 
     show_settings(config, args.noise)

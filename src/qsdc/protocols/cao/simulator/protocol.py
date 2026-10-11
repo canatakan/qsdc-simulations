@@ -108,7 +108,7 @@ Attempt = transmission.Attempt[Block, BlockRun]
 Transmission = transmission.Transmission[Block, BlockRun]
 
 
-class CaoSimulator:
+class Simulator:
     def __init__(self, config: SimulatorConfig, backend: AnalyticBackend | None = None):
         self.config = config
         self.backend = backend or AnalyticBackend(config.squeeze_r, config.noise)

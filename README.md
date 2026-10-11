@@ -112,10 +112,10 @@ defaults are the noiseless paper setting.
 
 ```python
 from qsdc.protocols.srikara.config import SimulatorConfig
-from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
+from qsdc.protocols.srikara.simulator.protocol import Simulator
 
 config = SimulatorConfig(error_correction="secded", max_attempts=3)
-transmission = SrikaraSimulator(config).transmit("101001110010")
+transmission = Simulator(config).transmit("101001110010")
 assert transmission.recovered_bits == "101001110010"
 ```
 
@@ -176,9 +176,9 @@ units with a vacuum variance of 1, as in the paper.
 
 ```python
 from qsdc.protocols.cao.config import SimulatorConfig
-from qsdc.protocols.cao.simulator.protocol import CaoSimulator
+from qsdc.protocols.cao.simulator.protocol import Simulator
 
-transmission = CaoSimulator(SimulatorConfig(max_attempts=3)).transmit("1010")
+transmission = Simulator(SimulatorConfig(max_attempts=3)).transmit("1010")
 ```
 
 The payload is uniformized (0 → 01/10, 1 → 00/11, alternately) and split
