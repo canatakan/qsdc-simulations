@@ -5,7 +5,7 @@ import pytest
 
 from qsdc.common.coding.bits import bytes_to_bits
 from qsdc.common.random import ClassicalRandomSource, weighted_random_bits
-from qsdc.protocols.cao.config import SimulatorConfig
+from qsdc.protocols.cao.config import NOISES, SimulatorConfig
 from qsdc.protocols.cao.constants import EPR_BOUND
 from qsdc.protocols.cao.simulator.backends import AnalyticBackend
 from qsdc.protocols.cao.simulator.protocol import Simulator
@@ -73,14 +73,16 @@ def test_noiseless_round_trip():
 
     assert transmission.recovered_bits == payload
     assert all(
-        attempt.run.gain == pytest.approx(1 / sqrt(2))
+        attempt.run.estimate.gain == pytest.approx(1 / sqrt(2))
         for attempt in transmission.attempts
     )
 
 
-def test_a_detected_error_is_retried():
+def test_without_reconciliation_a_detected_error_is_retried():
     payload = "10"
-    config = SimulatorConfig(max_attempts=2)
+    config = SimulatorConfig(
+        block_bits=2, boxes=4, check_pairs=4, reconciliation=None, max_attempts=2
+    )
 
     transmission = Simulator(config, InvertFirstSignal(0.0)).transmit(payload)
 
@@ -88,6 +90,43 @@ def test_a_detected_error_is_retried():
     assert first.run.accepted and first.decoded_bits is None
     assert not first.run.signals[0].parity_valid
     assert second.decoded_bits == payload
+
+
+def test_reconciliation_corrects_a_wrong_box():
+    payload = weighted_random_bits(256, 0.5, ClassicalRandomSource(6))
+
+    transmission = Simulator(SimulatorConfig(), InvertFirstSignal(0.0)).transmit(
+        payload
+    )
+
+    (attempt,) = transmission.attempts
+    assert attempt.run.signals[0].decoded_bits != attempt.run.signals[0].box.bits
+    assert attempt.decoded_bits == payload
+
+
+@pytest.mark.parametrize("name", ["clean", "lab"])
+def test_reconciliation_delivers_the_message(name):
+    payload = weighted_random_bits(1024, 0.5, ClassicalRandomSource(7))
+    config = SimulatorConfig(noise=NOISES[name], max_attempts=3)
+
+    transmission = Simulator(config).transmit(payload)
+
+    wrong = sum(
+        s.decoded_bits != s.box.bits
+        for a in transmission.attempts
+        for s in a.run.signals
+    )
+    assert wrong > 0
+    assert transmission.recovered_bits == payload
+
+
+def test_without_reconciliation_the_raw_errors_withhold_blocks():
+    payload = weighted_random_bits(1024, 0.5, ClassicalRandomSource(7))
+    config = SimulatorConfig(noise=NOISES["lab"], reconciliation=None)
+
+    transmission = Simulator(config).transmit(payload)
+
+    assert transmission.recovered_bits is None
 
 
 def test_intercepting_the_detection_light_is_detected():
@@ -104,13 +143,11 @@ def test_intercepting_the_detection_light_is_detected():
 
 
 def test_honest_channel_passes_the_checks():
-    payload = weighted_random_bits(400, 0.5, ClassicalRandomSource(1))
-    config = SimulatorConfig(check_pairs=16)
+    payload = weighted_random_bits(1024, 0.5, ClassicalRandomSource(1))
 
-    transmission = Simulator(config).transmit(payload)
+    transmission = Simulator(SimulatorConfig()).transmit(payload)
 
-    accepted = [attempt.run.accepted for attempt in transmission.attempts]
-    assert fmean(accepted) > 0.9
+    assert all(attempt.run.accepted for attempt in transmission.attempts)
 
 
 def test_each_block_uses_its_pairs_once():

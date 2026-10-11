@@ -66,12 +66,13 @@ srikara-demo "hello" --noise metro_10km --block 3 --trace
 ```
 
 `cao-demo` does the same for the Cao simulator. `--noise` picks a noise
-baseline (default `clean`), and the other options set the seed, the squeezing,
-the check pairs and the sends per block.
+baseline (default `clean`), `--rows` how many boxes each table shows,
+`--no-reconciliation` turns step 7's error correction off, and the other options
+set the seed, the squeezing, the check pairs and the sends per block.
 
 ```bash
 cao-demo "hello"
-cao-demo "hello" --max-attempts 3 --block 2
+cao-demo "hello" --noise lab --rows 12
 cao-demo "hello" --noise metro_10km --max-attempts 3
 ```
 
@@ -170,9 +171,11 @@ the noisy circuit, so honest noise is not mistaken for an eavesdropper.
 
 ## Cao simulator
 
-`SimulatorConfig` (`cao/config.py`) holds the settings; its defaults follow the
-worked example of the paper (Fig. 3, Table I). Quadratures are in shot-noise
-units with a vacuum variance of 1, as in the paper.
+`SimulatorConfig` (`cao/config.py`) holds the settings. Each box follows the
+worked example of the paper (Fig. 3, Table I): 2 payload bits, 1 detection bit
+and an odd parity bit, mapped onto 8 intervals. A block holds 256 message bits
+in 512 boxes, so that the reconciliation code is long enough. Quadratures are in
+shot-noise units with a vacuum variance of 1, as in the paper.
 
 ```python
 from qsdc.protocols.cao.config import SimulatorConfig
@@ -204,28 +207,47 @@ pairs, `2 * check_pairs + boxes` of them (`simulator/protocol.py`):
 5. Alice displaces X of S1 by G1' and P by an independent Gaussian G2.
 6. Bob measures the arriving beam jointly with his S2:
    X_m = (X_info − X_2)/√2, P_m = (P_info + P_2)/√2 (Eq. 6).
-7. Alice reveals G2. Bob fits P_m = t G2 to estimate his gain t, which is
-   √(ηT/2) with fibre transmittance T and detector efficiency η, decodes
-   X_m / t into an interval, and checks the detection and parity bits. The block is released when every box passes, and its
-   two uniformizations are inverted.
+7. Postprocessing (`simulator/postprocessing.py`):
+   1. Parameter estimation: Alice reveals G2, and Bob fits P_m = t G2 + noise
+      to estimate his gain t, which is √(ηT/2) with fibre transmittance T and
+      detector efficiency η, and the variance of his noise.
+   2. Reconciliation: Alice sends the syndrome of an LDPC code
+      (`common/coding/ldpc.py`) over the payload bits of the block, of length
+      `reconciliation.syndrome_fraction` times the payload bits. Bob computes,
+      for each of his payload bits, the log-likelihood ratio given X_m / t, his
+      noise and the announced detection bits of the box. Each box's announced
+      parity bit adds one more check. A min-sum decoder then corrects Bob's
+      bits until every check matches.
+   3. Extraction: both uniformizations are inverted.
 
-A terminated block, or one with a detected error, is sent again up to
-`max_attempts` times.
+A terminated block, or one whose reconciliation does not converge, is sent
+again up to `max_attempts` times. With `reconciliation=None`, Bob instead decodes
+each box on its own and the block is released only when every box passes its
+detection and parity bits.
 
 Default choices where the paper gives no value:
 
 - `squeeze_r` = arcosh(9)/2 ≈ 1.444 (12.5 dB), so that the two-mode squeezed
   state has the variance V = V_A + 1 of the paper's security model.
-- `check_pairs` = 4 per stage, as many as boxes.
+- `check_pairs` = 64 per stage, 128 of the 640 pairs of a block.
 - `check_failure_threshold` = 1/e, the failure rate of uncorrelated light: a
   position of a pure EPR pair fails with probability exp(−2/(1 + e^(−2r))),
   15% at the default squeezing, and of two vacua with exp(−1).
+- `reconciliation.syndrome_fraction` = 0.5, enough for every block that passes
+  the checks up to the `metro_5km` baseline; `metro_10km` needs about 0.7.
 
 The modulation is taken literally: Alice displaces by G1' itself, so Bob reads
 G1'/√2 on top of the squeezed noise e^(−r) of the pair. On the clean channel
 about a fifth of the boxes are decoded into a wrong interval at the default
-squeezing. The paper removes these errors by reverse reconciliation, which is
-not simulated; here only the detection and parity bits detect them.
+squeezing, and on the `lab` baseline almost two fifths. Reconciliation removes
+these errors.
+
+The paper names reverse reconciliation and privacy amplification, but specifies
+neither. Reverse reconciliation corrects Alice's data towards Bob's, which
+suits a random key but not a message that Bob has to recover, so the
+reconciliation here is direct. The syndrome is public: it reveals
+`syndrome_fraction` bits per payload bit, on top of the announced detection and
+parity bits. Privacy amplification is not simulated.
 
 `AnalyticBackend` (`simulator/backends.py`) samples the vacuum quadratures and
 applies the paper's linear transformations, which gives the exact statistics
@@ -246,8 +268,8 @@ every loss replaces part of it with unsqueezed vacuum noise. Even the 1 km of
 the `lab` baseline therefore nearly doubles the wrong boxes, and the checks
 reject honest pairs more often with distance, because Eq. 5 compares Alice's
 and Bob's outcomes without compensating Bob's loss. The tests check the
-variances against Strawberry Fields. Strawberry Fields backends, SECDED and
-benchmarks are not implemented yet.
+variances against Strawberry Fields. Strawberry Fields backends, the security
+analysis of the paper's Sec. III and benchmarks are not implemented yet.
 
 ## Benchmarks
 

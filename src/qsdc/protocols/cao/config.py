@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from math import acosh, exp
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import model_validator
 
@@ -33,18 +33,29 @@ NOISES = {
 }
 
 
+class Reconciliation(Config):
+    syndrome_fraction: float = 0.5
+    column_weight: int = 3
+    max_iterations: int = 100
+
+
 class SimulatorConfig(Config):
     random_source: Literal["classical", "sf-bs-qrng"] = "classical"
     seed: int = 11
     noise: NoiseConfig = NoiseConfig()
     squeeze_r: float = acosh(9.0) / 2
     modulation_variance_snu: float = 8.0
-    block_bits: int = 2
-    boxes: int = 4
+    block_bits: int = 256
+    boxes: int = 512
     detection_bits: int = 1
-    check_pairs: int = 4
+    check_pairs: int = 64
     check_failure_threshold: float = exp(-1.0)
+    reconciliation: Optional[Reconciliation] = Reconciliation()  # noqa: UP045
     max_attempts: int = 1
+
+    @property
+    def payload_bits(self) -> int:
+        return 4 * self.block_bits
 
     @property
     def box_bits(self) -> int:

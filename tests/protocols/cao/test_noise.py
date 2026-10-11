@@ -73,12 +73,12 @@ def test_checks_match_strawberry_fields():
 
 
 def test_the_gain_estimate_follows_the_loss():
-    config = SimulatorConfig(noise=NOISE, check_pairs=16, max_attempts=3)
+    config = SimulatorConfig(noise=NOISE, check_failure_threshold=1.01)
     payload = weighted_random_bits(200, 0.5, ClassicalRandomSource(4))
 
     transmission = Simulator(config).transmit(payload)
 
-    gains = [a.run.gain for a in transmission.attempts if a.run.gain is not None]
+    gains = [a.run.estimate.gain for a in transmission.attempts if a.run.estimate]
     assert fmean(gains) == pytest.approx(GAIN, rel=0.03)
 
 

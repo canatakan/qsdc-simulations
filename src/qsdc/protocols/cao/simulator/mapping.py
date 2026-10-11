@@ -22,9 +22,8 @@ def uniformize_message(bits: str) -> str:
 
 
 def restore_message(bits: str) -> str:
-    return "".join(
-        "1" if bits[i] == bits[i + 1] else "0" for i in range(0, len(bits), 2)
-    )
+    pairs = [bits[i : i + 2] for i in range(0, len(bits), 2)]
+    return "".join("1" if pair[0] == pair[1] else "0" for pair in pairs)
 
 
 def uniformize_block(bits: str, rng: RandomSource) -> str:
@@ -41,6 +40,14 @@ class Box:
     bits: str
     detection: tuple[int, ...]
     parity: str
+
+    @property
+    def detection_values(self) -> str:
+        return "".join(self.bits[i] for i in self.detection)
+
+    @property
+    def payload_parity(self) -> str:
+        return str((1 + int(self.parity) + self.detection_values.count("1")) % 2)
 
     def unmap(self, bits: str) -> str:
         return "".join(bit for i, bit in enumerate(bits) if i not in self.detection)

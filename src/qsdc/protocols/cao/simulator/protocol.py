@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import sqrt
 
 from qsdc.common import transmission
@@ -16,6 +16,13 @@ from qsdc.protocols.cao.simulator.mapping import (
     restore_message,
     uniformize_block,
     uniformize_message,
+)
+from qsdc.protocols.cao.simulator.postprocessing import (
+    Estimate,
+    confidences,
+    estimate,
+    reconcile,
+    reconciliation_code,
 )
 
 
@@ -96,8 +103,10 @@ class BlockRun:
     pairs: int
     channel: Stage
     authentication: Stage | None
-    signals: tuple[Signal, ...]
-    gain: float | None
+    signals: tuple[Signal, ...] = ()
+    estimate: Estimate | None = None
+    syndrome: str | None = None
+    reconciled: str | None = None
 
     @property
     def accepted(self) -> bool:
@@ -113,6 +122,9 @@ class Simulator:
         self.config = config
         self.backend = backend or AnalyticBackend(config.squeeze_r, config.noise)
         self.code = interval_code(config)
+        self.reconciliation = (
+            reconciliation_code(config) if config.reconciliation else None
+        )
 
     def transmit(self, payload: str) -> Transmission:
         config = self.config
@@ -125,9 +137,16 @@ class Simulator:
 
     def _send(self, block: Block, seed: int) -> tuple[BlockRun, str | None]:
         run = self.run_block(block, seed)
-        if not run.accepted or not all(signal.valid for signal in run.signals):
+        if not run.accepted:
             return run, None
-        payload = "".join(signal.decoded_payload for signal in run.signals)
+        if self.reconciliation is None:
+            if not all(signal.valid for signal in run.signals):
+                return run, None
+            payload = "".join(signal.decoded_payload for signal in run.signals)
+        elif run.reconciled is None:
+            return run, None
+        else:
+            payload = run.reconciled
         return run, restore_message(restore_block(payload))[: len(block.bits)]
 
     def run_block(self, block: Block, seed: int) -> BlockRun:
@@ -138,12 +157,16 @@ class Simulator:
         checks = config.check_pairs
         pairs = 2 * checks + config.boxes
         positions = rng.shuffled(range(pairs))
-        channel = self._stage(sorted(positions[:checks]))
+        channel_positions = sorted(positions[:checks])
+        authentication_positions = sorted(positions[checks : 2 * checks])
+        signal_positions = sorted(positions[2 * checks :])
+
+        channel = self._stage(channel_positions)
         if not channel.accepted:
-            return BlockRun(pairs, channel, None, (), None)
-        authentication = self._stage(sorted(positions[checks : 2 * checks]))
+            return BlockRun(pairs, channel, None)
+        authentication = self._stage(authentication_positions)
         if not authentication.accepted:
-            return BlockRun(pairs, channel, authentication, (), None)
+            return BlockRun(pairs, channel, authentication)
 
         bits = uniformize_block(block.uniformized, rng)
         width = config.box_bits
@@ -154,24 +177,38 @@ class Simulator:
         sigma = sqrt(config.modulation_variance_snu)
         g1 = [self.code.sample(box.bits, rng) for box in boxes]
         g2 = [rng.gauss(sigma) for _ in boxes]
-        measured = [self.backend.measure_signal(complex(x, p)) for x, p in zip(g1, g2)]
+        measured = []
+        for x, p in zip(g1, g2):
+            measured.append(self.backend.measure_signal(complex(x, p)))
 
-        gain = sum(p * m.imag for p, m in zip(g2, measured)) / sum(p * p for p in g2)
-        signals = tuple(
-            Signal(
-                index,
-                box,
-                x,
-                p,
-                m,
-                m.real / gain,
-                self.code.decode(m.real / gain),
+        channel_estimate = estimate(g2, [m.imag for m in measured])
+        signals = []
+        for i, box in enumerate(boxes):
+            value = measured[i].real / channel_estimate.gain
+            signals.append(
+                Signal(
+                    index=signal_positions[i],
+                    box=box,
+                    g1=g1[i],
+                    g2=g2[i],
+                    measured=measured[i],
+                    decoded_value=value,
+                    decoded_bits=self.code.decode(value),
+                )
             )
-            for index, box, x, p, m in zip(
-                sorted(positions[2 * checks :]), boxes, g1, g2, measured
-            )
+        run = BlockRun(pairs, channel, authentication, tuple(signals), channel_estimate)
+        if self.reconciliation is None:
+            return run
+
+        values = [signal.decoded_value for signal in signals]
+        bit_confidences = confidences(boxes, values, self.code, channel_estimate)
+        syndrome, reconciled = reconcile(
+            self.reconciliation,
+            boxes,
+            bit_confidences,
+            config.reconciliation.max_iterations,
         )
-        return BlockRun(pairs, channel, authentication, signals, gain)
+        return replace(run, syndrome=syndrome, reconciled=reconciled)
 
     def _stage(self, positions: list[int]) -> Stage:
         checks = tuple(
