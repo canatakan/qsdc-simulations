@@ -5,7 +5,7 @@ import pytest
 
 from qsdc.common.coding.bits import bytes_to_bits
 from qsdc.common.random import ClassicalRandomSource, weighted_random_bits
-from qsdc.protocols.cao.config import NOISES, SimulatorConfig
+from qsdc.protocols.cao.config import NOISES, Reconciliation, SimulatorConfig
 from qsdc.protocols.cao.constants import EPR_BOUND
 from qsdc.protocols.cao.simulator.backends import AnalyticBackend
 from qsdc.protocols.cao.simulator.protocol import Simulator
@@ -81,7 +81,7 @@ def test_noiseless_round_trip():
 def test_without_reconciliation_a_detected_error_is_retried():
     payload = "10"
     config = SimulatorConfig(
-        block_bits=2, boxes=4, check_pairs=4, reconciliation=None, max_attempts=2
+        boxes=4, check_pairs=4, reconciliation=None, max_attempts=2
     )
 
     transmission = Simulator(config, InvertFirstSignal(0.0)).transmit(payload)
@@ -93,11 +93,10 @@ def test_without_reconciliation_a_detected_error_is_retried():
 
 
 def test_reconciliation_corrects_a_wrong_box():
-    payload = weighted_random_bits(256, 0.5, ClassicalRandomSource(6))
+    config = SimulatorConfig()
+    payload = weighted_random_bits(config.block_bits, 0.5, ClassicalRandomSource(6))
 
-    transmission = Simulator(SimulatorConfig(), InvertFirstSignal(0.0)).transmit(
-        payload
-    )
+    transmission = Simulator(config, InvertFirstSignal(0.0)).transmit(payload)
 
     (attempt,) = transmission.attempts
     assert attempt.run.signals[0].decoded_bits != attempt.run.signals[0].box.bits
@@ -170,6 +169,6 @@ def test_transmission_is_reproducible():
     assert first == second
 
 
-def test_rejects_boxes_that_do_not_divide_the_block():
+def test_rejects_settings_without_secure_message_bits():
     with pytest.raises(ValueError):
-        SimulatorConfig(block_bits=2, boxes=3)
+        SimulatorConfig(reconciliation=Reconciliation(syndrome_fraction=0.5))

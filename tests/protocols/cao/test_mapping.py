@@ -95,7 +95,7 @@ def test_a_wrong_bit_fails_parity():
 
 
 def test_mapping_keeps_the_gaussian_of_a_biased_payload():
-    config = SimulatorConfig()
+    config = SimulatorConfig(reconciliation=None)
     code = interval_code(config)
     rng = ClassicalRandomSource(8)
     payload = weighted_random_bits(4000, 0.9, rng)

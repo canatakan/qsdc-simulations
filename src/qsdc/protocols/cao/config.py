@@ -5,7 +5,14 @@ from typing import Literal, Optional
 
 from pydantic import model_validator
 
-from qsdc.common.config.base import Config
+from qsdc.common.config.base import (
+    Config,
+    Fraction,
+    NonNegative,
+    NonNegativeInt,
+    Positive,
+    PositiveInt,
+)
 from qsdc.common.config.noise import BASELINES, Channel, Detector, Environment, Memory
 
 
@@ -34,35 +41,55 @@ NOISES = {
 
 
 class Reconciliation(Config):
-    syndrome_fraction: float = 0.5
-    column_weight: int = 3
-    max_iterations: int = 100
+    syndrome_fraction: Fraction = 0.3
+    column_weight: PositiveInt = 3
+    max_iterations: PositiveInt = 100
+    secrecy_margin: NonNegativeInt = 32
 
 
 class SimulatorConfig(Config):
     random_source: Literal["classical", "sf-bs-qrng"] = "classical"
     seed: int = 11
     noise: NoiseConfig = NoiseConfig()
-    squeeze_r: float = acosh(9.0) / 2
-    modulation_variance_snu: float = 8.0
-    block_bits: int = 256
-    boxes: int = 512
-    detection_bits: int = 1
-    check_pairs: int = 64
-    check_tolerance_sigmas: float = 3.0
+    squeeze_r: NonNegative = acosh(9.0) / 2
+    modulation_variance_snu: Positive = 8.0
+    boxes: PositiveInt = 512
+    box_bits: PositiveInt = 2
+    detection_bits: PositiveInt = 1
+    check_pairs: PositiveInt = 64
+    check_tolerance_sigmas: Positive = 3.0
     reconciliation: Optional[Reconciliation] = Reconciliation()  # noqa: UP045
-    max_attempts: int = 1
+    max_attempts: PositiveInt = 1
 
     @property
     def payload_bits(self) -> int:
-        return 4 * self.block_bits
+        return self.boxes * self.box_bits
 
     @property
-    def box_bits(self) -> int:
-        return 4 * self.block_bits // self.boxes
+    def syndrome_bits(self) -> int:
+        return round(self.reconciliation.syndrome_fraction * self.payload_bits)
+
+    @property
+    def public_bits(self) -> int:
+        # What Eve can read about the payload on the classical channel: one
+        # announced parity bit per box and the reconciliation syndrome.
+        return self.boxes + self.syndrome_bits
+
+    @property
+    def block_bits(self) -> int:
+        if self.reconciliation is None:
+            # Both uniformizations double the bits.
+            return self.payload_bits // 4
+        margin = self.reconciliation.secrecy_margin
+        return self.payload_bits - self.public_bits - margin
 
     @model_validator(mode="after")
-    def _whole_boxes(self) -> SimulatorConfig:
-        if 4 * self.block_bits % self.boxes:
-            raise ValueError("4 * block_bits must be divisible by boxes")
+    def _message_fits(self) -> SimulatorConfig:
+        if self.reconciliation is None and self.payload_bits % 4:
+            raise ValueError("the payload bits must be divisible by 4")
+        if self.block_bits < 1:
+            raise ValueError(
+                "no secure message bits are left: the announced parities, the "
+                "syndrome and the secrecy margin cover all payload bits"
+            )
         return self

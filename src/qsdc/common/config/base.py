@@ -10,6 +10,7 @@ Fraction = Annotated[float, Field(ge=0.0, le=1.0)]
 NonNegative = Annotated[float, Field(ge=0.0)]
 Positive = Annotated[float, Field(gt=0.0)]
 PositiveInt = Annotated[int, Field(ge=1)]
+NonNegativeInt = Annotated[int, Field(ge=0)]
 
 
 class Config(BaseModel):

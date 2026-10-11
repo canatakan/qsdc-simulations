@@ -33,7 +33,7 @@ def reconciliation_code(config: SimulatorConfig) -> LdpcCode:
     length = config.payload_bits
     code = LdpcCode.regular(
         length,
-        checks=round(settings.syndrome_fraction * length),
+        checks=config.syndrome_bits,
         column_weight=settings.column_weight,
         seed=config.seed,
     )

@@ -17,9 +17,11 @@ from __future__ import annotations
 import argparse
 from math import e, log10, sqrt
 
+from pydantic import ValidationError
+
 from qsdc.common.coding.bits import bits_to_bytes, bytes_to_bits, hamming_distance
 from qsdc.common.utils import header, interval, step, table
-from qsdc.protocols.cao.config import NOISES, SimulatorConfig
+from qsdc.protocols.cao.config import NOISES, Reconciliation, SimulatorConfig
 from qsdc.protocols.cao.constants import EPR_BOUND
 from qsdc.protocols.cao.simulator.mapping import interval_code, restore_block
 from qsdc.protocols.cao.simulator.protocol import (
@@ -49,18 +51,32 @@ def main() -> None:
         help="release a block only when every box decodes correctly on its own",
     )
     parser.add_argument(
+        "--syndrome-fraction",
+        type=float,
+        help="syndrome bits per payload bit (default 0.3)",
+    )
+    parser.add_argument(
         "--block", type=int, help="block to show in detail (default: most sends)"
     )
     parser.add_argument(
         "--rows", type=int, default=8, help="boxes and checks shown per table"
     )
     args = parser.parse_args()
+    if not args.message:
+        parser.error("the message must not be empty")
 
     fields = ("random_source", "seed", "squeeze_r", "check_pairs", "max_attempts")
     update = {f: getattr(args, f) for f in fields if getattr(args, f) is not None}
     if args.no_reconciliation:
         update["reconciliation"] = None
-    config = SimulatorConfig(noise=NOISES[args.noise], **update)
+    elif args.syndrome_fraction is not None:
+        update["reconciliation"] = Reconciliation(
+            syndrome_fraction=args.syndrome_fraction
+        )
+    try:
+        config = SimulatorConfig(noise=NOISES[args.noise], **update)
+    except ValidationError as error:
+        parser.error(str(error.errors()[0]["msg"]))
     payload = bytes_to_bits(args.message.encode())
     transmission = Simulator(config).transmit(payload)
     blocks = group_by_block(transmission)
@@ -122,6 +138,14 @@ def show_settings(config: SimulatorConfig, noise: str) -> None:
                 else f"LDPC syndrome of {settings.syndrome_fraction:g} x "
                 f"{config.payload_bits} payload bits, column weight "
                 f"{settings.column_weight}",
+            ),
+            (
+                "Privacy amplification",
+                "off, the paper's uniformization"
+                if settings is None
+                else f"{config.payload_bits} payload bits - {config.boxes} parities "
+                f"- {config.syndrome_bits} syndrome - {settings.secrecy_margin} margin "
+                f"= {config.block_bits} message bits",
             ),
             ("Sends per block", f"at most {config.max_attempts}"),
         ],
@@ -199,10 +223,17 @@ def show_attempt(
 
     signals = run.signals
     step("4. Gaussian mapping")
-    print(f"Message bits            {shortened(block.bits)}")
-    print(f"Message uniformization  {shortened(block.uniformized)}")
     payloads = "".join(s.box.payload for s in signals)
-    print(f"Block uniformization    {shortened(payloads)}")
+    print(f"Message bits            {shortened(block.bits)}")
+    if block.payload is not None:
+        print(
+            f"Privacy amplification   {len(payloads) - config.block_bits} random bits "
+            f"added, payload chosen so that its hash is the message"
+        )
+        print(f"Payload                 {shortened(payloads)}")
+    else:
+        print(f"Message uniformization  {shortened(block.uniformized)}")
+        print(f"Block uniformization    {shortened(payloads)}")
     table(
         ("Box", "Payload", "Detection at", "Mapped", "Parity", "Interval"),
         [
@@ -288,11 +319,15 @@ def show_attempt(
                 "Wrong payload bits after reconciliation: "
                 f"{hamming_distance(reconciled, payloads)}"
             )
-    if attempt.decoded_bits is not None:
-        payload = reconciled if reconciled is not None else raw
+    if attempt.decoded_bits is not None and reconciled is not None:
         print(
-            f"(iii) Inverse mapping: {shortened(payload, 24)} -> "
-            f"{shortened(restore_block(payload), 24)} -> "
+            f"(iii) Privacy amplification: hash of {shortened(reconciled, 24)} -> "
+            f"{shortened(attempt.decoded_bits, 24)}"
+        )
+    elif attempt.decoded_bits is not None:
+        print(
+            f"(iii) Inverse mapping: {shortened(raw, 24)} -> "
+            f"{shortened(restore_block(raw), 24)} -> "
             f"{shortened(attempt.decoded_bits, 24)}"
         )
     print(f"-> {outcome(attempt)}")

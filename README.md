@@ -67,13 +67,14 @@ srikara-demo "hello" --noise metro_10km --block 3 --trace
 
 `cao-demo` does the same for the Cao simulator. `--noise` picks a noise
 baseline (default `clean`), `--rows` how many boxes each table shows,
+`--syndrome-fraction` sets the reconciliation syndrome,
 `--no-reconciliation` turns step 7's error correction off, and the other options
 set the seed, the squeezing, the check pairs and the sends per block.
 
 ```bash
 cao-demo "hello"
 cao-demo "hello" --noise lab --rows 12
-cao-demo "hello" --noise metro_10km --max-attempts 3
+cao-demo "hello" --noise metro_5km --syndrome-fraction 0.4
 ```
 
 ### Benchmarks
@@ -173,8 +174,8 @@ the noisy circuit, so honest noise is not mistaken for an eavesdropper.
 
 `SimulatorConfig` (`cao/config.py`) holds the settings. Each box follows the
 worked example of the paper (Fig. 3, Table I): 2 payload bits, 1 detection bit
-and an odd parity bit, mapped onto 8 intervals. A block holds 256 message bits
-in 512 boxes, so that the reconciliation code is long enough. Quadratures are in
+and an odd parity bit, mapped onto 8 intervals. A block has 512 boxes, so 1024
+payload bits, so that the reconciliation code is long enough. Quadratures are in
 shot-noise units with a vacuum variance of 1, as in the paper.
 
 ```python
@@ -184,9 +185,9 @@ from qsdc.protocols.cao.simulator.protocol import Simulator
 transmission = Simulator(SimulatorConfig(max_attempts=3)).transmit("1010")
 ```
 
-The payload is uniformized (0 → 01/10, 1 → 00/11, alternately) and split
-into blocks of `block_bits` message bits. Each block is sent on its own EPR
-pairs, `2 * check_pairs + boxes` of them (`simulator/protocol.py`):
+The message is split into blocks of `block_bits` message bits, and each block
+is sent on its own EPR pairs, `2 * check_pairs + boxes` of them
+(`simulator/protocol.py`):
 
 1. Two squeezed vacua on a 50:50 beam splitter give the pair S1 (Alice) and
    S2 (Bob), Eqs. 1–4.
@@ -200,13 +201,13 @@ pairs, `2 * check_pairs + boxes` of them (`simulator/protocol.py`):
    so that a position fails with probability q = e^(−1/σ²), and the threshold
    is q + `check_tolerance_sigmas` · √(q(1 − q)/`check_pairs`).
 3. Authentication: the same test on positions chosen by Bob.
-4. Gaussian mapping (`simulator/mapping.py`): every uniformized bit becomes
-   a random code word (0 → 00/01, 1 → 10/11), the result is split into
-   `boxes` boxes, and `detection_bits` random bits are inserted into each box
-   at random positions. The box selects one of the equiprobable intervals of
-   N(0, V_A), and G1' is drawn from the Gaussian inside it. The odd parity bit
-   of the box is not mapped, as in the paper, but announced over the
-   classical channel together with the detection bits.
+4. Gaussian mapping (`simulator/mapping.py`): the message bits become the
+   payload bits (see privacy amplification below), which are split into
+   `boxes` boxes of `box_bits` bits, and `detection_bits` random bits are
+   inserted into each box at random positions. The box selects one of the
+   equiprobable intervals of N(0, V_A), and G1' is drawn from the Gaussian
+   inside it. The odd parity bit of the box is not mapped, as in the paper,
+   but announced over the classical channel together with the detection bits.
 5. Alice displaces X of S1 by G1' and P by an independent Gaussian G2.
 6. Bob measures the arriving beam jointly with his S2:
    X_m = (X_info − X_2)/√2, P_m = (P_info + P_2)/√2 (Eq. 6).
@@ -221,12 +222,42 @@ pairs, `2 * check_pairs + boxes` of them (`simulator/protocol.py`):
       noise and the announced detection bits of the box. Each box's announced
       parity bit adds one more check. A min-sum decoder then corrects Bob's
       bits until every check matches.
-   3. Extraction: both uniformizations are inverted.
+   3. Privacy amplification: Bob hashes the corrected payload into the
+      message bits.
 
 A terminated block, or one whose reconciliation does not converge, is sent
-again up to `max_attempts` times. With `reconciliation=None`, Bob instead decodes
-each box on its own and the block is released only when every box passes its
-detection and parity bits.
+again up to `max_attempts` times, with the same payload, so that a retry
+publishes nothing new.
+
+With `reconciliation=None`, the protocol follows the paper's mapping instead:
+the message is uniformized twice (0 → 01/10 and 1 → 00/11 alternately, then
+every bit into a random code word, 0 → 00/01 and 1 → 10/11), a block carries a
+quarter of its payload bits as message, Bob decodes each box on its own, and
+the block is released only when every box passes its detection and parity
+bits.
+
+### Privacy amplification
+
+Everything Alice announces is a parity of her payload bits: one bit per box
+for its parity, and the syndrome. Without further steps, the syndrome together
+with the box parities would reveal the message to anyone on the classical
+channel. The paper names privacy amplification for this, but does not specify
+it, and the usual one, hashing the reconciled data down, would destroy a
+message. Here it is applied in reverse, as in practical QSDC systems: with a
+public random universal hash (`common/coding/universal_hash.py`), Alice picks
+her payload uniformly among all payloads whose hash is the message, using
+fresh random bits, and Bob hashes the corrected payload.
+
+Each public bit costs one message bit, so a block carries
+
+```text
+block_bits = payload_bits − boxes − syndrome bits − secrecy_margin
+```
+
+message bits, with `secrecy_margin` = 32. The tests check that the hash adds its
+full rank to the public bits, which means that the public bits reveal nothing
+about the message. Information that Eve could gain on the quantum channel is
+not counted; the paper's security analysis (Sec. III) is not implemented.
 
 Default choices where the paper gives no value:
 
@@ -237,8 +268,19 @@ Default choices where the paper gives no value:
   An honest position fails 15% of the time on the clean channel at the default
   squeezing and 40% on `record_27km`, so a fixed threshold would either miss
   disturbances on short links or terminate honest blocks on long ones.
-- `reconciliation.syndrome_fraction` = 0.5, enough for every block that passes
-  the checks up to the `metro_5km` baseline; `metro_10km` needs about 0.7.
+- `reconciliation.syndrome_fraction` = 0.3. The noisier the channel, the
+  longer the syndrome has to be, and every syndrome bit costs a message bit.
+  The smallest fraction that corrected all of 16 blocks:
+
+  | Baseline | Syndrome fraction | Message bits per block |
+  | --- | --- | --- |
+  | `clean` | 0.15 | 326 |
+  | `lab` | 0.3 | 173 |
+  | `metro_5km` | 0.4 | 70 |
+  | `metro_10km`, `record_27km` | about 0.6 or more | none left |
+
+  From 10 km on, Bob misses more than the announced parities leave room for,
+  so the configuration is rejected.
 
 The modulation is taken literally: Alice displaces by G1' itself, so Bob reads
 G1'/√2 on top of the squeezed noise e^(−r) of the pair. On the clean channel
@@ -246,12 +288,10 @@ about a fifth of the boxes are decoded into a wrong interval at the default
 squeezing, and on the `lab` baseline almost two fifths. Reconciliation removes
 these errors.
 
-The paper names reverse reconciliation and privacy amplification, but specifies
-neither. Reverse reconciliation corrects Alice's data towards Bob's, which
-suits a random key but not a message that Bob has to recover, so the
-reconciliation here is direct. The syndrome is public: it reveals
-`syndrome_fraction` bits per payload bit, on top of the announced detection and
-parity bits. Privacy amplification is not simulated.
+The paper names reverse reconciliation, but does not specify it. Reverse
+reconciliation corrects Alice's data towards Bob's, which suits a random key
+but not a message that Bob has to recover, so the reconciliation here is
+direct.
 
 `AnalyticBackend` (`simulator/backends.py`) samples the vacuum quadratures and
 applies the paper's linear transformations, which gives the exact statistics

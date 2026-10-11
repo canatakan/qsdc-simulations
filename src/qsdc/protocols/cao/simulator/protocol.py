@@ -4,7 +4,8 @@ from dataclasses import dataclass, replace
 from math import exp, sqrt
 
 from qsdc.common import transmission
-from qsdc.common.random import make_random_source
+from qsdc.common.coding.universal_hash import UniversalHash
+from qsdc.common.random import RandomSource, derive_seed, make_random_source
 from qsdc.protocols.cao.config import SimulatorConfig
 from qsdc.protocols.cao.constants import EPR_BOUND
 from qsdc.protocols.cao.simulator.backends import AnalyticBackend
@@ -28,16 +29,33 @@ from qsdc.protocols.cao.simulator.postprocessing import (
 
 @dataclass(frozen=True)
 class Block(transmission.Block):
-    uniformized: str
+    uniformized: str | None = None
+    payload: str | None = None
 
 
 def encode_blocks(payload: str, block_bits: int) -> list[Block]:
     padded = payload.ljust(-(-len(payload) // block_bits) * block_bits, "0")
     uniformized = uniformize_message(padded)
-    return [
-        Block(i, payload[i : i + block_bits], uniformized[2 * i : 2 * (i + block_bits)])
-        for i in range(0, len(payload), block_bits)
-    ]
+    blocks = []
+    for i in range(0, len(payload), block_bits):
+        message_part = uniformized[2 * i : 2 * (i + block_bits)]
+        blocks.append(Block(i, payload[i : i + block_bits], uniformized=message_part))
+    return blocks
+
+
+def amplify_blocks(
+    payload: str, amplifier: UniversalHash, rng: RandomSource
+) -> list[Block]:
+    # The payload is a random input whose hash is the message, so the public
+    # bits hide the message while they are fewer than the random bits.
+    block_bits = amplifier.output_bits
+    blocks = []
+    for i in range(0, len(payload), block_bits):
+        bits = payload[i : i + block_bits]
+        randomness = "".join(rng.choice("01") for _ in range(amplifier.free_bits))
+        hashed = amplifier.preimage(bits.ljust(block_bits, "0"), randomness)
+        blocks.append(Block(i, bits, payload=hashed))
+    return blocks
 
 
 @dataclass(frozen=True)
@@ -129,14 +147,27 @@ class Simulator:
         rate = self.expected_failure_rate
         margin = sqrt(rate * (1 - rate) / config.check_pairs)
         self.check_threshold = rate + config.check_tolerance_sigmas * margin
+        self.amplifier = None
+        if config.reconciliation is not None:
+            self.amplifier = UniversalHash(
+                config.payload_bits,
+                config.block_bits,
+                seed=derive_seed(config.seed, "universal hash"),
+            )
         self.reconciliation = (
             reconciliation_code(config) if config.reconciliation else None
         )
 
     def transmit(self, payload: str) -> Transmission:
         config = self.config
+        if self.amplifier is None:
+            blocks = encode_blocks(payload, config.block_bits)
+        else:
+            seed = derive_seed(config.seed, "privacy amplification")
+            rng = make_random_source(config.random_source, seed)
+            blocks = amplify_blocks(payload, self.amplifier, rng)
         return transmission.send_blocks(
-            encode_blocks(payload, config.block_bits),
+            blocks,
             config.seed,
             config.max_attempts,
             self._send,
@@ -150,11 +181,12 @@ class Simulator:
             if not all(signal.valid for signal in run.signals):
                 return run, None
             payload = "".join(signal.decoded_payload for signal in run.signals)
+            message = restore_message(restore_block(payload))
         elif run.reconciled is None:
             return run, None
         else:
-            payload = run.reconciled
-        return run, restore_message(restore_block(payload))[: len(block.bits)]
+            message = self.amplifier.hash(run.reconciled)
+        return run, message[: len(block.bits)]
 
     def run_block(self, block: Block, seed: int) -> BlockRun:
         config = self.config
@@ -175,7 +207,10 @@ class Simulator:
         if not authentication.accepted:
             return BlockRun(pairs, channel, authentication)
 
-        bits = uniformize_block(block.uniformized, rng)
+        if block.payload is not None:
+            bits = block.payload
+        else:
+            bits = uniformize_block(block.uniformized, rng)
         width = config.box_bits
         boxes = [
             map_box(bits[i : i + width], config.detection_bits, rng)
