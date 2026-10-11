@@ -68,6 +68,8 @@ def main() -> None:
         "--trace", action="store_true", help="noise path of the detailed block's modes"
     )
     args = parser.parse_args()
+    if not args.message:
+        parser.error("the message must not be empty")
 
     update = {"noise": NOISES[args.noise]}
     for field in ("backend", "random_source", "seed"):

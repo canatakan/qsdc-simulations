@@ -52,10 +52,10 @@ class ClassicalRandomSource(RandomSource):
 
 class SFBeamSplitterQRNG(RandomSource):
     name = "sf-bs-qrng"
+    BATCH = 1024
 
-    def __init__(self, seed: int | None = None, batch_size: int = 1024):
+    def __init__(self, seed: int | None = None):
         self.seed = seed
-        self.batch_size = batch_size
         self._bits: deque[int] = deque()
         self._refills = 0
 
@@ -96,7 +96,7 @@ class SFBeamSplitterQRNG(RandomSource):
             )
             self._refills += 1
         try:
-            for _ in range(self.batch_size):
+            for _ in range(self.BATCH):
                 photon_counts = (
                     sf.Engine("fock", backend_options={"cutoff_dim": 2})
                     .run(program)

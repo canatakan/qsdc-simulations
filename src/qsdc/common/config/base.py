@@ -6,9 +6,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from qsdc.common.random import RandomSource
 
+Fraction = Annotated[float, Field(ge=0.0, le=1.0)]
+NonNegative = Annotated[float, Field(ge=0.0)]
+Positive = Annotated[float, Field(gt=0.0)]
+PositiveInt = Annotated[int, Field(ge=1)]
+
 
 class Config(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
 
 class Fixed(Config):

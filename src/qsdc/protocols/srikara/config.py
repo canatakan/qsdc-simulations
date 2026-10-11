@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from typing import Literal
 
-from qsdc.common.config.base import Config, Distribution, Uniform
+from qsdc.common.config.base import (
+    Config,
+    Distribution,
+    NonNegative,
+    Positive,
+    PositiveInt,
+    Uniform,
+)
 from qsdc.common.config.noise import Channel, Detector, Environment, Memory
 from qsdc.protocols.srikara.constants import MESSAGE_VARIANCE_SNU
 
@@ -30,10 +37,10 @@ class SimulatorConfig(Config):
     random_source: Literal["classical", "sf-bs-qrng"] = "classical"
     seed: int = 11
     noise: NoiseConfig = NoiseConfig()
-    alpha_variance_snu: float = MESSAGE_VARIANCE_SNU
+    alpha_variance_snu: NonNegative = MESSAGE_VARIANCE_SNU
     squeeze_r: Distribution = Uniform(lower=0.115, upper=0.576)
     theta_pi: Distribution = Uniform(lower=0.0, upper=2.0)
-    tolerance_sigmas: float = 1.0
+    tolerance_sigmas: Positive = 1.0
     intervals: Literal[
         "default",
         "gray",
@@ -41,4 +48,4 @@ class SimulatorConfig(Config):
     ] = "default"
     axis_policy: Literal["random", "best_qp", "aligned"] = "random"
     error_correction: Literal["none", "parity", "secded"] = "none"
-    max_attempts: int = 1
+    max_attempts: PositiveInt = 1

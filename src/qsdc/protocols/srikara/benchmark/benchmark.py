@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from time import perf_counter
 
-from qsdc.common.config.base import Config
+from qsdc.common.config.base import Config, Fraction, PositiveInt
 from qsdc.common.random import ClassicalRandomSource, derive_seed, weighted_random_bits
 from qsdc.protocols.srikara.benchmark.metrics import RunMetrics, measure, pool
 from qsdc.protocols.srikara.config import SimulatorConfig
@@ -11,8 +11,8 @@ from qsdc.protocols.srikara.simulator.protocol import Simulator
 
 
 class Workload(Config):
-    payload_bits: int = 10_000
-    one_probability: float = 0.5
+    payload_bits: PositiveInt = 10_000
+    one_probability: Fraction = 0.5
     seed: int = 33
 
     def payload(self) -> str:

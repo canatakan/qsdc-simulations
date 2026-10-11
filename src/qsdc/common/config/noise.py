@@ -5,19 +5,19 @@ from pathlib import Path
 
 import yaml
 
-from qsdc.common.config.base import Config
+from qsdc.common.config.base import Config, Fraction, NonNegative, Positive
 
 
 class Channel(Config):
-    transmittance: float = 1.0
-    nbar: float = 0.0
+    transmittance: Fraction = 1.0
+    nbar: NonNegative = 0.0
 
 
 class Memory(Config):
-    seconds: float = 0.0
-    lifetime_seconds: float = 1.0
-    efficiency: float = 1.0
-    nbar: float = 0.0
+    seconds: NonNegative = 0.0
+    lifetime_seconds: Positive = 1.0
+    efficiency: Fraction = 1.0
+    nbar: NonNegative = 0.0
 
     @property
     def transmittance(self) -> float:
@@ -25,8 +25,8 @@ class Memory(Config):
 
 
 class Detector(Config):
-    efficiency: float = 1.0
-    electronic_variance: float = 0.0
+    efficiency: Fraction = 1.0
+    electronic_variance: NonNegative = 0.0
 
 
 class Environment(Config):
