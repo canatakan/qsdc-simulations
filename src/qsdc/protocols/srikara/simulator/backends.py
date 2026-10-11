@@ -8,8 +8,9 @@ from math import cosh, sinh, sqrt
 import numpy as np
 from strawberryfields import Engine, Program, hbar, ops
 
+from qsdc.common.noise import Detector
 from qsdc.common.quadrature import VACUUM_VARIANCE, Quadrature
-from qsdc.protocols.srikara.config import Detector, NoiseConfig, SimulatorConfig
+from qsdc.protocols.srikara.config import NoiseConfig, SimulatorConfig
 from qsdc.protocols.srikara.simulator.encoding import MESSAGE_DIRECTION
 
 SF_SCALE = sqrt(2.0 * hbar)

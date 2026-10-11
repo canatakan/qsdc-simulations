@@ -28,9 +28,10 @@ from strawberryfields import Engine, Program, ops
 from qsdc.common.bits import bits_to_bytes, bytes_to_bits, hamming_distance
 from qsdc.common.display import header, interval, step, table
 from qsdc.common.error_correction import secded_decode, secded_encode
+from qsdc.common.noise import Detector
 from qsdc.common.quadrature import Quadrature
 from qsdc.protocols.srikara.benchmark.catalog import NOISES, SIMULATORS
-from qsdc.protocols.srikara.config import Detector, SimulatorConfig
+from qsdc.protocols.srikara.config import SimulatorConfig
 from qsdc.protocols.srikara.simulator.backends import (
     SF_SCALE,
     VACUUM_VARIANCE,

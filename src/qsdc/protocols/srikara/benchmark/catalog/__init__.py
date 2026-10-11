@@ -5,6 +5,7 @@ from pathlib import Path
 
 import yaml
 
+from qsdc.common.noise import BASELINES
 from qsdc.protocols.srikara.benchmark.benchmark import Benchmark, Case, Workload
 from qsdc.protocols.srikara.config import NoiseConfig, SimulatorConfig
 
@@ -27,7 +28,8 @@ def assign(document: dict, path: str, value: object) -> None:
 
 
 NOISES = {
-    name: NoiseConfig.model_validate(spec) for name, spec in load("noises").items()
+    name: NoiseConfig.from_environment(environment)
+    for name, environment in BASELINES.items()
 }
 SIMULATOR_SPECS = load("simulators")
 SIMULATORS = {

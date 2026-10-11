@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from math import exp
 from typing import Annotated, Literal, Union
 
 from pydantic import Field
 
 from qsdc.common.config import Config
+from qsdc.common.noise import Channel, Detector, Environment, Memory
 from qsdc.common.random import RandomSource
 
 
@@ -35,33 +35,22 @@ class Uniform(Config):
 Distribution = Annotated[Union[Fixed, Uniform], Field(discriminator="kind")]
 
 
-class Channel(Config):
-    transmittance: float = 1.0
-    nbar: float = 0.0
-
-
-class Memory(Config):
-    seconds: float = 0.0
-    lifetime_seconds: float = 1.0
-    efficiency: float = 1.0
-    nbar: float = 0.0
-
-    @property
-    def transmittance(self) -> float:
-        return self.efficiency * exp(-self.seconds / self.lifetime_seconds)
-
-
-class Detector(Config):
-    efficiency: float = 1.0
-    electronic_variance: float = 0.0
-
-
 class NoiseConfig(Config):
     forward: Channel = Channel()
     memory: Memory = Memory()
     backward: Channel = Channel()
     alice_detector: Detector = Detector()
     bob_detector: Detector = Detector()
+
+    @classmethod
+    def from_environment(cls, environment: Environment) -> NoiseConfig:
+        return cls(
+            forward=environment.fibre,
+            memory=environment.memory,
+            backward=environment.fibre,
+            alice_detector=environment.detector,
+            bob_detector=environment.detector,
+        )
 
 
 class SimulatorConfig(Config):
