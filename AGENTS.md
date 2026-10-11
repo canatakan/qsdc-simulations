@@ -218,3 +218,13 @@ Equiprobable intervals for V_A = 8 (Table I):
 100 (0, 0.90]       101 (0.90, 1.91]     110 (1.91, 3.25]     111 (3.25, inf)
 ```
 
+
+Noise (shot-noise units, vacuum variance 1), from the shared baselines:
+
+```text
+thermal loss (T, nbar):  q -> sqrt(T) q + sqrt((1 - T)(2 nbar + 1)) v
+detector (eta, v_el):    q -> sqrt(eta) q + sqrt(1 - eta) v + sqrt(v_el) e
+S1: Alice's delay OD1 -> D(G1' + i G2) -> fibre
+S2: fibre -> Bob's delay OD2
+checks: S1 after OD1, S2 after the fibre
+```

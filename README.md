@@ -29,8 +29,8 @@ make install
 
   > Reference: S. Srikara, K. Thapliyal, and A. Pathak, Continuous variable direct secure quantum communication using gaussian states, Quantum Inf. Process. 19, 1 (2020).
 
-- `cao`: CV QSDC based on Gaussian mapping with two-mode squeezed states, on a
-  noiseless channel.
+- `cao`: CV QSDC based on Gaussian mapping with two-mode squeezed states, with an
+  analytic backend that applies the shared noise baselines.
 
   > Reference: Z. Cao, L. Wang, K. Liang, G. Chai, and J. Peng, Continuous-variable quantum secure direct communication based on Gaussian mapping, Phys. Rev. Appl. 16, 024012 (2021).
 
@@ -59,12 +59,14 @@ srikara-demo "hello" --simulator baseline --noise clean
 srikara-demo "hello" --noise metro_10km --block 3 --trace
 ```
 
-`cao-demo` does the same for the Cao simulator. Its options set the seed, the
-squeezing, the check pairs and the sends per block.
+`cao-demo` does the same for the Cao simulator. `--noise` picks a noise
+baseline (default `clean`), and the other options set the seed, the squeezing,
+the check pairs and the sends per block.
 
 ```bash
 cao-demo "hello"
 cao-demo "hello" --max-attempts 3 --block 2
+cao-demo "hello" --noise metro_10km --max-attempts 3
 ```
 
 ### Benchmarks
@@ -78,6 +80,24 @@ srikara-benchmark rerender
 `rerender` rebuilds every report's plots, `runs.csv`, `report.html` and the index
 from its `results.json`, without simulating again, for example after a change
 to the report layout.
+
+## Noise baselines
+
+Both simulators use the noise baselines of `src/qsdc/common/noises.yaml`, each
+with the source of its values. A baseline describes one fibre pass, one memory
+or optical delay, and one homodyne detector; each protocol places them on its
+own links.
+
+| Baseline | Fibre per pass | Excess noise | Detectors | Memory |
+| --- | --- | --- | --- | --- |
+| `clean` | none | 0 | ideal | ideal |
+| `lab` | 1 km spool | 0.002 SNU | η = 0.95, 0.01 SNU | 0.95 |
+| `metro_5km` | 5 km | 0.005 SNU | η = 0.85, 0.05 SNU | 0.9 |
+| `metro_10km` | 10 km | 0.01 SNU | η = 0.8, 0.1 SNU | 0.9 |
+| `record_27km` | 27.27 km, ultralow loss | 0.0015 SNU | η = 0.613, 0.122 SNU | 0.9 |
+
+`record_27km` is the shortest point of Zhang et al., PRL 125, 010502 (2020).
+Phase noise is not modelled yet.
 
 ## Srikara simulator
 
@@ -178,9 +198,9 @@ pairs, `2 * check_pairs + boxes` of them (`simulator/protocol.py`):
 5. Alice displaces X of S1 by G1' and P by an independent Gaussian G2.
 6. Bob measures the arriving beam jointly with his S2:
    X_m = (X_info − X_2)/√2, P_m = (P_info + P_2)/√2 (Eq. 6).
-7. Alice reveals G2. Bob fits P_m = t G2 to estimate his gain t (1/√2 on a
-   clean channel), decodes X_m / t into an interval, and checks the detection
-   and parity bits. The block is released when every box passes, and its
+7. Alice reveals G2. Bob fits P_m = t G2 to estimate his gain t, which is
+   √(ηT/2) with fibre transmittance T and detector efficiency η, decodes
+   X_m / t into an interval, and checks the detection and parity bits. The block is released when every box passes, and its
    two uniformizations are inverted.
 
 A terminated block, or one with a detected error, is sent again up to
@@ -203,8 +223,25 @@ not simulated; here only the detection and parity bits detect them.
 
 `AnalyticBackend` (`simulator/backends.py`) samples the vacuum quadratures and
 applies the paper's linear transformations, which gives the exact statistics
-of these Gaussian states and measurements. Channel noise, Strawberry Fields
-backends, SECDED and benchmarks are not implemented yet.
+of these Gaussian states and measurements. `SimulatorConfig.noise` places a
+noise baseline on the links of Fig. 1:
+
+- S1 waits in Alice's delay line OD1 while S2 travels to Bob and the checks
+  run; Alice then displaces it and sends it through the fibre.
+- S2 travels through the same fibre and waits in Bob's delay line OD2 until
+  S_info arrives.
+- Each party heterodynes with its detector, and Bob's joint measurement uses
+  two of his homodyne detectors.
+
+Loss is a thermal loss channel, and a detector adds its loss and electronic
+noise to each measured quadrature. Since both beams pass the fibre and one
+delay line each, the EPR noise still cancels in Bob's joint measurement, but
+every loss replaces part of it with unsqueezed vacuum noise. Even the 1 km of
+the `lab` baseline therefore nearly doubles the wrong boxes, and the checks
+reject honest pairs more often with distance, because Eq. 5 compares Alice's
+and Bob's outcomes without compensating Bob's loss. The tests check the
+variances against Strawberry Fields. Strawberry Fields backends, SECDED and
+benchmarks are not implemented yet.
 
 ## Benchmarks
 
@@ -233,25 +270,14 @@ and the studies are YAML files in `benchmark/catalog/`:
 
 - `simulators.yaml`: named simulator configurations, each optionally extending
   another one (`baseline` is the paper's protocol, `optimized` the best one).
-- `noises.yaml`: noise baselines, each with the source of its values.
 - `studies.yaml`: the studies, each run under the noise baselines it lists
   (`lab` by default), which become the series of its report. A study lists its
   cases, or has one or two axes whose
   values make one case per point. Cases change fields by dotted path, such as
   `squeeze_r.value` or `noise.forward.transmittance`.
 
-The noise baselines:
-
-| Baseline | Fibre per direction | Excess noise | Detectors | Memory |
-| --- | --- | --- | --- | --- |
-| `clean` | none | 0 | ideal | ideal |
-| `lab` | 1 km spool | 0.002 SNU | η = 0.95, 0.01 SNU | 0.95 |
-| `metro_5km` | 5 km | 0.005 SNU | η = 0.85, 0.05 SNU | 0.9 |
-| `metro_10km` | 10 km | 0.01 SNU | η = 0.8, 0.1 SNU | 0.9 |
-| `record_27km` | 27.27 km, ultralow loss | 0.0015 SNU | η = 0.613, 0.122 SNU | 0.9 |
-
-`record_27km` is the shortest point of Zhang et al., PRL 125, 010502 (2020).
-Phase noise is not modelled yet.
+The noise baselines are the shared ones of the section above, with the fibre
+used in both directions and the same detector at Alice and Bob.
 
 There are 18 built-in studies, so a full run writes 18 reports.
 Most run under `lab` only, because their conclusion does not depend on the noise

@@ -112,7 +112,7 @@ Transmission = transmission.Transmission[Block, BlockRun]
 class CaoSimulator:
     def __init__(self, config: SimulatorConfig, backend: AnalyticBackend | None = None):
         self.config = config
-        self.backend = backend or AnalyticBackend(config.squeeze_r)
+        self.backend = backend or AnalyticBackend(config.squeeze_r, config.noise)
         self.code = interval_code(config)
 
     def transmit(self, payload: str) -> Transmission:

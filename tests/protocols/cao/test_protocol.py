@@ -11,17 +11,14 @@ from qsdc.protocols.cao.simulator.protocol import EPR_BOUND, CaoSimulator
 
 
 class NoiselessBackend(AnalyticBackend):
-    def _pair(self):
-        return 0j, 0j
-
-    def _heterodyne(self, mode):
-        return mode / sqrt(2)
+    def _vacuum(self):
+        return 0j
 
 
 class InterceptedBackend(AnalyticBackend):
     def _pair(self):
         signal, _ = super()._pair()
-        return signal, complex(*self._rng.standard_normal(2))
+        return signal, self._vacuum()
 
 
 class InvertFirstSignal(NoiselessBackend):

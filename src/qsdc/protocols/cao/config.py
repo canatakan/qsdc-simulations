@@ -6,11 +6,37 @@ from typing import Literal
 from pydantic import model_validator
 
 from qsdc.common.config import Config
+from qsdc.common.noise import BASELINES, Channel, Detector, Environment, Memory
+
+
+class NoiseConfig(Config):
+    alice_memory: Memory = Memory()
+    channel: Channel = Channel()
+    bob_memory: Memory = Memory()
+    alice_detector: Detector = Detector()
+    bob_detector: Detector = Detector()
+
+    @classmethod
+    def from_environment(cls, environment: Environment) -> NoiseConfig:
+        return cls(
+            alice_memory=environment.memory,
+            channel=environment.fibre,
+            bob_memory=environment.memory,
+            alice_detector=environment.detector,
+            bob_detector=environment.detector,
+        )
+
+
+NOISES = {
+    name: NoiseConfig.from_environment(environment)
+    for name, environment in BASELINES.items()
+}
 
 
 class SimulatorConfig(Config):
     random_source: Literal["classical", "sf-bs-qrng"] = "classical"
     seed: int = 11
+    noise: NoiseConfig = NoiseConfig()
     squeeze_r: float = acosh(9.0) / 2
     modulation_variance_snu: float = 8.0
     block_bits: int = 2

@@ -1,13 +1,13 @@
 """Send a text message through the simulated Cao et al. CV-QSDC protocol.
 
 Prints the settings, one line per send, every protocol step of one block and the
-recovered message. The channel is noiseless; the only noise is the vacuum noise
-of the squeezed states and of the measurements.
+recovered message. --noise picks a noise baseline; the default, clean, leaves
+only the vacuum noise of the squeezed states and of the measurements.
 
 Examples:
     cao-demo "hello"
     cao-demo "hello" --max-attempts 3 --block 2
-    cao-demo "hello" --squeeze-r 3
+    cao-demo "hello" --noise metro_10km --squeeze-r 3
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from math import e, log10, sqrt
 
 from qsdc.common.bits import bits_to_bytes, bytes_to_bits, hamming_distance
 from qsdc.common.display import header, interval, step, table
-from qsdc.protocols.cao.config import SimulatorConfig
+from qsdc.protocols.cao.config import NOISES, SimulatorConfig
 from qsdc.protocols.cao.simulator.mapping import interval_code, restore_block
 from qsdc.protocols.cao.simulator.protocol import (
     EPR_BOUND,
@@ -35,6 +35,7 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("message", nargs="?", default="hello")
+    parser.add_argument("--noise", choices=list(NOISES), default="clean")
     parser.add_argument("--random-source", choices=("classical", "sf-bs-qrng"))
     parser.add_argument("--seed", type=int)
     parser.add_argument("--squeeze-r", type=float)
@@ -47,12 +48,12 @@ def main() -> None:
 
     fields = ("random_source", "seed", "squeeze_r", "check_pairs", "max_attempts")
     update = {f: getattr(args, f) for f in fields if getattr(args, f) is not None}
-    config = SimulatorConfig(**update)
+    config = SimulatorConfig(noise=NOISES[args.noise], **update)
     payload = bytes_to_bits(args.message.encode())
     transmission = CaoSimulator(config).transmit(payload)
     blocks = group_by_block(transmission)
 
-    show_settings(config)
+    show_settings(config, args.noise)
     print(
         f"\n{args.message!r} -> {len(payload)} bits -> {len(blocks)} blocks, "
         f"{transmission.attempts[0].run.pairs} EPR pairs per send"
@@ -79,8 +80,8 @@ def most_eventful(blocks: list[list[Attempt]]) -> int:
     return max(range(len(blocks)), key=lambda number: score(blocks[number]))
 
 
-def show_settings(config: SimulatorConfig) -> None:
-    header("Cao et al., clean channel")
+def show_settings(config: SimulatorConfig, noise: str) -> None:
+    header(f"Cao et al., noise '{noise}'")
     width = config.box_bits + config.detection_bits
     table(
         ("Setting", "Value"),
@@ -100,6 +101,12 @@ def show_settings(config: SimulatorConfig) -> None:
             ("Check failure threshold", f"{config.check_failure_threshold:.4f}"),
             ("Sends per block", f"at most {config.max_attempts}"),
         ],
+    )
+    n = config.noise
+    print(
+        f"\nFibre T = {n.channel.transmittance:g} (nbar {n.channel.nbar:g}), "
+        f"delay lines T = {n.alice_memory.transmittance:.4g} / {n.bob_memory.transmittance:.4g}, "
+        f"detector eta = {n.bob_detector.efficiency:g}, v_el = {n.bob_detector.electronic_variance:g} SNU"
     )
 
 
@@ -198,7 +205,9 @@ def show_attempt(attempt: Attempt, number: int, config: SimulatorConfig) -> None
     )
 
     step("7. Alice reveals G2, Bob estimates his gain and inverts the mapping")
-    print(f"Gain from P_m = t G2: t = {run.gain:.4f} (noiseless: {1 / sqrt(2):.4f})")
+    n = config.noise
+    expected = sqrt(n.bob_detector.efficiency * n.channel.transmittance / 2)
+    print(f"Gain from P_m = t G2: t = {run.gain:.4f} (expected: {expected:.4f})")
     table(
         ("j", "X_m / t", "Decoded", "Mapped", "Detection", "Parity", "Payload"),
         [
