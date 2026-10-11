@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from math import pi, sqrt
 
+from qsdc.common import transmission
 from qsdc.common.quadrature import VACUUM_VARIANCE, P, Q, Quadrature
-from qsdc.common.random import RandomSource, derive_seed, make_random_source
+from qsdc.common.random import RandomSource, make_random_source
 from qsdc.protocols.srikara.config import SimulatorConfig
 from qsdc.protocols.srikara.simulator.backends import (
     Backend,
@@ -58,28 +59,8 @@ class BlockRun:
         return all(check.passed for check in self.controls + self.decoys)
 
 
-@dataclass(frozen=True)
-class Attempt:
-    block: Block
-    number: int
-    run: BlockRun
-    decoded_bits: str | None
-
-
-@dataclass(frozen=True)
-class Transmission:
-    attempts: tuple[Attempt, ...]
-
-    @property
-    def final_attempts(self) -> list[Attempt]:
-        return list(
-            {attempt.block.offset: attempt for attempt in self.attempts}.values()
-        )
-
-    @property
-    def recovered_bits(self) -> str | None:
-        decoded = [attempt.decoded_bits for attempt in self.final_attempts]
-        return None if None in decoded else "".join(decoded)
+Attempt = transmission.Attempt[Block, BlockRun]
+Transmission = transmission.Transmission[Block, BlockRun]
 
 
 class SrikaraSimulator:
@@ -90,21 +71,19 @@ class SrikaraSimulator:
 
     def transmit(self, payload: str) -> Transmission:
         config = self.config
-        attempts = []
-        for block_index, block in enumerate(
-            encode_blocks(payload, config.error_correction)
-        ):
-            for number in range(config.max_attempts):
-                seed = derive_seed(config.seed, block_index, number)
-                run = self.run_block(block.symbols, seed)
-                received = [message.decoded_bits for message in run.messages]
-                decoded = None
-                if run.accepted:
-                    decoded = decode_block(block, received, config.error_correction)
-                attempts.append(Attempt(block, number, run, decoded))
-                if decoded is not None:
-                    break
-        return Transmission(tuple(attempts))
+        return transmission.send_blocks(
+            encode_blocks(payload, config.error_correction),
+            config.seed,
+            config.max_attempts,
+            self._send,
+        )
+
+    def _send(self, block: Block, seed: int) -> tuple[BlockRun, str | None]:
+        run = self.run_block(block.symbols, seed)
+        if not run.accepted:
+            return run, None
+        received = [message.decoded_bits for message in run.messages]
+        return run, decode_block(block, received, self.config.error_correction)
 
     def run_block(self, symbols: tuple[str, ...], seed: int) -> BlockRun:
         config = self.config

@@ -1,57 +1,17 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from bisect import bisect_right
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from math import inf, sqrt
-from statistics import NormalDist
 
+from qsdc.common.intervals import (
+    BINARY_LABELS,
+    GRAY_LABELS,
+    GaussianIntervalCode,
+    UniformIntervalCode,
+)
 from qsdc.common.quadrature import VACUUM_VARIANCE
-from qsdc.common.random import RandomSource
 
 MESSAGE_DIRECTION = 1 + 1j
-BINARY_LABELS = ("000", "001", "010", "011", "100", "101", "110", "111")
-GRAY_LABELS = ("000", "001", "011", "010", "110", "100", "101", "111")
-
-
-@dataclass(frozen=True)
-class IntervalCode(ABC):
-    labels: tuple[str, ...]
-    bounds: tuple[float, ...]
-
-    def interval(self, bits: str) -> tuple[float, float]:
-        index = self.labels.index(bits)
-        return self.bounds[index], self.bounds[index + 1]
-
-    @abstractmethod
-    def sample(self, bits: str, rng: RandomSource) -> float: ...
-
-    def decode(self, value: float) -> str:
-        return self.labels[bisect_right(self.bounds, value) - 1]
-
-
-@dataclass(frozen=True)
-class UniformIntervalCode(IntervalCode):
-    tail_width: float
-
-    def sample(self, bits: str, rng: RandomSource) -> float:
-        lower, upper = self.interval(bits)
-        if lower == -inf:
-            lower = upper - self.tail_width
-        if upper == inf:
-            upper = lower + self.tail_width
-        return rng.uniform(lower, upper)
-
-
-@dataclass(frozen=True)
-class GaussianIntervalCode(IntervalCode):
-    sigma: float
-
-    def sample(self, bits: str, rng: RandomSource) -> float:
-        gaussian = NormalDist(0.0, self.sigma)
-        lower, upper = self.interval(bits)
-        return gaussian.inv_cdf(rng.uniform(gaussian.cdf(lower), gaussian.cdf(upper)))
-
 
 DEFAULT = UniformIntervalCode(
     BINARY_LABELS, (-inf, -3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0, inf), tail_width=1.0

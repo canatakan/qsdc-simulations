@@ -3,13 +3,10 @@ from __future__ import annotations
 from math import exp
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 
+from qsdc.common.config import Config
 from qsdc.common.random import RandomSource
-
-
-class Config(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
 
 class Fixed(Config):

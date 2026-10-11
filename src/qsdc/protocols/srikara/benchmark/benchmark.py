@@ -3,9 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from time import perf_counter
 
+from qsdc.common.config import Config
 from qsdc.common.random import ClassicalRandomSource, derive_seed, weighted_random_bits
 from qsdc.protocols.srikara.benchmark.metrics import RunMetrics, measure, pool
-from qsdc.protocols.srikara.config import Config, SimulatorConfig
+from qsdc.protocols.srikara.config import SimulatorConfig
 from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
 
 

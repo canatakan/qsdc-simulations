@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from qsdc.common import transmission
 from qsdc.common.error_correction import (
     parity_decode,
     parity_encode,
@@ -12,9 +13,7 @@ from qsdc.common.error_correction import (
 
 
 @dataclass(frozen=True)
-class Block:
-    offset: int
-    bits: str
+class Block(transmission.Block):
     symbols: tuple[str, ...]
 
 
