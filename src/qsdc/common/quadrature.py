@@ -1,16 +1,29 @@
-"""Shared continuous-variable quadrature definitions."""
+from __future__ import annotations
 
-from enum import Enum
+from cmath import phase
+from dataclasses import dataclass
 from math import pi
 
+# q = Re alpha, so one shot-noise unit (SNU) of variance is 1/4.
+VACUUM_VARIANCE = 0.25
 
-class QuadratureAxis(str, Enum):
-    Q = "q"
-    P = "p"
+
+@dataclass(frozen=True)
+class Quadrature:
+    direction: complex
 
     def component(self, value: complex) -> float:
-        return value.real if self is QuadratureAxis.Q else value.imag
+        d = self.direction
+        return (value.real * d.real + value.imag * d.imag) / abs(d)
 
     @property
     def angle(self) -> float:
-        return 0.0 if self is QuadratureAxis.Q else pi / 2.0
+        return phase(self.direction)
+
+    @property
+    def name(self) -> str:
+        return {1: "q", 1j: "p"}.get(self.direction, f"{self.angle / pi:+.3f}π")
+
+
+Q = Quadrature(1 + 0j)
+P = Quadrature(1j)

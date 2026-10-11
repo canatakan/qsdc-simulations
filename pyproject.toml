@@ -13,16 +13,18 @@ dependencies = [
   "matplotlib",
   "numpy",
   "pydantic>=2.13,<3",
+  "PyYAML>=6,<7",
   "strawberryfields",
 ]
+
+[project.scripts]
+srikara-benchmark = "qsdc.protocols.srikara.benchmark.cli:main"
+srikara-demo = "qsdc.protocols.srikara.demo:main"
 
 [project.optional-dependencies]
 dev = [
   "pytest",
 ]
-
-[project.scripts]
-srikara-benchmark = "qsdc.protocols.srikara.benchmark.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = [

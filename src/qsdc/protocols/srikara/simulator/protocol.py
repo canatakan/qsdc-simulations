@@ -1,320 +1,179 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import pi, sqrt
 
-from qsdc.common.quadrature import QuadratureAxis
-from qsdc.common.random.base import RandomSource
-from qsdc.common.random.classical import ClassicalRandomSource
-from qsdc.protocols.srikara.simulator.backends.analytic.ideal import AnalyticBackend
-from qsdc.protocols.srikara.simulator.backends.base import QSDCBackend
-from qsdc.protocols.srikara.configuration.simulator import SimulatorConfig
-from qsdc.protocols.srikara.simulator.encoding import (
-    beta_for_message_value,
-    bits_for_real,
-    sample_message_value,
+from qsdc.common.quadrature import VACUUM_VARIANCE, P, Q, Quadrature
+from qsdc.common.random import RandomSource, derive_seed, make_random_source
+from qsdc.protocols.srikara.config import SimulatorConfig
+from qsdc.protocols.srikara.simulator.backends import (
+    Backend,
+    PreparedState,
+    make_backend,
 )
-from qsdc.protocols.srikara.simulator.flow import (
-    ModeRoute,
-    OpticalSwitch,
-    ProtocolTranscript,
-    build_transcript,
+from qsdc.protocols.srikara.simulator.encoding import INTERVAL_CODES, MESSAGE_DIRECTION
+from qsdc.protocols.srikara.simulator.routing import ModeRoute, route_modes
+from qsdc.protocols.srikara.simulator.transport import (
+    Block,
+    decode_block,
+    encode_blocks,
 )
+
+AXES = (Q, P)
 
 
 @dataclass(frozen=True)
-class BobPreparedState:
+class Check:
     index: int
-    alpha: complex
-    squeeze_r: float
-    theta: float
-
-
-@dataclass(frozen=True)
-class ControlCheck:
-    index: int
-    axis: QuadratureAxis
+    axis: Quadrature
     expected: float
-    expected_sigma: float
+    sigma: float
     measured: float
     passed: bool
 
 
 @dataclass(frozen=True)
-class DecoyCheck:
+class Message:
     index: int
-    axis: QuadratureAxis
-    expected: float
-    expected_sigma: float
-    measured: float
-    passed: bool
-
-
-@dataclass(frozen=True)
-class MessageDecode:
-    index: int
-    intervals: str
     sent_bits: str
-    message_value: float
-    alice_beta: complex
-    axis: QuadratureAxis
+    value: float
+    axis: Quadrature
     measured: float
-    expected_baseline: float
-    observed_delta: float
-    response_factor: float
-    recovered_beta: complex
+    baseline: float
+    response: float
     decoded_value: float
     decoded_bits: str
 
 
 @dataclass(frozen=True)
-class ProtocolResult:
-    backend_name: str
-    random_source_name: str
-    check_tolerance_sigmas: float
-    intervals: str
-    check_axis_policy: str
-    message_axis_policy: str
-    measurement_noise_sigma: float
-    control_passed: bool
-    decoy_passed: bool
+class BlockRun:
+    states: tuple[PreparedState, ...]
     route: ModeRoute
-    transcript: ProtocolTranscript
-    prepared_states: tuple[BobPreparedState, ...]
-    control_indices: tuple[int, ...]
-    message_indices: tuple[int, ...]
-    decoy_indices: tuple[int, ...]
-    controls: tuple[ControlCheck, ...]
-    decoys: tuple[DecoyCheck, ...]
-    messages: tuple[MessageDecode, ...]
+    controls: tuple[Check, ...]
+    decoys: tuple[Check, ...]
+    messages: tuple[Message, ...]
 
     @property
     def accepted(self) -> bool:
-        return self.control_passed and self.decoy_passed
+        return all(check.passed for check in self.controls + self.decoys)
 
 
-def simulate_qsdc(
-    message_bits: list[str] | tuple[str, ...],
-    config: SimulatorConfig,
-    backend: QSDCBackend | None = None,
-    random_source: RandomSource | None = None,
-) -> ProtocolResult:
-    active_backend: QSDCBackend = backend if backend is not None else AnalyticBackend()
-    if config.n_states % 4 != 0:
-        raise ValueError("n_states must be divisible by 4")
-    if len(message_bits) != config.n_states // 4:
-        raise ValueError("message count does not match n_states")
-    protocol_random = random_source or ClassicalRandomSource(config.seed)
+@dataclass(frozen=True)
+class Attempt:
+    block: Block
+    number: int
+    run: BlockRun
+    decoded_bits: str | None
 
-    # Backend seeding is only for backend-owned sampling, such as SF homodyne draws.
-    active_backend.begin_run(config.seed)
 
-    prepared_states = _bob_prepare_states(config, protocol_random)
-    route = OpticalSwitch(protocol_random).route(config.n_states)
-    transcript = build_transcript(route, protocol_random)
+@dataclass(frozen=True)
+class Transmission:
+    attempts: tuple[Attempt, ...]
 
-    controls = tuple(
-        _check_control(
-            prepared_states[index], active_backend, config, protocol_random
+    @property
+    def final_attempts(self) -> list[Attempt]:
+        return list(
+            {attempt.block.offset: attempt for attempt in self.attempts}.values()
         )
-        for index in route.control_indices
-    )
-    control_passed = all(check.passed for check in controls)
 
-    message_by_index: dict[int, tuple[str, float, complex]] = {}
-    for index, bits in zip(route.message_indices, message_bits):
-        message_value = sample_message_value(
+    @property
+    def recovered_bits(self) -> str | None:
+        decoded = [attempt.decoded_bits for attempt in self.final_attempts]
+        return None if None in decoded else "".join(decoded)
+
+
+class SrikaraSimulator:
+    def __init__(self, config: SimulatorConfig, backend: Backend | None = None):
+        self.config = config
+        self.backend = backend or make_backend(config)
+        self.code = INTERVAL_CODES[config.intervals]
+
+    def transmit(self, payload: str) -> Transmission:
+        config = self.config
+        attempts = []
+        for block_index, block in enumerate(
+            encode_blocks(payload, config.error_correction)
+        ):
+            for number in range(config.max_attempts):
+                seed = derive_seed(config.seed, block_index, number)
+                run = self.run_block(block.symbols, seed)
+                received = [message.decoded_bits for message in run.messages]
+                decoded = None
+                if run.accepted:
+                    decoded = decode_block(block, received, config.error_correction)
+                attempts.append(Attempt(block, number, run, decoded))
+                if decoded is not None:
+                    break
+        return Transmission(tuple(attempts))
+
+    def run_block(self, symbols: tuple[str, ...], seed: int) -> BlockRun:
+        config = self.config
+        rng = make_random_source(config.random_source, seed)
+        self.backend.begin_run(seed)
+
+        n_states = 4 * len(symbols)
+        sigma = sqrt(config.alpha_variance_snu * VACUUM_VARIANCE)
+        states = tuple(
+            PreparedState(
+                index,
+                complex(rng.gauss(sigma), rng.gauss(sigma)),
+                config.squeeze_r.sample(rng),
+                pi * config.theta_pi.sample(rng),
+            )
+            for index in range(n_states)
+        )
+        route = route_modes(n_states, rng)
+        controls = tuple(
+            self._check(states[i], rng.choice(AXES), returned=False)
+            for i in route.control
+        )
+        values = [self.code.sample(bits, rng) for bits in symbols]
+        decoys = tuple(
+            self._check(states[i], rng.choice(AXES), returned=True) for i in route.decoy
+        )
+        messages = tuple(
+            self._message(states[i], bits, value, rng)
+            for i, bits, value in zip(route.message, symbols, values)
+        )
+        return BlockRun(states, route, controls, decoys, messages)
+
+    def _check(self, state: PreparedState, axis: Quadrature, returned: bool) -> Check:
+        if returned:
+            expected = self.backend.expect_returned(state, axis)
+            measured = self.backend.measure_returned(state, axis)
+        else:
+            expected = self.backend.expect_control(state, axis)
+            measured = self.backend.measure_control(state, axis)
+        passed = (
+            abs(measured - expected.mean)
+            <= self.config.tolerance_sigmas * expected.sigma
+        )
+        return Check(state.index, axis, expected.mean, expected.sigma, measured, passed)
+
+    def _message(
+        self, state: PreparedState, bits: str, value: float, rng: RandomSource
+    ) -> Message:
+        if self.config.axis_policy == "random":
+            axis = rng.choice(AXES)
+        else:
+            response_q = self.backend.message_response(state, Q)
+            response_p = self.backend.message_response(state, P)
+            if self.config.axis_policy == "best_qp":
+                axis = Q if abs(response_q) >= abs(response_p) else P
+            else:
+                axis = Quadrature(complex(response_q, response_p))
+        measured = self.backend.measure_returned(state, axis, value * MESSAGE_DIRECTION)
+        baseline = self.backend.expect_returned(state, axis).mean
+        response = self.backend.message_response(state, axis)
+        decoded = (measured - baseline) / response
+        return Message(
+            state.index,
             bits,
-            protocol_random,
-            intervals=config.intervals,
+            value,
+            axis,
+            measured,
+            baseline,
+            response,
+            decoded,
+            self.code.decode(decoded),
         )
-        beta = beta_for_message_value(message_value)
-        message_by_index[index] = (bits, message_value, beta)
-
-    decoys = tuple(
-        _check_decoy(
-            prepared_states[index], active_backend, config, protocol_random
-        )
-        for index in route.decoy_indices
-    )
-    decoy_passed = all(check.passed for check in decoys)
-
-    messages = tuple(
-        _decode_message(
-            prepared_states[index],
-            message_by_index[index],
-            active_backend,
-            config,
-            protocol_random,
-        )
-        for index in route.message_indices
-    )
-
-    return ProtocolResult(
-        backend_name=active_backend.name,
-        random_source_name=protocol_random.name,
-        check_tolerance_sigmas=config.tolerance_sigmas,
-        intervals=config.intervals,
-        check_axis_policy=config.check_axis_policy,
-        message_axis_policy=config.message_axis_policy,
-        measurement_noise_sigma=active_backend.measurement_noise_sigma,
-        control_passed=control_passed,
-        decoy_passed=decoy_passed,
-        route=route,
-        transcript=transcript,
-        prepared_states=tuple(prepared_states),
-        control_indices=route.control_indices,
-        message_indices=route.message_indices,
-        decoy_indices=route.decoy_indices,
-        controls=controls,
-        decoys=decoys,
-        messages=messages,
-    )
-
-
-def _bob_prepare_states(
-    config: SimulatorConfig, random_source: RandomSource
-) -> list[BobPreparedState]:
-    states: list[BobPreparedState] = []
-    for index in range(config.n_states):
-        alpha = config.alpha_distribution.sample(random_source)
-        squeeze_r = config.squeeze_r_distribution.sample(random_source)
-        theta = config.theta_distribution.sample(random_source)
-        states.append(BobPreparedState(index, alpha, squeeze_r, theta))
-    return states
-
-
-def _check_control(
-    state: BobPreparedState,
-    backend: QSDCBackend,
-    config: SimulatorConfig,
-    random_source: RandomSource,
-) -> ControlCheck:
-    axis = _check_axis(state, config, random_source)
-    expectation = backend.control_expectation(
-        state.alpha,
-        state.squeeze_r,
-        state.theta,
-        axis,
-    )
-    measured = backend.control_measurement(
-        state.alpha, state.squeeze_r, state.theta, axis
-    )
-
-    tolerance = config.tolerance_sigmas * expectation.sigma
-    return ControlCheck(
-        index=state.index,
-        axis=axis,
-        expected=expectation.mean,
-        expected_sigma=expectation.sigma,
-        measured=measured,
-        passed=abs(measured - expectation.mean) <= tolerance,
-    )
-
-
-def _check_decoy(
-    state: BobPreparedState,
-    backend: QSDCBackend,
-    config: SimulatorConfig,
-    random_source: RandomSource,
-) -> DecoyCheck:
-    axis = _check_axis(state, config, random_source)
-    expectation = backend.returned_expectation(
-        state.alpha,
-        state.squeeze_r,
-        state.theta,
-        axis,
-    )
-    measured = backend.returned_measurement(
-        state.alpha, state.squeeze_r, state.theta, beta=0j, axis=axis
-    )
-
-    tolerance = config.tolerance_sigmas * expectation.sigma
-    return DecoyCheck(
-        index=state.index,
-        axis=axis,
-        expected=expectation.mean,
-        expected_sigma=expectation.sigma,
-        measured=measured,
-        passed=abs(measured - expectation.mean) <= tolerance,
-    )
-
-
-def _check_axis(
-    state: BobPreparedState,
-    config: SimulatorConfig,
-    random_source: RandomSource,
-) -> QuadratureAxis:
-    if config.check_axis_policy == "random":
-        return random_source.choice((QuadratureAxis.Q, QuadratureAxis.P))
-    if config.check_axis_policy == "optimized":
-        return (
-            QuadratureAxis.Q
-            if abs(state.alpha.real) >= abs(state.alpha.imag)
-            else QuadratureAxis.P
-        )
-    raise ValueError(f"unknown check_axis_policy {config.check_axis_policy!r}")
-
-
-def _decode_message(
-    state: BobPreparedState,
-    message: tuple[str, float, complex],
-    backend: QSDCBackend,
-    config: SimulatorConfig,
-    random_source: RandomSource,
-) -> MessageDecode:
-    bits, message_value, alice_beta = message
-    axis = _message_axis(state, backend, config, random_source)
-    measured = backend.returned_measurement(
-        state.alpha, state.squeeze_r, state.theta, beta=alice_beta, axis=axis
-    )
-    baseline_expectation = backend.returned_expectation(
-        state.alpha,
-        state.squeeze_r,
-        state.theta,
-        axis,
-    )
-    observed_delta = measured - baseline_expectation.mean
-    response_factor = backend.message_response_factor(
-        state.squeeze_r, state.theta, axis
-    )
-    decoded_value = observed_delta / response_factor
-    recovered_beta = complex(decoded_value, decoded_value)
-    decoded_bits = bits_for_real(decoded_value, intervals=config.intervals)
-    return MessageDecode(
-        index=state.index,
-        intervals=config.intervals,
-        sent_bits=bits,
-        message_value=message_value,
-        alice_beta=alice_beta,
-        axis=axis,
-        measured=measured,
-        expected_baseline=baseline_expectation.mean,
-        observed_delta=observed_delta,
-        response_factor=response_factor,
-        recovered_beta=recovered_beta,
-        decoded_value=decoded_value,
-        decoded_bits=decoded_bits,
-    )
-
-
-def _message_axis(
-    state: BobPreparedState,
-    backend: QSDCBackend,
-    config: SimulatorConfig,
-    random_source: RandomSource,
-) -> QuadratureAxis:
-    if config.message_axis_policy == "random":
-        return random_source.choice((QuadratureAxis.Q, QuadratureAxis.P))
-    if config.message_axis_policy == "optimized":
-        q_response = backend.message_response_factor(
-            state.squeeze_r, state.theta, QuadratureAxis.Q
-        )
-        p_response = backend.message_response_factor(
-            state.squeeze_r, state.theta, QuadratureAxis.P
-        )
-        return (
-            QuadratureAxis.Q
-            if abs(q_response) >= abs(p_response)
-            else QuadratureAxis.P
-        )
-    raise ValueError(f"unknown message_axis_policy {config.message_axis_policy!r}")

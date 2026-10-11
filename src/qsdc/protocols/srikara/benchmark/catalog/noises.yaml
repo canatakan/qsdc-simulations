@@ -1,0 +1,35 @@
+# nbar = xi T / (2 (1 - T)) for an excess noise xi (SNU) per pass.
+
+clean: {}
+
+# 1 km at 0.2 dB/km, xi = 0.002; squeezed-light detectors (Vahlbruch et al., PRL 117, 110801).
+lab:
+  forward: {transmittance: 0.955, nbar: 0.0212}
+  backward: {transmittance: 0.955, nbar: 0.0212}
+  memory: {efficiency: 0.95}
+  alice_detector: {efficiency: 0.95, electronic_variance: 0.01}
+  bob_detector: {efficiency: 0.95, electronic_variance: 0.01}
+
+# 5 km at 0.2 dB/km, xi = 0.005.
+metro_5km:
+  forward: {transmittance: 0.794, nbar: 0.0097}
+  backward: {transmittance: 0.794, nbar: 0.0097}
+  memory: {efficiency: 0.9}
+  alice_detector: {efficiency: 0.85, electronic_variance: 0.05}
+  bob_detector: {efficiency: 0.85, electronic_variance: 0.05}
+
+# 10 km at 0.2 dB/km, xi = 0.01.
+metro_10km:
+  forward: {transmittance: 0.631, nbar: 0.0085}
+  backward: {transmittance: 0.631, nbar: 0.0085}
+  memory: {efficiency: 0.9}
+  alice_detector: {efficiency: 0.8, electronic_variance: 0.1}
+  bob_detector: {efficiency: 0.8, electronic_variance: 0.1}
+
+# 27.27 km at 0.16 dB/km, as measured by Zhang et al., PRL 125, 010502 (2020).
+record_27km:
+  forward: {transmittance: 0.366, nbar: 0.00043}
+  backward: {transmittance: 0.366, nbar: 0.00043}
+  memory: {efficiency: 0.9}
+  alice_detector: {efficiency: 0.613, electronic_variance: 0.122}
+  bob_detector: {efficiency: 0.613, electronic_variance: 0.122}

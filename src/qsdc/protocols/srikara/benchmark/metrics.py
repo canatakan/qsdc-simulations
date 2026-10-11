@@ -1,153 +1,135 @@
-"""Metric helpers for benchmark trial and combo summaries."""
-
 from __future__ import annotations
 
-from statistics import mean
-from typing import Iterable, Sequence
+from collections.abc import Sequence
+from dataclasses import asdict, dataclass, fields
+from math import log2
 
 from qsdc.common.bits import hamming_distance
-from qsdc.protocols.srikara.simulator.encoding import interval_for_bits
-from qsdc.protocols.srikara.simulator.protocol import ControlCheck, DecoyCheck, MessageDecode
+from qsdc.protocols.srikara.simulator.protocol import Transmission
+
+RATES = (
+    "bit_error_rate",
+    "raw_bit_error_rate",
+    "erasure_rate",
+    "delivered_fraction",
+    "delivered_bits_per_state",
+    "information_per_state",
+    "rejection_rate",
+    "check_failure_rate",
+)
 
 
-def summarize_messages(
-    messages: Sequence[MessageDecode],
-    payload_bit_count: int | None = None,
-) -> dict[str, float | int]:
-    sent_transmitted_bits = "".join(message.sent_bits for message in messages)
-    decoded_transmitted_bits = "".join(message.decoded_bits for message in messages)
-    if payload_bit_count is None:
-        payload_bit_count = len(sent_transmitted_bits)
-    if payload_bit_count < 0 or payload_bit_count > len(sent_transmitted_bits):
-        raise ValueError("payload_bit_count is outside the transmitted bitstream")
+@dataclass(frozen=True)
+class RunMetrics:
+    payload_bits: int
+    error_bits: int
+    erased_bits: int
+    raw_bits: int
+    raw_error_bits: int
+    states: int
+    blocks: int
+    retries: int
+    rejected: int
+    checks: int
+    failed_checks: int
+    uncorrectable: int
+    seconds: float
+    symbol_counts: tuple[int, ...]
 
-    sent_payload_bits = sent_transmitted_bits[:payload_bit_count]
-    decoded_payload_bits = decoded_transmitted_bits[:payload_bit_count]
-    bit_error_count = hamming_distance(sent_payload_bits, decoded_payload_bits)
-    symbol_error_count = sum(
-        1 for message in messages if message.sent_bits != message.decoded_bits
-    )
-    padding_bit_count = len(sent_transmitted_bits) - payload_bit_count
-    symbol_count = len(messages)
+    @property
+    def delivered_bits(self) -> int:
+        return self.payload_bits - self.erased_bits - self.error_bits
 
-    absolute_errors: list[float] = []
-    miss_distances: list[float] = []
-    margins: list[float] = []
-    for message in messages:
-        absolute_errors.append(abs(message.decoded_value - message.message_value))
-        miss_distance, margin = interval_position(
-            message.sent_bits,
-            message.decoded_value,
-            intervals=message.intervals,
+    @property
+    def bit_error_rate(self) -> float | None:
+        released = self.payload_bits - self.erased_bits
+        return self.error_bits / released if released else None
+
+    @property
+    def raw_bit_error_rate(self) -> float:
+        return self.raw_error_bits / self.raw_bits
+
+    @property
+    def erasure_rate(self) -> float:
+        return self.erased_bits / self.payload_bits
+
+    @property
+    def delivered_fraction(self) -> float:
+        return self.delivered_bits / self.payload_bits
+
+    @property
+    def delivered_bits_per_state(self) -> float:
+        return self.delivered_bits / self.states
+
+    @property
+    def information_per_symbol(self) -> float:
+        total = sum(self.symbol_counts)
+        sent = [sum(self.symbol_counts[8 * s : 8 * s + 8]) for s in range(8)]
+        decoded = [sum(self.symbol_counts[d::8]) for d in range(8)]
+        return sum(
+            count / total * log2(count * total / (sent[i // 8] * decoded[i % 8]))
+            for i, count in enumerate(self.symbol_counts)
+            if count
         )
-        miss_distances.append(miss_distance)
-        margins.append(margin)
 
-    return {
-        "payload_bit_count": payload_bit_count,
-        "padding_bit_count": padding_bit_count,
-        "transmitted_message_bit_count": len(sent_transmitted_bits),
-        "message_bit_count": payload_bit_count,
-        "message_bit_error_count": bit_error_count,
-        "bit_error_rate": (
-            bit_error_count / payload_bit_count if payload_bit_count else 0.0
-        ),
-        "message_symbol_count": symbol_count,
-        "message_mode_count": symbol_count,
-        "message_symbol_error_count": symbol_error_count,
-        "symbol_error_rate": (
-            symbol_error_count / symbol_count if symbol_count else 0.0
-        ),
-        "mean_abs_value_error": _mean_or_zero(absolute_errors),
-        "max_abs_value_error": max(absolute_errors, default=0.0),
-        "mean_interval_miss_distance": _mean_or_zero(miss_distances),
-        "max_interval_miss_distance": max(miss_distances, default=0.0),
-        "mean_interval_margin": _mean_or_zero(margins),
-        "min_interval_margin": min(margins, default=0.0),
-    }
+    @property
+    def information_per_state(self) -> float:
+        return self.information_per_symbol * sum(self.symbol_counts) / self.states
+
+    @property
+    def rejection_rate(self) -> float:
+        return self.rejected / (self.blocks + self.retries)
+
+    @property
+    def check_failure_rate(self) -> float:
+        return self.failed_checks / self.checks
+
+    def as_dict(self) -> dict[str, object]:
+        rates = {rate: getattr(self, rate) for rate in RATES}
+        return {**asdict(self), "delivered_bits": self.delivered_bits, **rates}
 
 
-def interval_position(
-    bits: str,
-    decoded_value: float,
-    intervals: str = "default",
-) -> tuple[float, float]:
-    interval = interval_for_bits(bits, intervals=intervals)
-    if interval.contains(decoded_value):
-        if interval.lower == float("-inf"):
-            margin = interval.upper - decoded_value
-        elif interval.upper == float("inf"):
-            margin = decoded_value - interval.lower
-        else:
-            margin = min(decoded_value - interval.lower, interval.upper - decoded_value)
-        return 0.0, margin
-    if decoded_value <= interval.lower:
-        miss_distance = interval.lower - decoded_value
-    elif decoded_value >= interval.upper:
-        miss_distance = decoded_value - interval.upper
-    else:
-        miss_distance = 0.0
-    return miss_distance, -miss_distance
-
-
-def summarize_checks(
-    checks: Sequence[ControlCheck] | Sequence[DecoyCheck],
-) -> dict[str, float | int | bool]:
-    deviations = [abs(check.measured - check.expected) for check in checks]
-    failed = sum(1 for check in checks if not check.passed)
-    return {
-        "check_count": len(checks),
-        "failed_check_count": failed,
-        "passed": failed == 0,
-        "mean_abs_deviation": _mean_or_zero(deviations),
-        "max_abs_deviation": max(deviations, default=0.0),
-    }
-
-
-def aggregate_trial_metrics(
-    trials: Sequence[dict[str, object]],
-    accepted: bool | None = None,
-) -> dict[str, object]:
-    selected = [
-        trial
-        for trial in trials
-        if accepted is None or bool(trial["accepted"]) is accepted
+def measure(transmission: Transmission, seconds: float) -> RunMetrics:
+    finals = transmission.final_attempts
+    released = [attempt for attempt in finals if attempt.decoded_bits is not None]
+    messages = [m for attempt in transmission.attempts for m in attempt.run.messages]
+    checks = [
+        check
+        for attempt in transmission.attempts
+        for check in attempt.run.controls + attempt.run.decoys
     ]
-    if not selected:
-        return {
-            "trial_count": 0,
-            "bit_error_rate": None,
-            "symbol_error_rate": None,
-            "mean_abs_value_error": None,
-            "mean_interval_miss_distance": None,
-            "mean_interval_margin": None,
-        }
+    symbol_counts = [0] * 64
+    for m in messages:
+        symbol_counts[8 * int(m.sent_bits, 2) + int(m.decoded_bits, 2)] += 1
+    return RunMetrics(
+        payload_bits=sum(len(attempt.block.bits) for attempt in finals),
+        error_bits=sum(
+            hamming_distance(a.block.bits, a.decoded_bits) for a in released
+        ),
+        erased_bits=sum(len(a.block.bits) for a in finals if a.decoded_bits is None),
+        raw_bits=3 * len(messages),
+        raw_error_bits=sum(
+            hamming_distance(m.sent_bits, m.decoded_bits) for m in messages
+        ),
+        states=sum(len(attempt.run.states) for attempt in transmission.attempts),
+        blocks=len(finals),
+        retries=len(transmission.attempts) - len(finals),
+        rejected=sum(not a.run.accepted for a in transmission.attempts),
+        checks=len(checks),
+        failed_checks=sum(not check.passed for check in checks),
+        uncorrectable=sum(
+            a.run.accepted and a.decoded_bits is None for a in transmission.attempts
+        ),
+        seconds=seconds,
+        symbol_counts=tuple(symbol_counts),
+    )
 
-    bit_errors = sum(int(trial["message_bit_error_count"]) for trial in selected)
-    bit_count = sum(int(trial["message_bit_count"]) for trial in selected)
-    symbol_errors = sum(int(trial["message_symbol_error_count"]) for trial in selected)
-    symbol_count = sum(int(trial["message_symbol_count"]) for trial in selected)
-    return {
-        "trial_count": len(selected),
-        "bit_error_rate": bit_errors / bit_count if bit_count else 0.0,
-        "symbol_error_rate": symbol_errors / symbol_count if symbol_count else 0.0,
-        "mean_abs_value_error": _mean_trial_field(
-            selected,
-            "mean_abs_value_error",
-        ),
-        "mean_interval_miss_distance": _mean_trial_field(
-            selected,
-            "mean_interval_miss_distance",
-        ),
-        "mean_interval_margin": _mean_trial_field(selected, "mean_interval_margin"),
+
+def pool(metrics: Sequence[RunMetrics]) -> RunMetrics:
+    totals = {
+        field.name: sum(getattr(m, field.name) for m in metrics)
+        for field in fields(RunMetrics)
+        if field.name != "symbol_counts"
     }
-
-
-def _mean_trial_field(trials: Sequence[dict[str, object]], field: str) -> float:
-    return mean(float(trial[field]) for trial in trials)
-
-
-def _mean_or_zero(values: Iterable[float]) -> float:
-    values = tuple(values)
-    return mean(values) if values else 0.0
-
+    counts = tuple(sum(column) for column in zip(*(m.symbol_counts for m in metrics)))
+    return RunMetrics(**totals, symbol_counts=counts)
