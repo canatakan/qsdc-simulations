@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>{{ title }}</h1>
+  </header>
+  {% for group in groups.values() %}
+  <section>
+    <h2>{{ group.title }}</h2>
+    <div class="table">
+      <table>
+        <thead>
+          <tr><th>Study</th><th>Layout</th><th class="number">Executions</th><th class="number">Cases</th><th class="number">Repetitions</th><th class="number">Time</th></tr>
+        </thead>
+        <tbody>
+          {% for row in group.rows %}
+          <tr>
+            <td><a href="{{ row.href }}">{{ row.name }}</a></td>
+            <td>{{ row.layout }}</td>
+            <td class="number">{{ row.executions }}</td>
+            <td class="number">{{ row.runs }}</td>
+            <td class="number">{{ row.repetitions }}</td>
+            <td class="number">{{ row.seconds }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% else %}
+  <p>No benchmark results yet.</p>
+  {% endfor %}
+</main>
+</body>
+</html>

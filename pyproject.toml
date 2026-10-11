@@ -9,19 +9,22 @@ description = "Continuous-variable QSDC protocol simulators."
 readme = "README.md"
 requires-python = ">=3.9,<3.10"
 dependencies = [
+  "Jinja2>=3.1,<4",
   "matplotlib",
   "numpy",
+  "pydantic>=2.13,<3",
+  "PyYAML>=6,<7",
   "strawberryfields",
 ]
+
+[project.scripts]
+srikara-benchmark = "qsdc.protocols.srikara.benchmark.cli:main"
+srikara-demo = "qsdc.protocols.srikara.demo:main"
 
 [project.optional-dependencies]
 dev = [
   "pytest",
 ]
-
-[project.scripts]
-cao-demo = "qsdc.protocols.cao.cli.mapping_demo:main"
-srikara-benchmark = "qsdc.protocols.srikara.benchmark.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = [

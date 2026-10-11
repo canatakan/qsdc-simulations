@@ -1,86 +1,73 @@
-"""Three-bit interval encoding from the CV QSDC paper."""
-
 from __future__ import annotations
 
-from math import inf
+from abc import ABC, abstractmethod
+from bisect import bisect_right
+from dataclasses import dataclass, replace
+from math import inf, sqrt
+from statistics import NormalDist
 
-from qsdc.common.random.base import RandomSource
+from qsdc.common.quadrature import VACUUM_VARIANCE
+from qsdc.common.random import RandomSource
 
-from qsdc.common.gaussian import (
-    EncodingInterval,
-    GaussianEncoding,
-    get_gaussian_encoding,
+MESSAGE_DIRECTION = 1 + 1j
+BINARY_LABELS = ("000", "001", "010", "011", "100", "101", "110", "111")
+GRAY_LABELS = ("000", "001", "011", "010", "110", "100", "101", "111")
+
+
+@dataclass(frozen=True)
+class IntervalCode(ABC):
+    labels: tuple[str, ...]
+    bounds: tuple[float, ...]
+
+    def interval(self, bits: str) -> tuple[float, float]:
+        index = self.labels.index(bits)
+        return self.bounds[index], self.bounds[index + 1]
+
+    @abstractmethod
+    def sample(self, bits: str, rng: RandomSource) -> float: ...
+
+    def decode(self, value: float) -> str:
+        return self.labels[bisect_right(self.bounds, value) - 1]
+
+
+@dataclass(frozen=True)
+class UniformIntervalCode(IntervalCode):
+    tail_width: float
+
+    def sample(self, bits: str, rng: RandomSource) -> float:
+        lower, upper = self.interval(bits)
+        if lower == -inf:
+            lower = upper - self.tail_width
+        if upper == inf:
+            upper = lower + self.tail_width
+        return rng.uniform(lower, upper)
+
+
+@dataclass(frozen=True)
+class GaussianIntervalCode(IntervalCode):
+    sigma: float
+
+    def sample(self, bits: str, rng: RandomSource) -> float:
+        gaussian = NormalDist(0.0, self.sigma)
+        lower, upper = self.interval(bits)
+        return gaussian.inv_cdf(rng.uniform(gaussian.cdf(lower), gaussian.cdf(upper)))
+
+
+DEFAULT = UniformIntervalCode(
+    BINARY_LABELS, (-inf, -3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0, inf), tail_width=1.0
+)
+DEFAULT_VARIANCE_SNU = 64 / 3
+# Table I of Cao et al. (V_A = 8 SNU), scaled to the default's energy.
+CAO_BOUNDS_SNU = (-3.2537, -1.9077, -0.9012, 0.0, 0.9012, 1.9077, 3.2537)
+CAO_SCALE = sqrt(DEFAULT_VARIANCE_SNU / 8.0 * VACUUM_VARIANCE)
+GAUSSIAN_GRAY = GaussianIntervalCode(
+    GRAY_LABELS,
+    (-inf, *(bound * CAO_SCALE for bound in CAO_BOUNDS_SNU), inf),
+    sigma=sqrt(DEFAULT_VARIANCE_SNU * VACUUM_VARIANCE),
 )
 
-GRAY_CODED_BITS = ["000", "001", "011", "010", "110", "100", "101", "111"]
-
-ENCODING_INTERVALS: dict[str, GaussianEncoding] = {
-    "default": GaussianEncoding(
-        intervals=(
-            EncodingInterval("000", -inf, -3.0),
-            EncodingInterval("001", -3.0, -2.0),
-            EncodingInterval("010", -2.0, -1.0),
-            EncodingInterval("011", -1.0, 0.0),
-            EncodingInterval("100", 0.0, 1.0),
-            EncodingInterval("101", 1.0, 2.0),
-            EncodingInterval("110", 2.0, 3.0),
-            EncodingInterval("111", 3.0, inf),
-        ),
-        tail_width=1.0,
-    ),
-    "optimized_v4": get_gaussian_encoding(GRAY_CODED_BITS, variance=4.0),
-    "optimized_v8": get_gaussian_encoding(GRAY_CODED_BITS, variance=8.0),
-    "optimized_v12": get_gaussian_encoding(GRAY_CODED_BITS, variance=12.0),
+INTERVAL_CODES = {
+    "default": DEFAULT,
+    "gray": replace(DEFAULT, labels=GRAY_LABELS),
+    "gaussian_gray": GAUSSIAN_GRAY,
 }
-
-
-def validate_bits(bits: str) -> None:
-    if len(bits) != 3 or any(bit not in "01" for bit in bits):
-        raise ValueError(f"expected a 3-bit string, got {bits!r}")
-
-
-def interval_for_bits(
-    bits: str,
-    intervals: str = "default",
-) -> EncodingInterval:
-    """Return the paper's real interval for one 3-bit symbol."""
-
-    validate_bits(bits)
-    for interval in ENCODING_INTERVALS[intervals].intervals:
-        if interval.bits == bits:
-            return interval
-    raise ValueError(f"unknown 3-bit symbol {bits!r}")
-
-
-def bits_for_real(value: float, intervals: str = "default") -> str:
-    """Decode a real number by locating its paper interval."""
-
-    for interval in ENCODING_INTERVALS[intervals].intervals:
-        if interval.contains(value):
-            return interval.bits
-    raise ValueError(
-        f"value {value!r} was not found in any encoding interval; "
-        "review the interval configuration"
-    )
-
-
-def sample_message_value(
-    bits: str,
-    random_source: RandomSource,
-    intervals: str = "default",
-) -> float:
-    """Choose m from the interval for bits."""
-
-    tail_width = ENCODING_INTERVALS[intervals].tail_width
-    interval = interval_for_bits(bits, intervals=intervals)
-    if interval.lower == -inf:
-        return random_source.uniform(interval.upper - tail_width, interval.upper)
-    if interval.upper == inf:
-        return random_source.uniform(interval.lower, interval.lower + tail_width)
-    return random_source.uniform(interval.lower, interval.upper)
-
-
-def beta_for_message_value(message_value: float) -> complex:
-    """Return Alice's displacement beta = m(1 + i)."""
-
-    return complex(message_value, message_value)
