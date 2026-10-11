@@ -184,8 +184,8 @@ under every baseline, so each baseline is one color in the same report.
 compares no coding, parity and SECDED, each with and without retries.
 
 The optimized simulator measures along Alice's displacement (`aligned`), uses
-the paper's intervals with Gray labels (`gray`), θ = 3π/2 and
-r = 0.576, which is 5 dB of squeezing, the top of the paper's 1–5 dB range.
+the paper's intervals with Gray labels (`gray`), θ drawn uniformly from 3π/2 ± π/4 and
+r = 0.576, which is 5 dB of squeezing; the paper specifies neither.
 The optimization steps add parity error detection and then retries.
 
 `interval_comparison` compares the three interval codes: the paper's

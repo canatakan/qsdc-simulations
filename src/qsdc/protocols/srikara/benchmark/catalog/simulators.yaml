@@ -19,7 +19,7 @@ gray:
 
 optimized:
   extends: gray
-  theta_pi: {kind: fixed, value: 1.5}
+  theta_pi: {kind: uniform, lower: 1.25, upper: 1.75}
 
 parity:
   extends: optimized

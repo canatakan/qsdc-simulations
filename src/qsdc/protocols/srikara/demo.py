@@ -7,7 +7,7 @@ Simulators (from the benchmark catalog):
     baseline   the paper's protocol
     aligned    + measurement along Alice's displacement
     gray       + Gray-labelled intervals
-    optimized  + theta = 3pi/2
+    optimized  + theta in 3pi/2 ± pi/4
     parity     + one parity bit per symbol
     retry      + up to 3 sends per block (optimized + EC, the default)
 

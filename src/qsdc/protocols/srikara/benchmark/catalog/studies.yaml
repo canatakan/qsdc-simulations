@@ -53,13 +53,24 @@ studies:
 
   theta_fixed:
     group: signal
+    set: {theta_pi: {kind: fixed, value: 1.5}}
     axes:
       - name: Fixed theta / pi
         set: [theta_pi.value]
         values: [0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75]
 
+  theta_band:
+    group: signal
+    cases:
+      - {label: Fixed 3pi/2, set: {theta_pi: {kind: fixed, value: 1.5}}}
+      - {label: 3pi/2 ± pi/8, set: {theta_pi: {kind: uniform, lower: 1.375, upper: 1.625}}}
+      - {label: 3pi/2 ± pi/4, set: {theta_pi: {kind: uniform, lower: 1.25, upper: 1.75}}}
+      - {label: 3pi/2 ± pi/2, set: {theta_pi: {kind: uniform, lower: 1.0, upper: 2.0}}}
+      - {label: Uniform, set: {theta_pi: {kind: uniform, lower: 0.0, upper: 2.0}}}
+
   r_theta_heatmap:
     group: signal
+    set: {theta_pi: {kind: fixed, value: 1.5}}
     axes:
       - name: Fixed squeezing r
         set: [squeeze_r.value]
@@ -75,7 +86,7 @@ studies:
       - {label: Default, simulator: baseline}
       - {label: + Aligned measurement, simulator: aligned}
       - {label: + Gray labels, simulator: gray}
-      - {label: + Fixed theta = 3pi/2, simulator: optimized}
+      - {label: + Theta band 3pi/2 ± pi/4, simulator: optimized}
       - {label: + Parity error detection, simulator: parity}
       - {label: + Retries, simulator: retry}
 
