@@ -2,16 +2,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from time import perf_counter
+from typing import Annotated
+
+from pydantic import Field
 
 from qsdc.common.random import ClassicalRandomSource, derive_seed, weighted_random_bits
 from qsdc.protocols.srikara.benchmark.metrics import RunMetrics, measure, pool
-from qsdc.protocols.srikara.config import Config, SimulatorConfig
+from qsdc.protocols.srikara.config import Config, Fraction, SimulatorConfig
 from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
 
 
 class Workload(Config):
-    payload_bits: int = 10_000
-    one_probability: float = 0.5
+    payload_bits: Annotated[int, Field(ge=1)] = 10_000
+    one_probability: Fraction = 0.5
     seed: int = 33
 
     def payload(self) -> str:

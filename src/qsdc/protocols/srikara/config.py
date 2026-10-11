@@ -9,7 +9,7 @@ from qsdc.common.random import RandomSource
 
 
 class Config(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
 
 class Fixed(Config):
@@ -36,18 +36,21 @@ class Uniform(Config):
 
 
 Distribution = Annotated[Union[Fixed, Uniform], Field(discriminator="kind")]
+Fraction = Annotated[float, Field(ge=0.0, le=1.0)]
+NonNegative = Annotated[float, Field(ge=0.0)]
+Positive = Annotated[float, Field(gt=0.0)]
 
 
 class Channel(Config):
-    transmittance: float = 1.0
-    nbar: float = 0.0
+    transmittance: Fraction = 1.0
+    nbar: NonNegative = 0.0
 
 
 class Memory(Config):
-    seconds: float = 0.0
-    lifetime_seconds: float = 1.0
-    efficiency: float = 1.0
-    nbar: float = 0.0
+    seconds: NonNegative = 0.0
+    lifetime_seconds: Positive = 1.0
+    efficiency: Fraction = 1.0
+    nbar: NonNegative = 0.0
 
     @property
     def transmittance(self) -> float:
@@ -55,8 +58,8 @@ class Memory(Config):
 
 
 class Detector(Config):
-    efficiency: float = 1.0
-    electronic_variance: float = 0.0
+    efficiency: Fraction = 1.0
+    electronic_variance: NonNegative = 0.0
 
 
 class NoiseConfig(Config):
@@ -72,10 +75,10 @@ class SimulatorConfig(Config):
     random_source: Literal["classical", "sf-bs-qrng"] = "classical"
     seed: int = 11
     noise: NoiseConfig = NoiseConfig()
-    alpha_variance_snu: float = 64 / 3
+    alpha_variance_snu: NonNegative = 64 / 3
     squeeze_r: Distribution = Uniform(lower=0.115, upper=0.576)
     theta_pi: Distribution = Uniform(lower=0.0, upper=2.0)
-    tolerance_sigmas: float = 1.0
+    tolerance_sigmas: Positive = 1.0
     intervals: Literal[
         "default",
         "gray",
@@ -83,4 +86,4 @@ class SimulatorConfig(Config):
     ] = "default"
     axis_policy: Literal["random", "best_qp", "aligned"] = "random"
     error_correction: Literal["none", "parity", "secded"] = "none"
-    max_attempts: int = 1
+    max_attempts: Annotated[int, Field(ge=1)] = 1
