@@ -96,13 +96,13 @@ class Signal:
 class BlockRun:
     pairs: int
     channel: Stage
-    authentication: Stage
+    authentication: Stage | None
     signals: tuple[Signal, ...]
     gain: float | None
 
     @property
     def accepted(self) -> bool:
-        return self.channel.accepted and self.authentication.accepted
+        return self.authentication is not None and self.authentication.accepted
 
 
 Attempt = transmission.Attempt[Block, BlockRun]
@@ -140,8 +140,10 @@ class CaoSimulator:
         pairs = 2 * checks + config.boxes
         positions = rng.shuffled(range(pairs))
         channel = self._stage(sorted(positions[:checks]))
+        if not channel.accepted:
+            return BlockRun(pairs, channel, None, (), None)
         authentication = self._stage(sorted(positions[checks : 2 * checks]))
-        if not (channel.accepted and authentication.accepted):
+        if not authentication.accepted:
             return BlockRun(pairs, channel, authentication, (), None)
 
         bits = uniformize_block(block.uniformized, rng)
