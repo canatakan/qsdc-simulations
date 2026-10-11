@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from qsdc.common.noise import Channel, Detector, Memory
+from qsdc.common.config.noise import Channel, Detector, Memory
 from qsdc.common.quadrature import Q
 from qsdc.protocols.srikara.benchmark.catalog import NOISES
 from qsdc.protocols.srikara.config import NoiseConfig, SimulatorConfig

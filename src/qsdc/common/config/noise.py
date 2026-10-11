@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-from qsdc.common.config import Config
+from qsdc.common.config.base import Config
 
 
 class Channel(Config):

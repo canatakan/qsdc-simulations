@@ -2,10 +2,16 @@
 
 Independent QSDC protocol simulators organized by protocol/paper reference.
 
-Importable code lives under `src/qsdc`, reusable utilities live under
-`src/qsdc/common`, protocol implementations live under
-`src/qsdc/protocols/<protocol>`, demos live next to each protocol as `demo.py`, and paper
-notes live under `docs/protocols/<protocol>`.
+Importable code lives under `src/qsdc`. Protocol implementations live under
+`src/qsdc/protocols/<protocol>`, each with its `config.py`, its fixed values
+and unit conventions in `constants.py`, its simulator and a `demo.py`. Code
+shared by the protocols lives under `src/qsdc/common`:
+
+- `config/`: the configuration base classes, parameter distributions, and the
+  noise models and baselines.
+- `coding/`: bit conversion, interval codes, parity and SECDED.
+- `quadrature.py`, `random.py`, `transmission.py` (blocks and retries) and
+  `utils.py` (the demos' console tables).
 
 ## Setup
 
@@ -83,7 +89,7 @@ to the report layout.
 
 ## Noise baselines
 
-Both simulators use the noise baselines of `src/qsdc/common/noises.yaml`, each
+Both simulators use the noise baselines of `src/qsdc/common/config/noises.yaml`, each
 with the source of its values. A baseline describes one fibre pass, one memory
 or optical delay, and one homodyne detector; each protocol places them on its
 own links.
@@ -296,10 +302,10 @@ The optimization steps add parity error detection and then retries.
 (`default`), the paper's with Gray labels (`gray`), and Cao et al.'s Gaussian
 intervals with Gray labels (`gaussian_gray`), with m drawn from the Gaussian
 inside each interval. Cao et al. give the equiprobable intervals for
-V_A = 8 SNU (their Table I); here they are scaled to the paper's mean energy of
-64/3 ≈ 21.3 SNU, so the comparison shows only the effect of the layout. Cao's
-quadratures also have a vacuum standard deviation of 1 and this simulator's
-1/2, which halves their bounds.
+V_A = 8 SNU (their Table I); here the equiprobable intervals are computed for
+the paper's mean energy of 64/3 ≈ 21.3 SNU instead, so the comparison shows only
+the effect of the layout. Cao's quadratures also have a vacuum standard
+deviation of 1 and this simulator's 1/2, which halves their bounds.
 
 The squeezing sweep goes up to r = 1.5 (13 dB) as an idealized trend: the simulated squeezed states are pure,
 without the anti-squeezing noise that limits real squeezers.

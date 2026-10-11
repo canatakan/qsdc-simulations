@@ -5,8 +5,8 @@ from typing import Literal
 
 from pydantic import model_validator
 
-from qsdc.common.config import Config
-from qsdc.common.noise import BASELINES, Channel, Detector, Environment, Memory
+from qsdc.common.config.base import Config
+from qsdc.common.config.noise import BASELINES, Channel, Detector, Environment, Memory
 
 
 class NoiseConfig(Config):

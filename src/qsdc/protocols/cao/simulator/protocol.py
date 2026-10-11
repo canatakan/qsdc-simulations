@@ -6,6 +6,7 @@ from math import sqrt
 from qsdc.common import transmission
 from qsdc.common.random import make_random_source
 from qsdc.protocols.cao.config import SimulatorConfig
+from qsdc.protocols.cao.constants import EPR_BOUND
 from qsdc.protocols.cao.simulator.backends import AnalyticBackend
 from qsdc.protocols.cao.simulator.mapping import (
     Box,
@@ -16,8 +17,6 @@ from qsdc.protocols.cao.simulator.mapping import (
     uniformize_block,
     uniformize_message,
 )
-
-EPR_BOUND = 2.0
 
 
 @dataclass(frozen=True)

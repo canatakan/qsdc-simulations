@@ -8,4 +8,3 @@ def bytes_to_bits(payload: bytes) -> str:
 
 def bits_to_bytes(bits: str) -> bytes:
     return bytes(int(bits[i : i + 8], 2) for i in range(0, len(bits), 8))
-

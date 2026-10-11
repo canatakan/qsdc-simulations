@@ -4,15 +4,20 @@ from dataclasses import dataclass
 from math import pi, sqrt
 
 from qsdc.common import transmission
-from qsdc.common.quadrature import VACUUM_VARIANCE, P, Q, Quadrature
+from qsdc.common.quadrature import P, Q, Quadrature
 from qsdc.common.random import RandomSource, make_random_source
 from qsdc.protocols.srikara.config import SimulatorConfig
+from qsdc.protocols.srikara.constants import (
+    MESSAGE_DIRECTION,
+    STATES_PER_SYMBOL,
+    VACUUM_VARIANCE,
+)
 from qsdc.protocols.srikara.simulator.backends import (
     Backend,
     PreparedState,
     make_backend,
 )
-from qsdc.protocols.srikara.simulator.encoding import INTERVAL_CODES, MESSAGE_DIRECTION
+from qsdc.protocols.srikara.simulator.encoding import INTERVAL_CODES
 from qsdc.protocols.srikara.simulator.routing import ModeRoute, route_modes
 from qsdc.protocols.srikara.simulator.transport import (
     Block,
@@ -90,7 +95,7 @@ class SrikaraSimulator:
         rng = make_random_source(config.random_source, seed)
         self.backend.begin_run(seed)
 
-        n_states = 4 * len(symbols)
+        n_states = STATES_PER_SYMBOL * len(symbols)
         sigma = sqrt(config.alpha_variance_snu * VACUUM_VARIANCE)
         states = tuple(
             PreparedState(

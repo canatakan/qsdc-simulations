@@ -3,11 +3,12 @@ from statistics import fmean, pvariance
 
 import pytest
 
-from qsdc.common.bits import bytes_to_bits
+from qsdc.common.coding.bits import bytes_to_bits
 from qsdc.common.random import ClassicalRandomSource, weighted_random_bits
 from qsdc.protocols.cao.config import SimulatorConfig
+from qsdc.protocols.cao.constants import EPR_BOUND
 from qsdc.protocols.cao.simulator.backends import AnalyticBackend
-from qsdc.protocols.cao.simulator.protocol import EPR_BOUND, CaoSimulator
+from qsdc.protocols.cao.simulator.protocol import CaoSimulator
 
 
 class NoiselessBackend(AnalyticBackend):

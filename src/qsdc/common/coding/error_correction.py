@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from itertools import product
 
-from qsdc.common.bits import hamming_distance
+from qsdc.common.coding.bits import hamming_distance
 
 
 def parity_encode(data: str, odd: bool = True) -> str:

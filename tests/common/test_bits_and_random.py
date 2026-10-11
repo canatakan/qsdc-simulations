@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from qsdc.common.bits import bits_to_bytes, bytes_to_bits
+from qsdc.common.coding.bits import bits_to_bytes, bytes_to_bits
 from qsdc.common.random import make_random_source, weighted_random_bits
 
 

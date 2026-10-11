@@ -1,38 +1,10 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal, Union
+from typing import Literal
 
-from pydantic import Field
-
-from qsdc.common.config import Config
-from qsdc.common.noise import Channel, Detector, Environment, Memory
-from qsdc.common.random import RandomSource
-
-
-class Fixed(Config):
-    kind: Literal["fixed"] = "fixed"
-    value: float
-
-    def sample(self, rng: RandomSource) -> float:
-        return self.value
-
-    def __str__(self) -> str:
-        return f"{self.value:g}"
-
-
-class Uniform(Config):
-    kind: Literal["uniform"] = "uniform"
-    lower: float
-    upper: float
-
-    def sample(self, rng: RandomSource) -> float:
-        return rng.uniform(self.lower, self.upper)
-
-    def __str__(self) -> str:
-        return f"U[{self.lower:g}, {self.upper:g}]"
-
-
-Distribution = Annotated[Union[Fixed, Uniform], Field(discriminator="kind")]
+from qsdc.common.config.base import Config, Distribution, Uniform
+from qsdc.common.config.noise import Channel, Detector, Environment, Memory
+from qsdc.protocols.srikara.constants import MESSAGE_VARIANCE_SNU
 
 
 class NoiseConfig(Config):
@@ -58,7 +30,7 @@ class SimulatorConfig(Config):
     random_source: Literal["classical", "sf-bs-qrng"] = "classical"
     seed: int = 11
     noise: NoiseConfig = NoiseConfig()
-    alpha_variance_snu: float = 64 / 3
+    alpha_variance_snu: float = MESSAGE_VARIANCE_SNU
     squeeze_r: Distribution = Uniform(lower=0.115, upper=0.576)
     theta_pi: Distribution = Uniform(lower=0.0, upper=2.0)
     tolerance_sigmas: float = 1.0

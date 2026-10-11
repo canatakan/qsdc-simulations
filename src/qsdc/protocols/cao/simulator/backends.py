@@ -5,8 +5,9 @@ from typing import Union
 
 import numpy as np
 
-from qsdc.common.noise import Channel, Detector, Memory
+from qsdc.common.config.noise import Channel, Detector, Memory
 from qsdc.protocols.cao.config import NoiseConfig
+from qsdc.protocols.cao.constants import VACUUM_VARIANCE
 
 Link = Union[Channel, Memory]
 
@@ -62,7 +63,7 @@ class AnalyticBackend:
 
     def _detect(self, value: float, detector: Detector) -> float:
         eta = detector.efficiency
-        loss, electronic = self._rng.standard_normal(2)
+        loss, electronic = self._rng.normal(0.0, sqrt(VACUUM_VARIANCE), 2)
         return (
             sqrt(eta) * value
             + sqrt(1 - eta) * loss
@@ -70,5 +71,5 @@ class AnalyticBackend:
         )
 
     def _vacuum(self) -> complex:
-        x, p = self._rng.standard_normal(2)
+        x, p = self._rng.normal(0.0, sqrt(VACUUM_VARIANCE), 2)
         return complex(x, p)

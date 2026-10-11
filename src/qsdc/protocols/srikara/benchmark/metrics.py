@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass, fields
 from math import log2
 
-from qsdc.common.bits import hamming_distance
+from qsdc.common.coding.bits import hamming_distance
 from qsdc.protocols.srikara.simulator.protocol import Transmission
 
 RATES = (

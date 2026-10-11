@@ -15,12 +15,12 @@ from __future__ import annotations
 import argparse
 from math import e, log10, sqrt
 
-from qsdc.common.bits import bits_to_bytes, bytes_to_bits, hamming_distance
-from qsdc.common.display import header, interval, step, table
+from qsdc.common.coding.bits import bits_to_bytes, bytes_to_bits, hamming_distance
+from qsdc.common.utils import header, interval, step, table
 from qsdc.protocols.cao.config import NOISES, SimulatorConfig
+from qsdc.protocols.cao.constants import EPR_BOUND
 from qsdc.protocols.cao.simulator.mapping import interval_code, restore_block
 from qsdc.protocols.cao.simulator.protocol import (
-    EPR_BOUND,
     Attempt,
     CaoSimulator,
     Stage,

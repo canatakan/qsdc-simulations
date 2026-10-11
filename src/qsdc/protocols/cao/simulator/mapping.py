@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from math import sqrt
 
-from qsdc.common.error_correction import parity_decode, parity_encode
-from qsdc.common.intervals import GaussianIntervalCode, binary_labels
+from qsdc.common.coding.error_correction import parity_decode, parity_encode
+from qsdc.common.coding.intervals import GaussianIntervalCode, binary_labels
 from qsdc.common.random import RandomSource
 from qsdc.protocols.cao.config import SimulatorConfig
 

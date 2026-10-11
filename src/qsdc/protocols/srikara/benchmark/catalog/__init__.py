@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-from qsdc.common.noise import BASELINES
+from qsdc.common.config.noise import BASELINES
 from qsdc.protocols.srikara.benchmark.benchmark import Benchmark, Case, Workload
 from qsdc.protocols.srikara.config import NoiseConfig, SimulatorConfig
 
