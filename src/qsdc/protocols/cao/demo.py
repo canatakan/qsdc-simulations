@@ -114,7 +114,7 @@ def show_settings(config: SimulatorConfig, noise: str) -> None:
             ("Detection bits per box", config.detection_bits),
             ("Gaussian intervals", f"{2**width} ({width} bits)"),
             ("Check pairs per stage", config.check_pairs),
-            ("Check failure threshold", f"{config.check_failure_threshold:.4f}"),
+            ("Check tolerance", f"{config.check_tolerance_sigmas:g} sigma"),
             (
                 "Reconciliation",
                 "off"
@@ -316,7 +316,8 @@ def show_stage(stage: Stage, rows: int) -> None:
     verdict = "passed" if stage.accepted else "failed"
     print(
         f"{failures(stage)} above {EPR_BOUND:g}, rate {stage.failure_rate:.3f} "
-        f"vs threshold {stage.threshold:.3f} -> {verdict}"
+        f"vs threshold {stage.threshold:.3f} (honest {stage.expected_failure_rate:.3f}) "
+        f"-> {verdict}"
     )
 
 

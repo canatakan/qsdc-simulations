@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from math import acosh, exp
+from math import acosh
 from typing import Literal, Optional
 
 from pydantic import model_validator
@@ -49,7 +49,7 @@ class SimulatorConfig(Config):
     boxes: int = 512
     detection_bits: int = 1
     check_pairs: int = 64
-    check_failure_threshold: float = exp(-1.0)
+    check_tolerance_sigmas: float = 3.0
     reconciliation: Optional[Reconciliation] = Reconciliation()  # noqa: UP045
     max_attempts: int = 1
 

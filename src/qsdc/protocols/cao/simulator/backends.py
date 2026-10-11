@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from math import exp, sqrt
+from math import cosh, exp, sinh, sqrt
 from typing import Union
 
 import numpy as np
@@ -30,6 +30,29 @@ class AnalyticBackend:
             self._heterodyne(signal, noise.alice_detector),
             self._heterodyne(detection, noise.bob_detector),
         )
+
+    def check_variance(self) -> float:
+        # Variance of X_m (and of P_m) at a check position for an honest pair:
+        # both beams are attenuated, and each heterodyne adds vacuum and detector noise.
+        noise = self.noise
+        alice_link, bob_link = noise.alice_memory, noise.channel
+        alice_detector, bob_detector = noise.alice_detector, noise.bob_detector
+        beam_variance = cosh(2 * self.squeeze_r) * VACUUM_VARIANCE
+        beam_covariance = sinh(2 * self.squeeze_r) * VACUUM_VARIANCE
+
+        alice = _heterodyne_variance(
+            _transmitted_variance(beam_variance, alice_link), alice_detector
+        )
+        bob = _heterodyne_variance(
+            _transmitted_variance(beam_variance, bob_link), bob_detector
+        )
+        covariance = (
+            sqrt(alice_detector.efficiency * bob_detector.efficiency)
+            * sqrt(alice_link.transmittance * bob_link.transmittance)
+            * beam_covariance
+            / 2
+        )
+        return (alice + bob - 2 * covariance) / 2
 
     def measure_signal(self, displacement: complex) -> complex:
         noise = self.noise
@@ -73,3 +96,18 @@ class AnalyticBackend:
     def _vacuum(self) -> complex:
         x, p = self._rng.normal(0.0, sqrt(VACUUM_VARIANCE), 2)
         return complex(x, p)
+
+
+def _transmitted_variance(variance: float, link: Link) -> float:
+    t = link.transmittance
+    return t * variance + (1 - t) * (2 * link.nbar + 1) * VACUUM_VARIANCE
+
+
+def _heterodyne_variance(variance: float, detector: Detector) -> float:
+    eta = detector.efficiency
+    split = (variance + VACUUM_VARIANCE) / 2
+    return (
+        eta * split
+        + (1 - eta) * VACUUM_VARIANCE
+        + detector.electronic_variance * VACUUM_VARIANCE
+    )

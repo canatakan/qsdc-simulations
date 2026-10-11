@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from math import sqrt
+from math import exp, sqrt
 
 from qsdc.common import transmission
 from qsdc.common.random import make_random_source
@@ -60,6 +60,7 @@ class Check:
 @dataclass(frozen=True)
 class Stage:
     checks: tuple[Check, ...]
+    expected_failure_rate: float
     threshold: float
 
     @property
@@ -122,6 +123,12 @@ class Simulator:
         self.config = config
         self.backend = backend or AnalyticBackend(config.squeeze_r, config.noise)
         self.code = interval_code(config)
+        self.expected_failure_rate = exp(
+            -EPR_BOUND / (2 * self.backend.check_variance())
+        )
+        rate = self.expected_failure_rate
+        margin = sqrt(rate * (1 - rate) / config.check_pairs)
+        self.check_threshold = rate + config.check_tolerance_sigmas * margin
         self.reconciliation = (
             reconciliation_code(config) if config.reconciliation else None
         )
@@ -214,4 +221,4 @@ class Simulator:
         checks = tuple(
             Check(index, *self.backend.measure_check()) for index in positions
         )
-        return Stage(checks, self.config.check_failure_threshold)
+        return Stage(checks, self.expected_failure_rate, self.check_threshold)

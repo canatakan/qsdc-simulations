@@ -73,7 +73,7 @@ def test_checks_match_strawberry_fields():
 
 
 def test_the_gain_estimate_follows_the_loss():
-    config = SimulatorConfig(noise=NOISE, check_failure_threshold=1.01)
+    config = SimulatorConfig(noise=NOISE)
     payload = weighted_random_bits(200, 0.5, ClassicalRandomSource(4))
 
     transmission = Simulator(config).transmit(payload)
@@ -100,3 +100,23 @@ def test_noise_raises_the_check_failures(name):
 
 def test_clean_baseline_is_the_default():
     assert NOISES["clean"] == SimulatorConfig().noise
+
+
+@pytest.mark.parametrize("name", ["clean", "metro_10km", "record_27km"])
+def test_check_variance_matches_the_sampled_checks(name):
+    backend = AnalyticBackend(SQUEEZE_R, NOISES[name])
+    checks = draws(backend, "measure_check")
+    x = [(alice.real - bob.real) / sqrt(2) for alice, bob in checks]
+    p = [(alice.imag + bob.imag) / sqrt(2) for alice, bob in checks]
+
+    assert pvariance(x) == pytest.approx(backend.check_variance(), rel=0.03)
+    assert pvariance(p) == pytest.approx(backend.check_variance(), rel=0.03)
+
+
+def test_calibrated_checks_accept_honest_blocks_at_27km():
+    payload = weighted_random_bits(1024, 0.5, ClassicalRandomSource(8))
+    config = SimulatorConfig(noise=NOISES["record_27km"])
+
+    transmission = Simulator(config).transmit(payload)
+
+    assert all(attempt.run.accepted for attempt in transmission.attempts)

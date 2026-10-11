@@ -194,8 +194,11 @@ pairs, `2 * check_pairs + boxes` of them (`simulator/protocol.py`):
    heterodyne-measure x and p. A position passes when
    X_m² + P_m² < 2 with X_m = (x_A − x_B)/√2 and P_m = (p_A + p_B)/√2
    (Eq. 5). On heterodyne outcomes, this is Duan's inseparability criterion.
-   The block is terminated unless the failure rate is below
-   `check_failure_threshold`.
+   The block is terminated unless the failure rate is below a threshold
+   calibrated to the noise: from the configured delay line, fibre and
+   detectors, Bob computes the variance σ² of X_m and P_m for an honest pair,
+   so that a position fails with probability q = e^(−1/σ²), and the threshold
+   is q + `check_tolerance_sigmas` · √(q(1 − q)/`check_pairs`).
 3. Authentication: the same test on positions chosen by Bob.
 4. Gaussian mapping (`simulator/mapping.py`): every uniformized bit becomes
    a random code word (0 → 00/01, 1 → 10/11), the result is split into
@@ -230,9 +233,10 @@ Default choices where the paper gives no value:
 - `squeeze_r` = arcosh(9)/2 ≈ 1.444 (12.5 dB), so that the two-mode squeezed
   state has the variance V = V_A + 1 of the paper's security model.
 - `check_pairs` = 64 per stage, 128 of the 640 pairs of a block.
-- `check_failure_threshold` = 1/e, the failure rate of uncorrelated light: a
-  position of a pure EPR pair fails with probability exp(−2/(1 + e^(−2r))),
-  15% at the default squeezing, and of two vacua with exp(−1).
+- `check_tolerance_sigmas` = 3, as in srikara. The paper gives no threshold.
+  An honest position fails 15% of the time on the clean channel at the default
+  squeezing and 40% on `record_27km`, so a fixed threshold would either miss
+  disturbances on short links or terminate honest blocks on long ones.
 - `reconciliation.syndrome_fraction` = 0.5, enough for every block that passes
   the checks up to the `metro_5km` baseline; `metro_10km` needs about 0.7.
 
@@ -265,10 +269,9 @@ Loss is a thermal loss channel, and a detector adds its loss and electronic
 noise to each measured quadrature. Since both beams pass the fibre and one
 delay line each, the EPR noise still cancels in Bob's joint measurement, but
 every loss replaces part of it with unsqueezed vacuum noise. Even the 1 km of
-the `lab` baseline therefore nearly doubles the wrong boxes, and the checks
-reject honest pairs more often with distance, because Eq. 5 compares Alice's
-and Bob's outcomes without compensating Bob's loss. The tests check the
-variances against Strawberry Fields. Strawberry Fields backends, the security
+the `lab` baseline therefore nearly doubles the wrong boxes. The tests check
+the variances against Strawberry Fields, and the calibrated check variance
+against the sampled checks. Strawberry Fields backends, the security
 analysis of the paper's Sec. III and benchmarks are not implemented yet.
 
 ## Benchmarks
