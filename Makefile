@@ -8,6 +8,9 @@ install:
 test:
 	python -m pytest
 
+cao/test:
+	python -m pytest tests/protocols/cao
+
 srikara/test:
 	python -m pytest tests/protocols/srikara
 

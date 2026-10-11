@@ -18,6 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
+cao-demo = "qsdc.protocols.cao.demo:main"
 srikara-benchmark = "qsdc.protocols.srikara.benchmark.cli:main"
 srikara-demo = "qsdc.protocols.srikara.demo:main"
 

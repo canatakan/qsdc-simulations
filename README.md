@@ -29,15 +29,21 @@ make install
 
   > Reference: S. Srikara, K. Thapliyal, and A. Pathak, Continuous variable direct secure quantum communication using gaussian states, Quantum Inf. Process. 19, 1 (2020).
 
+- `cao`: CV QSDC based on Gaussian mapping with two-mode squeezed states, on a
+  noiseless channel.
+
+  > Reference: Z. Cao, L. Wang, K. Liang, G. Chai, and J. Peng, Continuous-variable quantum secure direct communication based on Gaussian mapping, Phys. Rev. Appl. 16, 024012 (2021).
+
 ## Commands
 
-`make install` installs the package with two commands, `srikara-demo` and
-`srikara-benchmark`, into `.venv/bin`. Use them after
+`make install` installs the package with three commands, `srikara-demo`,
+`srikara-benchmark` and `cao-demo`, into `.venv/bin`. Use them after
 `source .venv/bin/activate`, or call them as `.venv/bin/srikara-demo`.
 
 ```bash
 make test
 make srikara/test
+make cao/test
 ```
 
 ### Demo
@@ -51,6 +57,14 @@ path of its modes. `srikara-demo --help` lists all options.
 srikara-demo "hello"
 srikara-demo "hello" --simulator baseline --noise clean
 srikara-demo "hello" --noise metro_10km --block 3 --trace
+```
+
+`cao-demo` does the same for the Cao simulator. Its options set the seed, the
+squeezing, the check pairs and the sends per block.
+
+```bash
+cao-demo "hello"
+cao-demo "hello" --max-attempts 3 --block 2
 ```
 
 ### Benchmarks
@@ -127,6 +141,70 @@ Both Strawberry Fields backends apply `SimulatorConfig.noise`: a thermal loss
 channel in each direction, Alice's memory, and each party's detector efficiency
 and electronic noise. Checks compare measurements against the expectation of
 the noisy circuit, so honest noise is not mistaken for an eavesdropper.
+
+## Cao simulator
+
+`SimulatorConfig` (`cao/config.py`) holds the settings; its defaults follow the
+worked example of the paper (Fig. 3, Table I). Quadratures are in shot-noise
+units with a vacuum variance of 1, as in the paper.
+
+```python
+from qsdc.protocols.cao.config import SimulatorConfig
+from qsdc.protocols.cao.simulator.protocol import CaoSimulator
+
+transmission = CaoSimulator(SimulatorConfig(max_attempts=3)).transmit("1010")
+```
+
+The payload is uniformized (0 → 01/10, 1 → 00/11, alternately) and split
+into blocks of `block_bits` message bits. Each block is sent on its own EPR
+pairs, `2 * check_pairs + boxes` of them (`simulator/protocol.py`):
+
+1. Two squeezed vacua on a 50:50 beam splitter give the pair S1 (Alice) and
+   S2 (Bob), Eqs. 1–4.
+2. Channel detection: on `check_pairs` positions chosen by Alice, both
+   heterodyne-measure x and p. A position passes when
+   X_m² + P_m² < 2 with X_m = (x_A − x_B)/√2 and P_m = (p_A + p_B)/√2
+   (Eq. 5). On heterodyne outcomes, this is Duan's inseparability criterion.
+   The block is terminated unless the failure rate is below
+   `check_failure_threshold`.
+3. Authentication: the same test on positions chosen by Bob.
+4. Gaussian mapping (`simulator/mapping.py`): every uniformized bit becomes
+   a random code word (0 → 00/01, 1 → 10/11), the result is split into
+   `boxes` boxes, and `detection_bits` random bits are inserted into each box
+   at random positions. The box selects one of the equiprobable intervals of
+   N(0, V_A), and G1' is drawn from the Gaussian inside it. The odd parity bit
+   of the box is not mapped, as in the paper, but announced over the
+   classical channel together with the detection bits.
+5. Alice displaces X of S1 by G1' and P by an independent Gaussian G2.
+6. Bob measures the arriving beam jointly with his S2:
+   X_m = (X_info − X_2)/√2, P_m = (P_info + P_2)/√2 (Eq. 6).
+7. Alice reveals G2. Bob fits P_m = t G2 to estimate his gain t (1/√2 on a
+   clean channel), decodes X_m / t into an interval, and checks the detection
+   and parity bits. The block is released when every box passes, and its
+   two uniformizations are inverted.
+
+A terminated block, or one with a detected error, is sent again up to
+`max_attempts` times.
+
+Default choices where the paper gives no value:
+
+- `squeeze_r` = arcosh(9)/2 ≈ 1.444 (12.5 dB), so that the two-mode squeezed
+  state has the variance V = V_A + 1 of the paper's security model.
+- `check_pairs` = 4 per stage, as many as boxes.
+- `check_failure_threshold` = 1/e, the failure rate of uncorrelated light: a
+  position of a pure EPR pair fails with probability exp(−2/(1 + e^(−2r))),
+  15% at the default squeezing, and of two vacua with exp(−1).
+
+The modulation is taken literally: Alice displaces by G1' itself, so Bob reads
+G1'/√2 on top of the squeezed noise e^(−r) of the pair. On the clean channel
+about a fifth of the boxes are decoded into a wrong interval at the default
+squeezing. The paper removes these errors by reverse reconciliation, which is
+not simulated; here only the detection and parity bits detect them.
+
+`AnalyticBackend` (`simulator/backends.py`) samples the vacuum quadratures and
+applies the paper's linear transformations, which gives the exact statistics
+of these Gaussian states and measurements. Channel noise, Strawberry Fields
+backends, SECDED and benchmarks are not implemented yet.
 
 ## Benchmarks
 
