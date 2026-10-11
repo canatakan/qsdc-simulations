@@ -21,11 +21,12 @@ from __future__ import annotations
 
 import argparse
 from cmath import polar
-from math import inf, pi, sqrt
+from math import pi, sqrt
 
 from strawberryfields import Engine, Program, ops
 
 from qsdc.common.bits import bits_to_bytes, bytes_to_bits, hamming_distance
+from qsdc.common.display import header, interval, step, table
 from qsdc.common.error_correction import secded_decode, secded_encode
 from qsdc.common.quadrature import Quadrature
 from qsdc.protocols.srikara.benchmark.catalog import NOISES, SIMULATORS
@@ -422,35 +423,8 @@ def wrong(message: Message) -> bool:
     return message.decoded_bits != message.sent_bits
 
 
-def header(title: str) -> None:
-    print(f"\n{title}\n{'=' * len(title)}")
-
-
-def step(title: str) -> None:
-    print(f"\n{title}\n{'-' * len(title)}")
-
-
-def table(
-    headers: tuple[str, ...], rows: list[tuple[object, ...]], indent: str = ""
-) -> None:
-    cells = [tuple(str(cell) for cell in row) for row in rows]
-    widths = [
-        max(len(h), *(len(row[i]) for row in cells)) for i, h in enumerate(headers)
-    ]
-    for row in (headers, tuple("-" * w for w in widths), *cells):
-        print(
-            (indent + "  ".join(cell.ljust(w) for cell, w in zip(row, widths))).rstrip()
-        )
-
-
 def cplx(value: complex) -> str:
     return f"{value.real:+.4f}{value.imag:+.4f}i"
-
-
-def interval(lower: float, upper: float) -> str:
-    left = "-inf" if lower == -inf else f"{lower:.4g}"
-    right = "inf" if upper == inf else f"{upper:.4g}"
-    return f"[{left}, {right})"
 
 
 if __name__ == "__main__":
