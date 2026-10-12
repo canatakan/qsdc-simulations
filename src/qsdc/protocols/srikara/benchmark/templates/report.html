@@ -18,7 +18,7 @@
     {% if single %}
     <article><h3>Payload delivered</h3><p>{{ "%.2f"|format(100 * single.delivered_fraction) }}%</p></article>
     <article><h3>Delivered bits / state</h3><p>{{ "%.4f"|format(single.delivered_bits_per_state) }}</p></article>
-    <article><h3>Information / state</h3><p>{{ "%.4f"|format(single.information_per_state) }}</p></article>
+    <article><h3>Raw-symbol MI / state</h3><p>{{ "%.4f"|format(single.information_per_state) }}</p></article>
     {% endif %}
     <article><h3>Simulation time</h3><p>{{ seconds }}</p></article>
   </section>
@@ -31,6 +31,7 @@
 
   <section>
     <h2>Results</h2>
+    {% if summary.repetitions > 1 %}<p>± and error bars: 95% confidence interval of the mean over {{ summary.repetitions }} repetitions (Student's t).</p>{% endif %}
     <div class="table">
       <table>
         <thead>
@@ -38,7 +39,7 @@
             <th class="number">#</th><th>Condition</th>{% if show_series %}<th>Series</th>{% endif %}
             <th class="number">BER</th><th class="number">Raw BER</th><th class="number">Erasures</th>
             <th class="number">Delivered</th><th class="number">Bits / state</th>
-            <th class="number">Information / state</th><th class="number">Blocks</th>
+            <th class="number">Raw-symbol MI / state</th><th class="number">Blocks</th>
             <th class="number">Retries</th><th class="number">Failed checks</th>
             <th class="number">Rejected by checks</th>
             <th class="number">Uncorrectable</th><th class="number">Time</th>

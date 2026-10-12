@@ -16,7 +16,7 @@ from qsdc.protocols.srikara.benchmark.benchmark import BenchmarkResult, RunResul
 PLOTTED = {
     "bit_error_rate": "Bit error rate",
     "delivered_bits_per_state": "Delivered bits / state",
-    "information_per_state": "Mutual information / state",
+    "information_per_state": "Raw-symbol MI / state",
     "rejection_rate": "Sends rejected by the checks",
 }
 HEATMAP_METRICS = ("bit_error_rate", "delivered_bits_per_state")
@@ -45,18 +45,37 @@ def _comparison(result: BenchmarkResult, labels: list[str]) -> Figure:
     labels = [fill(label, 40) for label in labels]
     series = list(dict.fromkeys(run.case.series for run in runs))
     colors = [colormaps["tab10"](series.index(run.case.series) % 10) for run in runs]
-    height = max(6.0, 0.4 * sum(label.count("\n") + 1 for label in labels))
+    height = max(6.0, 0.6 * sum(label.count("\n") + 1 for label in labels))
     figure = Figure(figsize=(15, height), layout="constrained")
     axes = figure.subplots(2, 2, sharey=True)
     positions = np.arange(len(runs))
     for axis, (metric, title) in zip(axes.flat, PLOTTED.items()):
         values = [_value(run, metric) for run in runs]
-        bars = axis.barh(positions, np.nan_to_num(values), color=colors)
-        axis.bar_label(
-            bars, labels=[_format(metric, value) for value in values], padding=3
+        errors = np.nan_to_num([run.interval(metric) for run in runs])
+        axis.barh(
+            positions,
+            np.nan_to_num(values),
+            xerr=errors,
+            color=colors,
+            error_kw={"capsize": 3, "elinewidth": 1},
         )
+        highest = np.nanmax([0.0, *(np.nan_to_num(values) + errors)])
+        right = max(0.01, 1.25 * highest)
+        wide = errors.max(initial=0.0) > 0.05 * right
+        for position, value, error in zip(positions, values, errors):
+            value = np.nan_to_num(value)
+            inside = wide and value - error > 0.3 * right
+            axis.annotate(
+                _format(metric, value),
+                (value - error, position) if inside else (value + error, position),
+                xytext=(-6, 0) if inside else (4, 0),
+                textcoords="offset points",
+                ha="right" if inside else "left",
+                va="center",
+                color="white" if inside else "black",
+            )
         axis.set_yticks(positions, labels)
-        axis.set_xlim(0.0, max(0.01, 1.25 * np.nanmax([0.0, *values])))
+        axis.set_xlim(0.0, right)
         _style(axis, title, metric, axis.xaxis)
     axes[0, 0].invert_yaxis()
     if len(series) > 1:
@@ -81,11 +100,16 @@ def _sweep(result: BenchmarkResult) -> Figure:
     for axis, (metric, title) in zip(axes.flat, PLOTTED.items()):
         for name in series:
             points = sorted(
-                (*run.case.at, _value(run, metric))
+                (*run.case.at, _value(run, metric), run.interval(metric))
                 for run in runs
                 if run.case.series == name
             )
-            axis.plot(*zip(*points), marker="o", linewidth=2.0, label=name)
+            x, y, error = (np.array(column) for column in zip(*points))
+            error = np.nan_to_num(error)
+            line = axis.plot(x, y, marker="o", linewidth=2.0, label=name)[0]
+            axis.fill_between(
+                x, y - error, y + error, color=line.get_color(), alpha=0.2, linewidth=0
+            )
         axis.set_xlabel(result.benchmark.axes[0])
         axis.set_xticks(sorted({run.case.at[0] for run in runs}))
         axis.set_ylim(0.0, max(0.01, axis.get_ylim()[1]))

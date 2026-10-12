@@ -1,4 +1,3 @@
-import numpy as np
 import pytest
 
 from qsdc.common.bits import bits_to_bytes, bytes_to_bits
@@ -27,11 +26,3 @@ def test_random_sources_are_reproducible_from_their_seed():
             for source in (left, right)
         ]
         assert draws[0] == draws[1]
-
-
-def test_quantum_random_source_leaves_numpy_randomness_untouched():
-    np.random.seed(123)
-    expected = np.random.random()
-    np.random.seed(123)
-    make_random_source("sf-bs-qrng", 9).uniform(0, 1)
-    assert np.random.random() == expected

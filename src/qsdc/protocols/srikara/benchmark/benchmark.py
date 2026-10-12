@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import nan, sqrt
+from statistics import fmean
 from time import perf_counter
 from typing import Annotated
 
 from pydantic import Field
+from scipy.stats import t
 
 from qsdc.common.random import ClassicalRandomSource, derive_seed, weighted_random_bits
 from qsdc.protocols.srikara.benchmark.metrics import RunMetrics, measure, pool
@@ -51,6 +54,21 @@ class RunResult:
     case: Case
     metrics: RunMetrics
     repetitions: tuple[RunMetrics, ...]
+
+    def interval(self, metric: str, confidence: float = 0.95) -> float:
+        reps = self.repetitions
+        if len(reps) < 2:
+            return nan
+        values = [
+            getattr(pool(reps[:i] + reps[i + 1 :]), metric) for i in range(len(reps))
+        ]
+        values = [value for value in values if value is not None]
+        n = len(values)
+        if n < 2:
+            return nan
+        mean = fmean(values)
+        error = sqrt((n - 1) / n * sum((value - mean) ** 2 for value in values))
+        return t.ppf((1 + confidence) / 2, n - 1) * error
 
 
 @dataclass(frozen=True)

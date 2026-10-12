@@ -3,7 +3,7 @@ from math import cosh, exp, pi, sinh, sqrt
 import pytest
 
 from qsdc.protocols.srikara.benchmark.catalog import NOISES
-from qsdc.protocols.srikara.config import SimulatorConfig
+from qsdc.protocols.srikara.config import Channel, NoiseConfig, SimulatorConfig
 from qsdc.protocols.srikara.simulator.backends import AnalyticBackend, PreparedState
 from qsdc.protocols.srikara.simulator.protocol import AXES, SrikaraSimulator
 
@@ -88,6 +88,29 @@ def test_rejected_blocks_are_retried_until_recovered(reject_every_other_run):
     assert [attempt.number for attempt in retried.attempts] == [0, 1] * (
         len(PAYLOAD) // 3
     )
+
+
+def test_a_failed_control_check_aborts_before_alice_sends_anything_back(
+    reject_every_other_run,
+):
+    transmission = SrikaraSimulator(
+        SimulatorConfig(max_attempts=2), reject_every_other_run()
+    ).transmit(PAYLOAD)
+
+    aborted = [attempt.run for attempt in transmission.attempts if attempt.number == 0]
+    assert all(run.aborted and not run.accepted for run in aborted)
+    assert all(run.decoys == () and run.messages == () for run in aborted)
+    assert all(len(run.states) == 4 for run in aborted)
+
+
+def test_a_channel_without_signal_still_decodes():
+    config = SimulatorConfig(
+        backend="sf", noise=NoiseConfig(backward=Channel(transmittance=0.0))
+    )
+    transmission = SrikaraSimulator(config).transmit("101")
+
+    [message] = transmission.attempts[0].run.messages
+    assert (message.response, message.decoded_value) == (0.0, 0.0)
 
 
 def test_aligned_axis_reads_the_full_message_displacement():

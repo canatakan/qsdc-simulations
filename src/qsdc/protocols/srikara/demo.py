@@ -145,8 +145,8 @@ def show_sends(blocks: list[list[Attempt]]) -> None:
                     number if first else "",
                     block.bits if first else "",
                     attempt.number + 1,
-                    " ".join(m.sent_bits for m in run.messages),
-                    " ".join(m.decoded_bits for m in run.messages),
+                    " ".join(m.sent_bits for m in run.messages) or "-",
+                    " ".join(m.decoded_bits for m in run.messages) or "-",
                     f"{sum(not c.passed for c in checks)}/{len(checks)}",
                     outcome(attempt),
                 )
@@ -155,8 +155,10 @@ def show_sends(blocks: list[list[Attempt]]) -> None:
 
 
 def outcome(attempt: Attempt) -> str:
+    if attempt.run.aborted:
+        return "aborted by the control check"
     if not attempt.run.accepted:
-        return "rejected"
+        return "rejected by the decoy check"
     if attempt.decoded_bits is None:
         return "error detected, withheld"
     errors = hamming_distance(attempt.decoded_bits, attempt.block.bits)
@@ -195,6 +197,11 @@ def show_attempt(
     if trace:
         for check in run.controls:
             trace_check(run.states[check.index], check, config, "control")
+    if run.aborted:
+        failed = sum(not c.passed for c in run.controls)
+        print(f"{failed} of {len(run.controls)} control checks failed")
+        print(f"-> {outcome(attempt)}, Alice sends nothing back")
+        return
 
     step("3. Alice displaces the message modes by m (1 + i), decoys stay unchanged")
     table(
