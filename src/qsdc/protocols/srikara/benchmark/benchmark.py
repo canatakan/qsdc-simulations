@@ -10,9 +10,10 @@ from pydantic import Field
 from scipy.stats import t
 
 from qsdc.common.random import ClassicalRandomSource, derive_seed, weighted_random_bits
-from qsdc.protocols.srikara.benchmark.metrics import RunMetrics, measure, pool
-from qsdc.protocols.srikara.config import Config, Fraction, SimulatorConfig
-from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
+
+from ..config import Config, Fraction, SimulatorConfig
+from ..simulator.protocol import SrikaraSimulator
+from .metrics import RunMetrics
 
 
 class Workload(Config):
@@ -48,6 +49,10 @@ class Benchmark:
     def layout(self) -> str:
         return LAYOUTS[len(self.axes)]
 
+    @property
+    def title(self) -> str:
+        return self.name.replace("_", " ").capitalize()
+
 
 @dataclass(frozen=True)
 class RunResult:
@@ -55,19 +60,29 @@ class RunResult:
     metrics: RunMetrics
     repetitions: tuple[RunMetrics, ...]
 
+    def value(self, metric: str) -> float:
+        # An undefined metric, such as a rate over nothing, is NaN.
+        value = getattr(self.metrics, metric)
+        return nan if value is None else value
+
     def interval(self, metric: str, confidence: float = 0.95) -> float:
         reps = self.repetitions
         if len(reps) < 2:
             return nan
+
+        # Jackknife: pool every repetition but one, once per repetition.
         values = [
-            getattr(pool(reps[:i] + reps[i + 1 :]), metric) for i in range(len(reps))
+            getattr(RunMetrics.pool(reps[:i] + reps[i + 1 :]), metric)
+            for i in range(len(reps))
         ]
         values = [value for value in values if value is not None]
         n = len(values)
         if n < 2:
             return nan
+
         mean = fmean(values)
         error = sqrt((n - 1) / n * sum((value - mean) ** 2 for value in values))
+
         return t.ppf((1 + confidence) / 2, n - 1) * error
 
 
@@ -78,29 +93,34 @@ class BenchmarkResult:
     seconds: float
 
 
+def reseed(config: Config, repetition: int) -> Config:
+    seed = derive_seed(config.seed, "repetition", repetition)
+    return config.model_copy(update={"seed": seed})
+
+
 def run_benchmark(benchmark: Benchmark, repetitions: int = 1) -> BenchmarkResult:
     started = perf_counter()
     payloads: dict[Workload, str] = {}
+
     runs = []
     for case in benchmark.cases:
         samples = []
         for repetition in range(repetitions):
+            # The first repetition uses the configured seeds, the others fresh ones.
             simulator, workload = case.simulator, case.workload
             if repetition:
-                simulator = simulator.model_copy(
-                    update={
-                        "seed": derive_seed(simulator.seed, "repetition", repetition)
-                    }
-                )
-                workload = workload.model_copy(
-                    update={
-                        "seed": derive_seed(workload.seed, "repetition", repetition)
-                    }
-                )
+                simulator = reseed(simulator, repetition)
+                workload = reseed(workload, repetition)
+
             if workload not in payloads:
                 payloads[workload] = workload.payload()
+
             case_started = perf_counter()
             transmission = SrikaraSimulator(simulator).transmit(payloads[workload])
-            samples.append(measure(transmission, perf_counter() - case_started))
-        runs.append(RunResult(case, pool(samples), tuple(samples)))
+            samples.append(
+                RunMetrics.measure(transmission, perf_counter() - case_started)
+            )
+
+        runs.append(RunResult(case, RunMetrics.pool(samples), tuple(samples)))
+
     return BenchmarkResult(benchmark, tuple(runs), perf_counter() - started)

@@ -8,11 +8,7 @@ from pathlib import Path
 
 from qsdc.protocols.srikara.benchmark.benchmark import Workload, run_benchmark
 from qsdc.protocols.srikara.benchmark.catalog import studies
-from qsdc.protocols.srikara.benchmark.report import (
-    rerender,
-    write_index,
-    write_report,
-)
+from qsdc.protocols.srikara.benchmark.report import rerender, write_index, write_report
 
 WORKLOAD = Workload()
 STUDIES = studies(WORKLOAD)
@@ -22,6 +18,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("list", help="list the built-in studies")
+
     run = commands.add_parser("run", help="run studies into <output-root>/<study>/")
     run.add_argument(
         "--study",
@@ -40,6 +37,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         action="store_true",
         help="skip studies that already have a report, e.g. to resume a run",
     )
+
     index = commands.add_parser("index", help="rebuild <output-root>/index.html")
     rerender_parser = commands.add_parser(
         "rerender",
@@ -47,6 +45,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     for command in (run, index, rerender_parser):
         command.add_argument("--output-root", type=Path, default=Path("results"))
+
     args = parser.parse_args(argv)
 
     if args.command == "list":
@@ -62,15 +61,18 @@ def main(argv: Sequence[str] | None = None) -> None:
             if args.skip_existing and done:
                 print(f"{study.name}: already done")
                 continue
+
             print(study.name)
             report = write_report(
                 run_benchmark(study, args.repetitions), args.output_root
             )
             print(f"  {report / 'report.html'}")
+
     if args.command == "rerender":
         for results in sorted(args.output_root.rglob("results.json")):
             rerender(results)
             print(f"Rerendered {results.parent / 'report.html'}")
+
     print(f"Index: {write_index(args.output_root)}")
 
 

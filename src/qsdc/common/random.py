@@ -36,6 +36,7 @@ class RandomSource(ABC):
         for i in reversed(range(1, len(result))):
             j = self.randbelow(i + 1)
             result[i], result[j] = result[j], result[i]
+
         return result
 
 
@@ -73,12 +74,14 @@ class SFBeamSplitterQRNG(RandomSource):
     def raw_bit(self) -> int:
         if not self._bits:
             self._refill()
+
         return self._bits.popleft()
 
     def _integer(self, bits: int) -> int:
         value = 0
         for _ in range(bits):
             value = (value << 1) | self.raw_bit()
+
         return value
 
     def _refill(self) -> None:
@@ -88,12 +91,14 @@ class SFBeamSplitterQRNG(RandomSource):
             ops.BSgate(np.pi / 4, 0.0) | (q[0], q[1])
             ops.MeasureFock() | q
 
+        # Seed numpy for the Fock samples, and restore its state afterwards.
         numpy_state = np.random.get_state()
         if self.seed is not None:
             np.random.seed(
                 np.random.SeedSequence((self.seed, self._refills)).generate_state(1)[0]
             )
             self._refills += 1
+
         try:
             for _ in range(self.BATCH):
                 photon_counts = (
@@ -118,6 +123,7 @@ def derive_seed(*parts: object) -> int:
         encoded = str(part).encode()
         digest.update(len(encoded).to_bytes(4, "big"))
         digest.update(encoded)
+
     return int.from_bytes(digest.digest()[:4], "big")
 
 
