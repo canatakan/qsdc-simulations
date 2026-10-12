@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from itertools import product
 
-from qsdc.common.coding.bits import hamming_distance
+from .bits import hamming_distance
 
 
 def parity_encode(data: str, odd: bool = True) -> str:
@@ -28,4 +28,5 @@ def secded_decode(word: str) -> str | None:
     for codeword, data in CODEWORDS.items():
         if hamming_distance(word, codeword) <= 1:
             return data
+
     return None

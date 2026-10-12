@@ -2,6 +2,7 @@ from math import cosh, exp, pi, sinh, sqrt
 
 import pytest
 
+from qsdc.common.random import make_random_source
 from qsdc.protocols.srikara.benchmark.catalog import NOISES
 from qsdc.protocols.srikara.config import Channel, NoiseConfig, SimulatorConfig
 from qsdc.protocols.srikara.simulator.backends import AnalyticBackend, PreparedState
@@ -123,8 +124,10 @@ def test_aligned_axis_reads_the_full_message_displacement():
 
 
 def test_bob_draws_alpha_with_the_configured_variance():
-    run = Simulator(SimulatorConfig()).run_block(("000",) * 1000, seed=3)
-    alphas = [state.alpha for state in run.states]
+    config = SimulatorConfig()
+    rng = make_random_source(config.random_source, 3)
+    states = Simulator(config).prepare_states(4000, rng)
+    alphas = [state.alpha for state in states]
     variance = sum(a.real**2 + a.imag**2 for a in alphas) / (2 * len(alphas))
 
     assert variance == pytest.approx(64 / 3 / 4, rel=0.05)

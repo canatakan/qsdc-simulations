@@ -11,7 +11,7 @@ from matplotlib.figure import Figure
 from matplotlib.patches import Patch
 from matplotlib.ticker import PercentFormatter
 
-from qsdc.protocols.srikara.benchmark.benchmark import BenchmarkResult, RunResult
+from .benchmark import BenchmarkResult
 
 PLOTTED = {
     "bit_error_rate": "Bit error rate",
@@ -35,8 +35,10 @@ def write_plots(
         figures = {"sweep.png": _sweep(result)}
     else:
         figures = {"comparison.png": _comparison(result, labels)}
+
     for name, figure in figures.items():
         figure.savefig(directory / name, dpi=150, bbox_inches="tight")
+
     return list(figures)
 
 
@@ -45,12 +47,14 @@ def _comparison(result: BenchmarkResult, labels: list[str]) -> Figure:
     labels = [fill(label, 40) for label in labels]
     series = list(dict.fromkeys(run.case.series for run in runs))
     colors = [colormaps["tab10"](series.index(run.case.series) % 10) for run in runs]
+
     height = max(6.0, 0.6 * sum(label.count("\n") + 1 for label in labels))
     figure = Figure(figsize=(15, height), layout="constrained")
     axes = figure.subplots(2, 2, sharey=True)
     positions = np.arange(len(runs))
+
     for axis, (metric, title) in zip(axes.flat, PLOTTED.items()):
-        values = [_value(run, metric) for run in runs]
+        values = [run.value(metric) for run in runs]
         errors = np.nan_to_num([run.interval(metric) for run in runs])
         axis.barh(
             positions,
@@ -59,9 +63,12 @@ def _comparison(result: BenchmarkResult, labels: list[str]) -> Figure:
             color=colors,
             error_kw={"capsize": 3, "elinewidth": 1},
         )
+
+        # A label sits inside its bar when the error bars are wide.
         highest = np.nanmax([0.0, *(np.nan_to_num(values) + errors)])
         right = max(0.01, 1.25 * highest)
         wide = errors.max(initial=0.0) > 0.05 * right
+
         for position, value, error in zip(positions, values, errors):
             value = np.nan_to_num(value)
             inside = wide and value - error > 0.3 * right
@@ -74,9 +81,11 @@ def _comparison(result: BenchmarkResult, labels: list[str]) -> Figure:
                 va="center",
                 color="white" if inside else "black",
             )
+
         axis.set_yticks(positions, labels)
         axis.set_xlim(0.0, right)
         _style(axis, title, metric, axis.xaxis)
+
     axes[0, 0].invert_yaxis()
     if len(series) > 1:
         figure.legend(
@@ -88,55 +97,64 @@ def _comparison(result: BenchmarkResult, labels: list[str]) -> Figure:
             ncols=len(series),
             frameon=False,
         )
-    figure.suptitle(_title(result), fontsize=16, fontweight="bold")
+
+    figure.suptitle(result.benchmark.title, fontsize=16, fontweight="bold")
     return figure
 
 
 def _sweep(result: BenchmarkResult) -> Figure:
     runs = result.runs
     series = list(dict.fromkeys(run.case.series for run in runs))
+
     figure = Figure(figsize=(12, 8), layout="constrained")
     axes = figure.subplots(2, 2)
+
     for axis, (metric, title) in zip(axes.flat, PLOTTED.items()):
         for name in series:
             points = sorted(
-                (*run.case.at, _value(run, metric), run.interval(metric))
+                (*run.case.at, run.value(metric), run.interval(metric))
                 for run in runs
                 if run.case.series == name
             )
             x, y, error = (np.array(column) for column in zip(*points))
             error = np.nan_to_num(error)
+
             line = axis.plot(x, y, marker="o", linewidth=2.0, label=name)[0]
             axis.fill_between(
                 x, y - error, y + error, color=line.get_color(), alpha=0.2, linewidth=0
             )
+
         axis.set_xlabel(result.benchmark.axes[0])
         axis.set_xticks(sorted({run.case.at[0] for run in runs}))
         axis.set_ylim(0.0, max(0.01, axis.get_ylim()[1]))
         _style(axis, title, metric, axis.yaxis)
         if len(series) > 1:
             axis.legend(frameon=False)
-    figure.suptitle(_title(result), fontsize=16, fontweight="bold")
+
+    figure.suptitle(result.benchmark.title, fontsize=16, fontweight="bold")
     return figure
 
 
 def _heatmaps(result: BenchmarkResult) -> list[Figure]:
     runs = result.runs
     limits = {
-        metric: _limits([_value(run, metric) for run in runs])
+        metric: _limits([run.value(metric) for run in runs])
         for metric in HEATMAP_METRICS
     }
+
     figures = []
     for series in dict.fromkeys(run.case.series for run in runs):
         cells = {run.case.at: run for run in runs if run.case.series == series}
         xs, ys = sorted({x for x, _ in cells}), sorted({y for _, y in cells})
+
         figure = Figure(figsize=(12, 4.8), layout="constrained")
         axes = figure.subplots(1, 2)
+
         for axis, metric in zip(axes, HEATMAP_METRICS):
             matrix = np.array(
                 [
                     [
-                        _value(cells[x, y], metric) if (x, y) in cells else np.nan
+                        cells[x, y].value(metric) if (x, y) in cells else np.nan
                         for x in xs
                     ]
                     for y in ys
@@ -151,6 +169,8 @@ def _heatmaps(result: BenchmarkResult) -> list[Figure]:
                 vmin=limits[metric][0],
                 vmax=limits[metric][1],
             )
+
+            # Each cell is labelled in white on dark colours, black on light ones.
             for (row, column), value in np.ndenumerate(matrix):
                 red, green, blue, _ = image.cmap(image.norm(value))
                 dark = 0.2126 * red + 0.7152 * green + 0.0722 * blue < 0.5
@@ -163,39 +183,38 @@ def _heatmaps(result: BenchmarkResult) -> list[Figure]:
                     fontsize=9,
                     color="white" if dark else "black",
                 )
+
             axis.set_xticks(range(len(xs)), [f"{x:g}" for x in xs])
             axis.set_yticks(range(len(ys)), [f"{y:g}" for y in ys])
             axis.set_xlabel(result.benchmark.axes[0])
             axis.set_ylabel(result.benchmark.axes[1])
             axis.set_title(PLOTTED[metric], fontweight="bold")
+
             colorbar = figure.colorbar(image, ax=axis, fraction=0.046, pad=0.04)
             if not metric.endswith("per_state"):
                 colorbar.formatter = PercentFormatter(1.0, decimals=1)
                 colorbar.update_ticks()
-        figure.suptitle(f"{_title(result)} · {series}", fontsize=16, fontweight="bold")
+
+        figure.suptitle(
+            f"{result.benchmark.title} · {series}", fontsize=16, fontweight="bold"
+        )
         figures.append(figure)
+
     return figures
 
 
 def _style(axis: Axes, title: str, metric: str, value_axis: Axis) -> None:
     axis.set_title(title, fontweight="bold")
     axis.grid(alpha=0.3)
+
     if not metric.endswith("per_state"):
         value_axis.set_major_formatter(PercentFormatter(1.0))
-
-
-def _title(result: BenchmarkResult) -> str:
-    return result.benchmark.name.replace("_", " ").capitalize()
-
-
-def _value(run: RunResult, metric: str) -> float:
-    value = getattr(run.metrics, metric)
-    return np.nan if value is None else value
 
 
 def _format(metric: str, value: float) -> str:
     if np.isnan(value):
         return "—"
+
     return f"{value:.3f}" if metric.endswith("per_state") else f"{value:.2%}"
 
 

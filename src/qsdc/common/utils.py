@@ -18,6 +18,7 @@ def table(
     widths = [
         max(len(h), *(len(row[i]) for row in cells)) for i, h in enumerate(headers)
     ]
+
     for row in (headers, tuple("-" * w for w in widths), *cells):
         print(
             (indent + "  ".join(cell.ljust(w) for cell, w in zip(row, widths))).rstrip()

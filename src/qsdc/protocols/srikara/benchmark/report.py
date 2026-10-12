@@ -5,26 +5,20 @@ import json
 import math
 import shutil
 from collections import Counter
-from dataclasses import fields
 from pathlib import Path
 from time import time_ns
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-from qsdc.protocols.srikara.benchmark.benchmark import (
-    Benchmark,
-    BenchmarkResult,
-    Case,
-    RunResult,
-    Workload,
-)
-from qsdc.protocols.srikara.benchmark.catalog import GROUPS, NOISES, STUDY_GROUPS
-from qsdc.protocols.srikara.benchmark.metrics import RunMetrics
-from qsdc.protocols.srikara.benchmark.plots import write_plots
-from qsdc.protocols.srikara.config import SimulatorConfig
-from qsdc.protocols.srikara.simulator.encoding import INTERVAL_CODES
+from ..config import SimulatorConfig
+from ..simulator.encoding import INTERVAL_CODES
+from .benchmark import Benchmark, BenchmarkResult, Case, RunResult, Workload
+from .catalog import GROUPS, NOISES, STUDY_GROUPS, study_order
+from .metrics import RunMetrics
+from .plots import write_plots
 
 TEMPLATES = Path(__file__).parent / "templates"
+
 TABLE_RATES = (
     "bit_error_rate",
     "raw_bit_error_rate",
@@ -33,8 +27,9 @@ TABLE_RATES = (
     "delivered_bits_per_state",
     "information_per_state",
 )
-GROUP_ORDER = list(GROUPS)
+
 OTHER = {"title": "Other"}
+
 _templates = Environment(
     loader=FileSystemLoader(TEMPLATES),
     autoescape=True,
@@ -49,6 +44,7 @@ def parameters(case: Case) -> dict[str, str]:
     noise = next(
         (name for name, preset in NOISES.items() if preset == simulator.noise), None
     )
+
     return {
         "Backend": simulator.backend,
         "Random source": simulator.random_source,
@@ -69,10 +65,12 @@ def parameters(case: Case) -> dict[str, str]:
 
 
 def run_labels(benchmark: Benchmark) -> list[str]:
+    # A run is labelled by the parameters that vary across the benchmark.
     values = [parameters(case) for case in benchmark.cases]
     varying = [key for key in values[0] if len({value[key] for value in values}) > 1]
     if len({case.series for case in benchmark.cases}) > 1:
         varying = [key for key in varying if key != "Noise"]
+
     return [
         case.label
         or ", ".join(f"{key}: {value[key]}" for key in varying)
@@ -104,22 +102,25 @@ def load_result(results: Path) -> BenchmarkResult:
                 run["label"],
                 tuple(run["at"]),
             ),
-            _metrics(run["metrics"]),
-            tuple(_metrics(values) for values in run["repetitions"]),
+            RunMetrics.from_dict(run["metrics"]),
+            tuple(RunMetrics.from_dict(values) for values in run["repetitions"]),
         )
         for run in document["runs"]
     )
+
     info = document["benchmark"]
     benchmark = Benchmark(
         info["name"], tuple(run.case for run in runs), tuple(info["axes"])
     )
+
     return BenchmarkResult(benchmark, runs, document["summary"]["simulation_seconds"])
 
 
 def _write(result: BenchmarkResult, directory: Path) -> None:
     benchmark = result.benchmark
-    (directory / "plots").mkdir(parents=True)
     labels = run_labels(benchmark)
+
+    (directory / "plots").mkdir(parents=True)
     plots = write_plots(result, labels, directory / "plots")
 
     summary = {
@@ -128,6 +129,7 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
         "states": sum(run.metrics.states for run in result.runs),
         "simulation_seconds": sum(run.metrics.seconds for run in result.runs),
     }
+
     runs = [
         {
             "id": position,
@@ -141,6 +143,7 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
         }
         for position, run in enumerate(result.runs, start=1)
     ]
+
     document = {
         "benchmark": {
             "name": benchmark.name,
@@ -150,6 +153,7 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
         "summary": summary,
         "runs": runs,
     }
+
     (directory / "results.json").write_text(json.dumps(document, indent=2) + "\n")
 
     rows = [_csv_row(run, benchmark.axes) for run in runs]
@@ -166,7 +170,9 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
         for key, value in values[0].items()
         if all(other[key] == value for other in values)
     }
+
     series = len({case.series for case in benchmark.cases}) > 1
+
     table = [
         {
             "id": position,
@@ -184,13 +190,15 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
         }
         for position, (run, label) in enumerate(zip(result.runs, labels), start=1)
     ]
+
     matrices = [
         {"id": position, "condition": label, **_symbol_matrix(run)}
         for position, (run, label) in enumerate(zip(result.runs, labels), start=1)
     ]
+
     shutil.copy(TEMPLATES / "style.css", directory / "style.css")
     html = _templates.get_template("report.html").render(
-        title=benchmark.name.replace("_", " ").capitalize(),
+        title=benchmark.title,
         layout=benchmark.layout,
         summary=summary,
         single=result.runs[0].metrics if len(result.runs) == 1 else None,
@@ -201,12 +209,15 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
         table=table,
         matrices=matrices,
     )
+
     (directory / "report.html").write_text(html)
 
 
 def write_index(root: Path) -> Path:
     latest: dict[str, tuple[Path, dict]] = {}
     executions: Counter[str] = Counter()
+
+    # The latest run of each study, and how many runs it has.
     for path in sorted(root.rglob("results.json")):
         document = json.loads(path.read_text())
         name = document["benchmark"]["name"]
@@ -214,13 +225,14 @@ def write_index(root: Path) -> Path:
         latest[name] = (path.parent / "report.html", document)
 
     groups: dict[str, dict] = {}
-    for name in sorted(latest, key=lambda name: (_study_order(name), name)):
+    for name in sorted(latest, key=lambda name: (study_order(name), name)):
         report, document = latest[name]
         summary = document["summary"]
         group = STUDY_GROUPS.get(name, "other")
-        groups.setdefault(group, {**GROUPS.get(group, OTHER), "rows": []})[
-            "rows"
-        ].append(
+        if group not in groups:
+            groups[group] = {**GROUPS.get(group, OTHER), "rows": []}
+
+        groups[group]["rows"].append(
             {
                 "name": name.replace("_", " ").capitalize(),
                 "layout": document["benchmark"]["layout"],
@@ -231,14 +243,17 @@ def write_index(root: Path) -> Path:
                 "seconds": _seconds(summary["simulation_seconds"]),
             }
         )
+
     root.mkdir(parents=True, exist_ok=True)
     shutil.copy(TEMPLATES / "style.css", root / "style.css")
+
     index = root / "index.html"
     index.write_text(
         _templates.get_template("index.html").render(
             title=root.name.replace("_", " ").capitalize(), groups=groups
         )
     )
+
     return index
 
 
@@ -246,15 +261,18 @@ def _symbol_matrix(run: RunResult) -> dict[str, object]:
     metrics = run.metrics
     labels = INTERVAL_CODES[run.case.simulator.intervals].labels
     counts = [
-        [metrics.symbol_counts[8 * int(s, 2) + int(d, 2)] for d in labels]
-        for s in labels
+        [metrics.symbol_count(int(s, 2), int(d, 2)) for d in labels] for s in labels
     ]
+
+    # Each row shares out the decodings of one sent symbol.
     rows = []
     for label, row in zip(labels, counts):
         total = sum(row) or 1
         cells = [{"count": count, "share": count / total} for count in row]
         rows.append({"label": label, "cells": cells})
+
     correct = sum(counts[i][i] for i in range(8)) / sum(map(sum, counts))
+
     return {
         "labels": labels,
         "rows": rows,
@@ -263,19 +281,17 @@ def _symbol_matrix(run: RunResult) -> dict[str, object]:
     }
 
 
-def _metrics(values: dict) -> RunMetrics:
-    counts = {field.name: values[field.name] for field in fields(RunMetrics)}
-    return RunMetrics(**{**counts, "symbol_counts": tuple(counts["symbol_counts"])})
-
-
 def _csv_row(run: dict, axes: tuple[str, ...]) -> dict[str, object]:
     metrics = dict(run["metrics"])
     counts = metrics.pop("symbol_counts")
-    symbols = {
-        f"{s:03b}->{d:03b}": counts[8 * s + d] for s in range(8) for d in range(8)
-    }
+    symbols = {}
+    for s in range(8):
+        for d in range(8):
+            symbols[f"{s:03b}->{d:03b}"] = counts[RunMetrics.symbol_index(s, d)]
+
     fields = {k: v for k, v in run.items() if k not in ("at", "metrics", "repetitions")}
     coordinates = dict(zip(axes, run["at"]))
+
     return _flatten({**fields, **coordinates, "metrics": metrics, "symbols": symbols})
 
 
@@ -286,26 +302,20 @@ def _flatten(record: dict, prefix: str = "") -> dict[str, object]:
             flat.update(_flatten(value, f"{prefix}{key}."))
         else:
             flat[prefix + key] = value
+
     return flat
-
-
-def _study_order(name: str) -> tuple[int, int]:
-    group = STUDY_GROUPS.get(name)
-    studies = list(STUDY_GROUPS)
-    return (
-        GROUP_ORDER.index(group) if group in GROUP_ORDER else len(GROUP_ORDER),
-        studies.index(name) if name in studies else len(studies),
-    )
 
 
 def _rate(run: RunResult, rate: str) -> str:
     value = getattr(run.metrics, rate)
     if value is None:
         return "—"
+
     text = "{:.4f}" if rate.endswith("per_state") else "{:.2%}"
     interval = run.interval(rate)
     if math.isnan(interval):
         return text.format(value)
+
     return f"{text.format(value)} ± {text.format(interval)}"
 
 

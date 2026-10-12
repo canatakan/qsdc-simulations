@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from qsdc.common.coding.bits import array_to_bits, bits_to_array
+from .bits import array_to_bits, bits_to_array
 
 
 class UniversalHash:

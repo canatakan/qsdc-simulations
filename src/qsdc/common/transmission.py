@@ -4,7 +4,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
-from qsdc.common.random import derive_seed
+from .random import derive_seed
 
 
 @dataclass(frozen=True)

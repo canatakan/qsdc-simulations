@@ -11,7 +11,8 @@ from qsdc.common.config.base import (
     Uniform,
 )
 from qsdc.common.config.noise import Channel, Detector, Environment, Memory
-from qsdc.protocols.srikara.constants import MESSAGE_VARIANCE_SNU
+
+from .constants import MESSAGE_VARIANCE_SNU
 
 
 class NoiseConfig(Config):
@@ -36,16 +37,20 @@ class SimulatorConfig(Config):
     backend: Literal["analytic", "sf", "sf-sampled"] = "analytic"
     random_source: Literal["classical", "sf-bs-qrng"] = "classical"
     seed: int = 11
+
     noise: NoiseConfig = NoiseConfig()
+
     alpha_variance_snu: NonNegative = MESSAGE_VARIANCE_SNU
     squeeze_r: Distribution = Uniform(lower=0.115, upper=0.576)
     theta_pi: Distribution = Uniform(lower=0.0, upper=2.0)
     tolerance_sigmas: Positive = 1.0
+
     intervals: Literal[
         "default",
         "gray",
         "gaussian_gray",
     ] = "default"
     axis_policy: Literal["random", "best_qp", "aligned"] = "random"
+
     error_correction: Literal["none", "parity", "secded"] = "none"
     max_attempts: PositiveInt = 1

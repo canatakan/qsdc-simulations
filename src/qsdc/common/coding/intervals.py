@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from math import inf
 from statistics import NormalDist
 
-from qsdc.common.random import RandomSource
+from ..random import RandomSource
 
 
 def binary_labels(width: int) -> tuple[str, ...]:
@@ -39,10 +39,13 @@ class UniformIntervalCode(IntervalCode):
 
     def sample(self, bits: str, rng: RandomSource) -> float:
         lower, upper = self.interval(bits)
+
+        # The open outer intervals are sampled over one tail width.
         if lower == -inf:
             lower = upper - self.tail_width
         if upper == inf:
             upper = lower + self.tail_width
+
         return rng.uniform(lower, upper)
 
 
@@ -57,9 +60,11 @@ class GaussianIntervalCode(IntervalCode):
         gaussian = NormalDist(0.0, sigma)
         count = len(labels)
         inner = tuple(gaussian.inv_cdf(k / count) for k in range(1, count))
+
         return cls(labels, (-inf, *inner, inf), sigma)
 
     def sample(self, bits: str, rng: RandomSource) -> float:
         gaussian = NormalDist(0.0, self.sigma)
         lower, upper = self.interval(bits)
+
         return gaussian.inv_cdf(rng.uniform(gaussian.cdf(lower), gaussian.cdf(upper)))

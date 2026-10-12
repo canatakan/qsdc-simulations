@@ -55,6 +55,7 @@ def main() -> None:
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+
     parser.add_argument("message", nargs="?", default="hello")
     parser.add_argument("--simulator", choices=list(SIMULATORS), default="retry")
     parser.add_argument("--noise", choices=list(NOISES), default="lab")
@@ -67,15 +68,18 @@ def main() -> None:
     parser.add_argument(
         "--trace", action="store_true", help="noise path of the detailed block's modes"
     )
+
     args = parser.parse_args()
     if not args.message:
         parser.error("the message must not be empty")
 
+    # The chosen preset, with the options given on the command line.
     update = {"noise": NOISES[args.noise]}
     for field in ("backend", "random_source", "seed"):
         if getattr(args, field) is not None:
             update[field] = getattr(args, field)
     config = SIMULATORS[args.simulator].model_copy(update=update)
+
     payload = bytes_to_bits(args.message.encode())
     transmission = Simulator(config).transmit(payload)
     blocks = group_by_block(transmission)
@@ -86,10 +90,12 @@ def main() -> None:
         f"{len(transmission.attempts[0].run.states)} states per send"
     )
     show_sends(blocks)
+
     number = args.block if args.block is not None else most_eventful(blocks)
     trace = args.trace and config.backend != "analytic"
     for attempt in blocks[number]:
         show_attempt(attempt, number, config, trace)
+
     show_result(args.message, payload, transmission)
 
 
@@ -97,12 +103,13 @@ def group_by_block(transmission: Transmission) -> list[list[Attempt]]:
     blocks: dict[int, list[Attempt]] = {}
     for attempt in transmission.attempts:
         blocks.setdefault(attempt.block.offset, []).append(attempt)
+
     return list(blocks.values())
 
 
 def most_eventful(blocks: list[list[Attempt]]) -> int:
     def score(sends: list[Attempt]) -> tuple[int, int]:
-        return len(sends), sum(wrong(m) for m in sends[-1].run.messages)
+        return len(sends), sum(not m.correct for m in sends[-1].run.messages)
 
     return max(range(len(blocks)), key=lambda number: score(blocks[number]))
 
@@ -124,6 +131,7 @@ def show_settings(config: SimulatorConfig, simulator: str, noise: str) -> None:
             ("Sends per block", f"at most {config.max_attempts}"),
         ],
     )
+
     n = config.noise
     print(
         f"\nFibre T = {n.forward.transmittance:g} / {n.backward.transmittance:g} "
@@ -135,6 +143,7 @@ def show_settings(config: SimulatorConfig, simulator: str, noise: str) -> None:
 
 def show_sends(blocks: list[list[Attempt]]) -> None:
     header("Sends")
+
     rows = []
     for number, sends in enumerate(blocks):
         block = sends[0].block
@@ -153,16 +162,20 @@ def show_sends(blocks: list[list[Attempt]]) -> None:
                     outcome(attempt),
                 )
             )
+
     table(("Block", "Bits", "Send", "Sent", "Decoded", "Failed checks", "Result"), rows)
 
 
 def outcome(attempt: Attempt) -> str:
     if attempt.run.aborted:
         return "aborted by the control check"
+
     if not attempt.run.accepted:
         return "rejected by the decoy check"
+
     if attempt.decoded_bits is None:
         return "error detected, withheld"
+
     errors = hamming_distance(attempt.decoded_bits, attempt.block.bits)
     return "released" if not errors else f"released, {errors} wrong bit(s)"
 
@@ -173,6 +186,7 @@ def show_attempt(
     run, route = attempt.run, attempt.run.route
     code = INTERVAL_CODES[config.intervals]
     header(f"Block {number}, send {attempt.number + 1}")
+
     roles = {
         **{i: "control" for i in route.control},
         **{i: "message" for i in route.message},
@@ -199,6 +213,7 @@ def show_attempt(
     if trace:
         for check in run.controls:
             trace_check(run.states[check.index], check, config, "control")
+
     if run.aborted:
         failed = sum(not c.passed for c in run.controls)
         print(f"{failed} of {len(run.controls)} control checks failed")
@@ -224,6 +239,7 @@ def show_attempt(
     if trace:
         for check in run.decoys:
             trace_check(run.states[check.index], check, config, "decoy")
+
     checks = run.controls + run.decoys
     print(
         f"{sum(not c.passed for c in checks)} of {len(checks)} checks failed -> "
@@ -259,8 +275,10 @@ def show_attempt(
     if trace:
         for message in run.messages:
             trace_message(run.states[message.index], message, config)
+
     if run.accepted:
         show_code(attempt, config)
+
     print(f"-> {outcome(attempt)}")
 
 
@@ -284,17 +302,20 @@ def show_checks(checks: tuple[Check, ...], config: SimulatorConfig) -> None:
 
 def show_code(attempt: Attempt, config: SimulatorConfig) -> None:
     received = [m.decoded_bits for m in attempt.run.messages]
+
     if config.error_correction == "parity":
         word, odd = received[0], odd_parity(attempt.block.offset)
         ones = word.count("1")
         verdict = "passes" if ones % 2 == odd else "error detected"
         print(f"{'Odd' if odd else 'Even'} parity of {word}: {ones} ones, {verdict}")
+
     if config.error_correction == "secded":
         for lane, word in enumerate("".join(column) for column in zip(*received)):
             data = secded_decode(word)
             if data is None:
                 print(f"Codeword {lane}: {word} -> uncorrectable")
                 continue
+
             flips = hamming_distance(word, secded_encode(data))
             print(f"Codeword {lane}: {word} -> data {data} ({flips} bit(s) corrected)")
 
@@ -303,12 +324,14 @@ def trace_check(
     state: PreparedState, check: Check, config: SimulatorConfig, kind: str
 ) -> None:
     print(f"\n  Noise path of {kind} mode {check.index}, {check.axis.name} quadrature:")
+
     if kind == "control":
         detector = config.noise.alice_detector
         stages = control_stages(state, config)
     else:
         detector = config.noise.bob_detector
         stages = returned_stages(state, 0j, config)
+
     trace_stages(stages, check.axis, detector)
 
 
@@ -326,6 +349,7 @@ def prepare_stages(
     state: PreparedState, config: SimulatorConfig
 ) -> list[tuple[str, object]]:
     forward = config.noise.forward
+
     return [
         (f"Bob displaces D({cplx(state.alpha)})", ops.Dgate(*polar(state.alpha))),
         (
@@ -343,6 +367,7 @@ def control_stages(
     state: PreparedState, config: SimulatorConfig
 ) -> list[tuple[str, object]]:
     detector = config.noise.alice_detector
+
     return [
         *prepare_stages(state, config),
         ("Alice unsqueezes S(-s)", ops.Sgate(state.squeeze_r, state.theta)),
@@ -358,6 +383,7 @@ def returned_stages(
 ) -> list[tuple[str, object]]:
     noise = config.noise
     memory, backward = noise.memory, noise.backward
+
     return [
         *prepare_stages(state, config),
         (
@@ -383,12 +409,14 @@ def returned_stages(
 def trace_stages(
     stages: list[tuple[str, object]], axis: Quadrature, detector: Detector
 ) -> None:
+    # Run the circuit up to each stage, and read the quadrature after it.
     rows = []
     for count in range(1, len(stages) + 1):
         program = Program(1)
         with program.context as q:
             for _, operation in stages[:count]:
                 operation | q[0]
+
         mean, variance = (
             Engine("gaussian").run(program).state.quad_expectation(0, axis.angle)
         )
@@ -399,10 +427,12 @@ def trace_stages(
                 f"{variance / SF_SCALE**2:.4f}",
             )
         )
+
     final = variance / SF_SCALE**2 + detector.electronic_variance * VACUUM_VARIANCE
     rows.append(
         (f"Electronic noise, {detector.electronic_variance:g} SNU", "", f"{final:.4f}")
     )
+
     table(("Stage", "Mean", "Variance"), rows, indent="    ")
     print(f"    sigma = {sqrt(final):.4f}")
 
@@ -412,25 +442,25 @@ def show_result(text: str, payload: str, transmission: Transmission) -> None:
     attempts = transmission.attempts
     finals = transmission.final_attempts
     messages = [m for attempt in attempts for m in attempt.run.messages]
+
     retries = len(attempts) - len(finals)
     print(f"Sends: {len(attempts)} for {len(finals)} blocks ({retries} retries)")
     print(f"States prepared: {sum(len(a.run.states) for a in attempts)}")
+
     raw = sum(hamming_distance(m.sent_bits, m.decoded_bits) for m in messages)
     print(f"Symbol bit errors: {raw} / {3 * len(messages)}")
+
     recovered = transmission.recovered_bits
     if recovered is None:
         missing = sum(a.decoded_bits is None for a in finals)
         print(f"No message released: {missing} block(s) failed every send.")
         return
+
     received = bits_to_bytes(recovered).decode(errors="replace")
     print(
         f"Released bit errors: {hamming_distance(recovered, payload)} / {len(payload)}"
     )
     print(f"Recovered: {received!r} ({'exact' if received == text else 'corrupted'})")
-
-
-def wrong(message: Message) -> bool:
-    return message.decoded_bits != message.sent_bits
 
 
 def cplx(value: complex) -> str:

@@ -14,11 +14,13 @@ class CorruptFirstMessage(AnalyticBackend):
 
     def measure_returned(self, state, axis, beta=0j):
         value = super().measure_returned(state, axis, beta)
+
+        # Moves the first message three intervals away.
         if beta and not self.corrupted:
             self.corrupted = True
-            value += (3.0 if beta.real < 0 else -3.0) * self.message_response(
-                state, axis
-            )
+            shift = 3.0 if beta.real < 0 else -3.0
+            value += shift * self.message_response(state, axis)
+
         return value
 
 

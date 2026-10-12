@@ -9,7 +9,8 @@ from qsdc.common.coding.intervals import (
     GaussianIntervalCode,
     UniformIntervalCode,
 )
-from qsdc.protocols.srikara.constants import (
+
+from ..constants import (
     MESSAGE_BOUNDS,
     MESSAGE_VARIANCE_SNU,
     TAIL_WIDTH,

@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from qsdc.common.coding.bits import array_to_bits, bits_to_array
+from .bits import array_to_bits, bits_to_array
 
 MAX_CONFIDENCE = 30.0
 

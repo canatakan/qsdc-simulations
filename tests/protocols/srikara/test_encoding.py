@@ -50,6 +50,7 @@ def test_alternating_parity_sends_every_symbol():
 def test_secded_block_survives_one_corrupted_symbol_and_detects_two():
     block = encode_blocks(PAYLOAD[:12], "secded")[0]
     corrupted = list(block.symbols)
+
     corrupted[4] = "".join("1" if bit == "0" else "0" for bit in corrupted[4])
     assert decode_block(block, corrupted, "secded") == block.bits
 

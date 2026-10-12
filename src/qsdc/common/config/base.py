@@ -4,7 +4,7 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from qsdc.common.random import RandomSource
+from ..random import RandomSource
 
 Fraction = Annotated[float, Field(ge=0.0, le=1.0)]
 NonNegative = Annotated[float, Field(ge=0.0)]
@@ -37,6 +37,7 @@ class Uniform(Config):
     def _ordered(self) -> Uniform:
         if self.lower > self.upper:
             raise ValueError("lower must not exceed upper")
+
         return self
 
     def sample(self, rng: RandomSource) -> float:

@@ -6,6 +6,7 @@ import numpy as np
 def hamming_distance(left: str, right: str) -> int:
     if len(left) != len(right):
         raise ValueError("bit strings differ in length")
+
     return sum(a != b for a, b in zip(left, right))
 
 

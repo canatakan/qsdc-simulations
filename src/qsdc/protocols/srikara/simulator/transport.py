@@ -27,6 +27,7 @@ def encode_blocks(payload: str, error_correction: str) -> list[Block]:
             Block(i, payload[i : i + 3], (payload[i : i + 3].ljust(3, "0"),))
             for i in range(0, len(payload), 3)
         ]
+
     if error_correction == "parity":
         return [
             Block(
@@ -37,6 +38,7 @@ def encode_blocks(payload: str, error_correction: str) -> list[Block]:
             for i in range(0, len(payload), 2)
         ]
 
+    # SECDED: three (8, 4) codewords, one bit of each in every symbol.
     blocks = []
     for offset in range(0, len(payload), 12):
         bits = payload[offset : offset + 12]
@@ -44,6 +46,7 @@ def encode_blocks(payload: str, error_correction: str) -> list[Block]:
         codewords = [secded_encode(padded[i : i + 4]) for i in range(0, 12, 4)]
         symbols = tuple("".join(column) for column in zip(*codewords))
         blocks.append(Block(offset, bits, symbols))
+
     return blocks
 
 
@@ -52,6 +55,7 @@ def decode_block(
 ) -> str | None:
     if error_correction == "none":
         return "".join(symbols)[: len(block.bits)]
+
     if error_correction == "parity":
         data = parity_decode(symbols[0], odd_parity(block.offset))
         return None if data is None else data[: len(block.bits)]
@@ -59,4 +63,5 @@ def decode_block(
     data = [secded_decode("".join(lane)) for lane in zip(*symbols)]
     if None in data:
         return None
+
     return "".join(data)[: len(block.bits)]
