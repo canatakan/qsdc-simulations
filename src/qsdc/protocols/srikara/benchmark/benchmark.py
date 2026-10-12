@@ -10,9 +10,10 @@ from pydantic import Field
 from scipy.stats import t
 
 from qsdc.common.random import ClassicalRandomSource, derive_seed, weighted_random_bits
-from qsdc.protocols.srikara.benchmark.metrics import RunMetrics, measure, pool
-from qsdc.protocols.srikara.config import Config, Fraction, SimulatorConfig
-from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
+
+from ..config import Config, Fraction, SimulatorConfig
+from ..simulator.protocol import SrikaraSimulator
+from .metrics import RunMetrics, measure, pool
 
 
 class Workload(Config):

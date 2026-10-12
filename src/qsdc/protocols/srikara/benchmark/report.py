@@ -11,18 +11,12 @@ from time import time_ns
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-from qsdc.protocols.srikara.benchmark.benchmark import (
-    Benchmark,
-    BenchmarkResult,
-    Case,
-    RunResult,
-    Workload,
-)
-from qsdc.protocols.srikara.benchmark.catalog import GROUPS, NOISES, STUDY_GROUPS
-from qsdc.protocols.srikara.benchmark.metrics import RunMetrics
-from qsdc.protocols.srikara.benchmark.plots import write_plots
-from qsdc.protocols.srikara.config import SimulatorConfig
-from qsdc.protocols.srikara.simulator.encoding import INTERVAL_CODES
+from ..config import SimulatorConfig
+from ..simulator.encoding import INTERVAL_CODES
+from .benchmark import Benchmark, BenchmarkResult, Case, RunResult, Workload
+from .catalog import GROUPS, NOISES, STUDY_GROUPS
+from .metrics import RunMetrics
+from .plots import write_plots
 
 TEMPLATES = Path(__file__).parent / "templates"
 

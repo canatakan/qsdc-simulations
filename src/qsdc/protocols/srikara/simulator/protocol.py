@@ -5,20 +5,12 @@ from math import pi, sqrt
 
 from qsdc.common.quadrature import VACUUM_VARIANCE, P, Q, Quadrature
 from qsdc.common.random import RandomSource, derive_seed, make_random_source
-from qsdc.protocols.srikara.config import SimulatorConfig
-from qsdc.protocols.srikara.simulator.backends import (
-    Backend,
-    Expectation,
-    PreparedState,
-    make_backend,
-)
-from qsdc.protocols.srikara.simulator.encoding import INTERVAL_CODES, MESSAGE_DIRECTION
-from qsdc.protocols.srikara.simulator.routing import ModeRoute, route_modes
-from qsdc.protocols.srikara.simulator.transport import (
-    Block,
-    decode_block,
-    encode_blocks,
-)
+
+from ..config import SimulatorConfig
+from .backends import Backend, Expectation, PreparedState, make_backend
+from .encoding import INTERVAL_CODES, MESSAGE_DIRECTION
+from .routing import ModeRoute, route_modes
+from .transport import Block, decode_block, encode_blocks
 
 AXES = (Q, P)
 
@@ -246,7 +238,7 @@ class SrikaraSimulator:
 
     def message_axis(self, state: PreparedState, rng: RandomSource) -> Quadrature:
         policy = self.config.axis_policy
-        
+
         if policy == "random":
             return rng.choice(AXES)
 

@@ -10,10 +10,7 @@ from qsdc.protocols.srikara.config import (
     NoiseConfig,
     SimulatorConfig,
 )
-from qsdc.protocols.srikara.simulator.backends import (
-    PreparedState,
-    SFSampledBackend,
-)
+from qsdc.protocols.srikara.simulator.backends import PreparedState, SFSampledBackend
 from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
 
 COHERENT = PreparedState(index=0, alpha=1.5 + 0j, squeeze_r=0.0, theta=0.0)

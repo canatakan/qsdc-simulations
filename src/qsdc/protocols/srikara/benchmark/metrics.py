@@ -5,7 +5,8 @@ from dataclasses import asdict, dataclass, fields
 from math import log2
 
 from qsdc.common.bits import hamming_distance
-from qsdc.protocols.srikara.simulator.protocol import Transmission
+
+from ..simulator.protocol import Transmission
 
 RATES = (
     "bit_error_rate",

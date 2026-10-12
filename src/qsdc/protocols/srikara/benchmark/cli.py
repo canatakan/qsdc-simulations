@@ -6,13 +6,9 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
-from qsdc.protocols.srikara.benchmark.benchmark import Workload, run_benchmark
-from qsdc.protocols.srikara.benchmark.catalog import studies
-from qsdc.protocols.srikara.benchmark.report import (
-    rerender,
-    write_index,
-    write_report,
-)
+from .benchmark import Workload, run_benchmark
+from .catalog import studies
+from .report import rerender, write_index, write_report
 
 WORKLOAD = Workload()
 STUDIES = studies(WORKLOAD)

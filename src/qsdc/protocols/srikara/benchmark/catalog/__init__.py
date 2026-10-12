@@ -5,8 +5,8 @@ from pathlib import Path
 
 import yaml
 
-from qsdc.protocols.srikara.benchmark.benchmark import Benchmark, Case, Workload
-from qsdc.protocols.srikara.config import NoiseConfig, SimulatorConfig
+from ...config import NoiseConfig, SimulatorConfig
+from ..benchmark import Benchmark, Case, Workload
 
 
 def load(name: str) -> dict:

@@ -28,23 +28,18 @@ from strawberryfields import Engine, Program, ops
 from qsdc.common.bits import bits_to_bytes, bytes_to_bits, hamming_distance
 from qsdc.common.error_correction import secded_decode, secded_encode
 from qsdc.common.quadrature import Quadrature
-from qsdc.protocols.srikara.benchmark.catalog import NOISES, SIMULATORS
-from qsdc.protocols.srikara.config import Detector, SimulatorConfig
-from qsdc.protocols.srikara.simulator.backends import (
+
+from .benchmark.catalog import NOISES, SIMULATORS
+from .config import Detector, SimulatorConfig
+from .simulator.backends import (
     SF_SCALE,
     VACUUM_VARIANCE,
     AnalyticBackend,
     PreparedState,
 )
-from qsdc.protocols.srikara.simulator.encoding import INTERVAL_CODES, MESSAGE_DIRECTION
-from qsdc.protocols.srikara.simulator.protocol import (
-    Attempt,
-    Check,
-    Message,
-    SrikaraSimulator,
-    Transmission,
-)
-from qsdc.protocols.srikara.simulator.transport import odd_parity
+from .simulator.encoding import INTERVAL_CODES, MESSAGE_DIRECTION
+from .simulator.protocol import Attempt, Check, Message, SrikaraSimulator, Transmission
+from .simulator.transport import odd_parity
 
 
 def main() -> None:
