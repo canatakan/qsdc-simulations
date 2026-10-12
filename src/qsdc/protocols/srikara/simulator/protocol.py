@@ -37,6 +37,10 @@ class Message:
     decoded_value: float
     decoded_bits: str
 
+    @property
+    def correct(self) -> bool:
+        return self.decoded_bits == self.sent_bits
+
 
 @dataclass(frozen=True)
 class BlockRun:

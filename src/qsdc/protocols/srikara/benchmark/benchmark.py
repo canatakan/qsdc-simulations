@@ -13,7 +13,7 @@ from qsdc.common.random import ClassicalRandomSource, derive_seed, weighted_rand
 
 from ..config import Config, Fraction, SimulatorConfig
 from ..simulator.protocol import SrikaraSimulator
-from .metrics import RunMetrics, measure, pool
+from .metrics import RunMetrics
 
 
 class Workload(Config):
@@ -49,12 +49,21 @@ class Benchmark:
     def layout(self) -> str:
         return LAYOUTS[len(self.axes)]
 
+    @property
+    def title(self) -> str:
+        return self.name.replace("_", " ").capitalize()
+
 
 @dataclass(frozen=True)
 class RunResult:
     case: Case
     metrics: RunMetrics
     repetitions: tuple[RunMetrics, ...]
+
+    def value(self, metric: str) -> float:
+        # An undefined metric, such as a rate over nothing, is NaN.
+        value = getattr(self.metrics, metric)
+        return nan if value is None else value
 
     def interval(self, metric: str, confidence: float = 0.95) -> float:
         reps = self.repetitions
@@ -63,7 +72,8 @@ class RunResult:
 
         # Jackknife: pool every repetition but one, once per repetition.
         values = [
-            getattr(pool(reps[:i] + reps[i + 1 :]), metric) for i in range(len(reps))
+            getattr(RunMetrics.pool(reps[:i] + reps[i + 1 :]), metric)
+            for i in range(len(reps))
         ]
         values = [value for value in values if value is not None]
         n = len(values)
@@ -107,8 +117,10 @@ def run_benchmark(benchmark: Benchmark, repetitions: int = 1) -> BenchmarkResult
 
             case_started = perf_counter()
             transmission = SrikaraSimulator(simulator).transmit(payloads[workload])
-            samples.append(measure(transmission, perf_counter() - case_started))
+            samples.append(
+                RunMetrics.measure(transmission, perf_counter() - case_started)
+            )
 
-        runs.append(RunResult(case, pool(samples), tuple(samples)))
+        runs.append(RunResult(case, RunMetrics.pool(samples), tuple(samples)))
 
     return BenchmarkResult(benchmark, tuple(runs), perf_counter() - started)

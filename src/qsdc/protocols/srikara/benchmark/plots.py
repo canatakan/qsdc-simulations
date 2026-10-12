@@ -11,7 +11,7 @@ from matplotlib.figure import Figure
 from matplotlib.patches import Patch
 from matplotlib.ticker import PercentFormatter
 
-from .benchmark import BenchmarkResult, RunResult
+from .benchmark import BenchmarkResult
 
 PLOTTED = {
     "bit_error_rate": "Bit error rate",
@@ -54,7 +54,7 @@ def _comparison(result: BenchmarkResult, labels: list[str]) -> Figure:
     positions = np.arange(len(runs))
 
     for axis, (metric, title) in zip(axes.flat, PLOTTED.items()):
-        values = [_value(run, metric) for run in runs]
+        values = [run.value(metric) for run in runs]
         errors = np.nan_to_num([run.interval(metric) for run in runs])
         axis.barh(
             positions,
@@ -98,7 +98,7 @@ def _comparison(result: BenchmarkResult, labels: list[str]) -> Figure:
             frameon=False,
         )
 
-    figure.suptitle(_title(result), fontsize=16, fontweight="bold")
+    figure.suptitle(result.benchmark.title, fontsize=16, fontweight="bold")
     return figure
 
 
@@ -112,7 +112,7 @@ def _sweep(result: BenchmarkResult) -> Figure:
     for axis, (metric, title) in zip(axes.flat, PLOTTED.items()):
         for name in series:
             points = sorted(
-                (*run.case.at, _value(run, metric), run.interval(metric))
+                (*run.case.at, run.value(metric), run.interval(metric))
                 for run in runs
                 if run.case.series == name
             )
@@ -131,14 +131,14 @@ def _sweep(result: BenchmarkResult) -> Figure:
         if len(series) > 1:
             axis.legend(frameon=False)
 
-    figure.suptitle(_title(result), fontsize=16, fontweight="bold")
+    figure.suptitle(result.benchmark.title, fontsize=16, fontweight="bold")
     return figure
 
 
 def _heatmaps(result: BenchmarkResult) -> list[Figure]:
     runs = result.runs
     limits = {
-        metric: _limits([_value(run, metric) for run in runs])
+        metric: _limits([run.value(metric) for run in runs])
         for metric in HEATMAP_METRICS
     }
 
@@ -154,7 +154,7 @@ def _heatmaps(result: BenchmarkResult) -> list[Figure]:
             matrix = np.array(
                 [
                     [
-                        _value(cells[x, y], metric) if (x, y) in cells else np.nan
+                        cells[x, y].value(metric) if (x, y) in cells else np.nan
                         for x in xs
                     ]
                     for y in ys
@@ -195,7 +195,9 @@ def _heatmaps(result: BenchmarkResult) -> list[Figure]:
                 colorbar.formatter = PercentFormatter(1.0, decimals=1)
                 colorbar.update_ticks()
 
-        figure.suptitle(f"{_title(result)} · {series}", fontsize=16, fontweight="bold")
+        figure.suptitle(
+            f"{result.benchmark.title} · {series}", fontsize=16, fontweight="bold"
+        )
         figures.append(figure)
 
     return figures
@@ -207,15 +209,6 @@ def _style(axis: Axes, title: str, metric: str, value_axis: Axis) -> None:
 
     if not metric.endswith("per_state"):
         value_axis.set_major_formatter(PercentFormatter(1.0))
-
-
-def _title(result: BenchmarkResult) -> str:
-    return result.benchmark.name.replace("_", " ").capitalize()
-
-
-def _value(run: RunResult, metric: str) -> float:
-    value = getattr(run.metrics, metric)
-    return np.nan if value is None else value
 
 
 def _format(metric: str, value: float) -> str:

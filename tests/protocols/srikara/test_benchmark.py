@@ -12,7 +12,7 @@ from qsdc.protocols.srikara.benchmark.benchmark import (
     run_benchmark,
 )
 from qsdc.protocols.srikara.benchmark.catalog import NOISES, studies
-from qsdc.protocols.srikara.benchmark.metrics import measure, pool
+from qsdc.protocols.srikara.benchmark.metrics import RunMetrics
 from qsdc.protocols.srikara.benchmark.report import load_result, rerender, write_report
 from qsdc.protocols.srikara.config import SimulatorConfig
 from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
@@ -21,7 +21,9 @@ PAYLOAD = "101001110010"
 
 
 def test_ideal_run_delivers_every_bit():
-    metrics = measure(SrikaraSimulator(SimulatorConfig()).transmit(PAYLOAD), 0.0)
+    metrics = RunMetrics.measure(
+        SrikaraSimulator(SimulatorConfig()).transmit(PAYLOAD), 0.0
+    )
 
     assert metrics.delivered_fraction == 1.0
     assert (metrics.bit_error_rate, metrics.erasure_rate, metrics.rejection_rate) == (
@@ -34,17 +36,19 @@ def test_ideal_run_delivers_every_bit():
 
 def test_noiseless_channel_carries_three_bits_per_message_state():
     every_symbol = "000001010011100101110111"
-    metrics = measure(SrikaraSimulator(SimulatorConfig()).transmit(every_symbol), 0.0)
+    metrics = RunMetrics.measure(
+        SrikaraSimulator(SimulatorConfig()).transmit(every_symbol), 0.0
+    )
 
     assert metrics.information_per_state == pytest.approx(3 / 4)
 
 
 def test_partial_delivery_counts_erasures_and_retry_states(reject_every_other_run):
-    single = measure(
+    single = RunMetrics.measure(
         SrikaraSimulator(SimulatorConfig(), reject_every_other_run()).transmit(PAYLOAD),
         0.0,
     )
-    retried = measure(
+    retried = RunMetrics.measure(
         SrikaraSimulator(
             SimulatorConfig(max_attempts=2), reject_every_other_run()
         ).transmit(PAYLOAD),
@@ -74,7 +78,7 @@ def test_partial_delivery_counts_erasures_and_retry_states(reject_every_other_ru
 def test_raw_bit_error_rate_is_undefined_when_every_send_is_aborted(
     reject_every_other_run,
 ):
-    metrics = measure(
+    metrics = RunMetrics.measure(
         SrikaraSimulator(SimulatorConfig(), reject_every_other_run()).transmit("101"),
         0.0,
     )
@@ -84,7 +88,7 @@ def test_raw_bit_error_rate_is_undefined_when_every_send_is_aborted(
 
 
 def test_bit_error_rate_is_undefined_when_nothing_is_released(eavesdropper):
-    metrics = measure(
+    metrics = RunMetrics.measure(
         SrikaraSimulator(SimulatorConfig(), eavesdropper()).transmit(PAYLOAD), 0.0
     )
 
@@ -138,7 +142,7 @@ def test_repetitions_use_new_seeds_and_pool_their_counts():
     )
     assert len({m.raw_error_bits for m in repeated.repetitions}) > 1
     assert repeated.metrics.payload_bits == 90
-    assert repeated.metrics == pool(repeated.repetitions)
+    assert repeated.metrics == RunMetrics.pool(repeated.repetitions)
 
 
 def test_heatmap_report_has_one_figure_per_series(tmp_path):

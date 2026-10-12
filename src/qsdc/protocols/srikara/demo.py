@@ -28,18 +28,23 @@ from strawberryfields import Engine, Program, ops
 from qsdc.common.bits import bits_to_bytes, bytes_to_bits, hamming_distance
 from qsdc.common.error_correction import secded_decode, secded_encode
 from qsdc.common.quadrature import Quadrature
-
-from .benchmark.catalog import NOISES, SIMULATORS
-from .config import Detector, SimulatorConfig
-from .simulator.backends import (
+from qsdc.protocols.srikara.benchmark.catalog import NOISES, SIMULATORS
+from qsdc.protocols.srikara.config import Detector, SimulatorConfig
+from qsdc.protocols.srikara.simulator.backends import (
     SF_SCALE,
     VACUUM_VARIANCE,
     AnalyticBackend,
     PreparedState,
 )
-from .simulator.encoding import INTERVAL_CODES, MESSAGE_DIRECTION
-from .simulator.protocol import Attempt, Check, Message, SrikaraSimulator, Transmission
-from .simulator.transport import odd_parity
+from qsdc.protocols.srikara.simulator.encoding import INTERVAL_CODES, MESSAGE_DIRECTION
+from qsdc.protocols.srikara.simulator.protocol import (
+    Attempt,
+    Check,
+    Message,
+    SrikaraSimulator,
+    Transmission,
+)
+from qsdc.protocols.srikara.simulator.transport import odd_parity
 
 
 def main() -> None:
@@ -102,7 +107,7 @@ def group_by_block(transmission: Transmission) -> list[list[Attempt]]:
 
 def most_eventful(blocks: list[list[Attempt]]) -> int:
     def score(sends: list[Attempt]) -> tuple[int, int]:
-        return len(sends), sum(wrong(m) for m in sends[-1].run.messages)
+        return len(sends), sum(not m.correct for m in sends[-1].run.messages)
 
     return max(range(len(blocks)), key=lambda number: score(blocks[number]))
 
@@ -454,10 +459,6 @@ def show_result(text: str, payload: str, transmission: Transmission) -> None:
         f"Released bit errors: {hamming_distance(recovered, payload)} / {len(payload)}"
     )
     print(f"Recovered: {received!r} ({'exact' if received == text else 'corrupted'})")
-
-
-def wrong(message: Message) -> bool:
-    return message.decoded_bits != message.sent_bits
 
 
 def header(title: str) -> None:

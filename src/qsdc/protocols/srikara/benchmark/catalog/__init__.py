@@ -43,6 +43,19 @@ GROUPS = STUDY_SPECS["groups"]
 STUDY_GROUPS = {name: spec["group"] for name, spec in STUDY_SPECS["studies"].items()}
 
 
+def study_order(name: str) -> tuple[int, int]:
+    # A study's place in the catalog: its group, then the study itself. Unknown
+    # names go last.
+    groups = list(GROUPS)
+    group = STUDY_GROUPS.get(name)
+    names = list(STUDY_GROUPS)
+
+    return (
+        groups.index(group) if group in groups else len(groups),
+        names.index(name) if name in names else len(names),
+    )
+
+
 def studies(workload: Workload) -> list[Benchmark]:
     return [
         study(name, spec, workload) for name, spec in STUDY_SPECS["studies"].items()
