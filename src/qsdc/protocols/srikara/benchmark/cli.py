@@ -18,6 +18,13 @@ WORKLOAD = Workload()
 STUDIES = studies(WORKLOAD)
 
 
+def positive_int(text: str) -> int:
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"must be at least 1, got {value}")
+    return value
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -31,7 +38,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     run.add_argument(
         "--repetitions",
-        type=int,
+        type=positive_int,
         default=1,
         help="independent seeds per case, pooled into each result (default: 1)",
     )

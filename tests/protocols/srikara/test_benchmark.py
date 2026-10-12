@@ -202,3 +202,7 @@ def test_rerender_leaves_a_report_untouched_when_its_results_do_not_load(tmp_pat
         rerender(results)
     assert (report / "plots" / "comparison.png").is_file()
 
+
+def test_cli_rejects_fewer_than_one_repetition():
+    with pytest.raises(SystemExit):
+        cli.main(["run", "--repetitions", "0"])

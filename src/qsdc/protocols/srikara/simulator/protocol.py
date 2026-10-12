@@ -93,6 +93,8 @@ class SrikaraSimulator:
         self.code = INTERVAL_CODES[config.intervals]
 
     def transmit(self, payload: str) -> Transmission:
+        if not payload or set(payload) - {"0", "1"}:
+            raise ValueError("payload must be a non-empty string of 0s and 1s")
         config = self.config
         attempts = []
         for block_index, block in enumerate(
