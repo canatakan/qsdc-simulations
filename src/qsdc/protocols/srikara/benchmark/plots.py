@@ -45,7 +45,7 @@ def _comparison(result: BenchmarkResult, labels: list[str]) -> Figure:
     labels = [fill(label, 40) for label in labels]
     series = list(dict.fromkeys(run.case.series for run in runs))
     colors = [colormaps["tab10"](series.index(run.case.series) % 10) for run in runs]
-    height = max(6.0, 0.4 * sum(label.count("\n") + 1 for label in labels))
+    height = max(6.0, 0.6 * sum(label.count("\n") + 1 for label in labels))
     figure = Figure(figsize=(15, height), layout="constrained")
     axes = figure.subplots(2, 2, sharey=True)
     positions = np.arange(len(runs))
@@ -59,17 +59,23 @@ def _comparison(result: BenchmarkResult, labels: list[str]) -> Figure:
             color=colors,
             error_kw={"capsize": 3, "elinewidth": 1},
         )
+        highest = np.nanmax([0.0, *(np.nan_to_num(values) + errors)])
+        right = max(0.01, 1.25 * highest)
+        wide = errors.max(initial=0.0) > 0.05 * right
         for position, value, error in zip(positions, values, errors):
+            value = np.nan_to_num(value)
+            inside = wide and value - error > 0.3 * right
             axis.annotate(
                 _format(metric, value),
-                (np.nan_to_num(value) + error, position),
-                xytext=(4, 0),
+                (value - error, position) if inside else (value + error, position),
+                xytext=(-6, 0) if inside else (4, 0),
                 textcoords="offset points",
+                ha="right" if inside else "left",
                 va="center",
+                color="white" if inside else "black",
             )
         axis.set_yticks(positions, labels)
-        highest = np.nanmax([0.0, *(np.nan_to_num(values) + errors)])
-        axis.set_xlim(0.0, max(0.01, 1.25 * highest))
+        axis.set_xlim(0.0, right)
         _style(axis, title, metric, axis.xaxis)
     axes[0, 0].invert_yaxis()
     if len(series) > 1:

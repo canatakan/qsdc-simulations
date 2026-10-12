@@ -235,7 +235,9 @@ def write_index(root: Path) -> Path:
     shutil.copy(TEMPLATES / "style.css", root / "style.css")
     index = root / "index.html"
     index.write_text(
-        _templates.get_template("index.html").render(title=root.name, groups=groups)
+        _templates.get_template("index.html").render(
+            title=root.name.replace("_", " ").capitalize(), groups=groups
+        )
     )
     return index
 
