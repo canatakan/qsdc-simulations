@@ -63,7 +63,9 @@ srikara-benchmark rerender
 
 `rerender` rebuilds every report's plots, `runs.csv`, `report.html` and the index
 from its `results.json`, without simulating again, for example after a change
-to the report layout.
+to the report layout. A `results.json` that no longer matches the current
+configuration (such as one written before a config field was renamed) stops
+`rerender` before anything in its report is changed.
 
 ## Srikara simulator
 

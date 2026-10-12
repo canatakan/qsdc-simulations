@@ -87,8 +87,9 @@ def write_report(result: BenchmarkResult, root: Path) -> Path:
 
 
 def rerender(results: Path) -> None:
+    result = load_result(results)
     shutil.rmtree(results.parent / "plots", ignore_errors=True)
-    _write(load_result(results), results.parent)
+    _write(result, results.parent)
 
 
 def load_result(results: Path) -> BenchmarkResult:
