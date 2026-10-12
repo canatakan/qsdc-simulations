@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from qsdc.common.random import RandomSource
 
@@ -32,6 +32,12 @@ class Uniform(Config):
     kind: Literal["uniform"] = "uniform"
     lower: float
     upper: float
+
+    @model_validator(mode="after")
+    def _ordered(self) -> Uniform:
+        if self.lower > self.upper:
+            raise ValueError("lower must not exceed upper")
+        return self
 
     def sample(self, rng: RandomSource) -> float:
         return rng.uniform(self.lower, self.upper)

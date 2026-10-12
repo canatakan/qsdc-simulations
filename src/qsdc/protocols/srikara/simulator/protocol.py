@@ -60,6 +60,10 @@ class BlockRun:
     messages: tuple[Message, ...]
 
     @property
+    def aborted(self) -> bool:
+        return not all(check.passed for check in self.controls)
+
+    @property
     def accepted(self) -> bool:
         return all(check.passed for check in self.controls + self.decoys)
 
@@ -75,6 +79,8 @@ class Simulator:
         self.code = INTERVAL_CODES[config.intervals]
 
     def transmit(self, payload: str) -> Transmission:
+        if not payload or set(payload) - {"0", "1"}:
+            raise ValueError("payload must be a non-empty string of 0s and 1s")
         config = self.config
         return transmission.send_blocks(
             encode_blocks(payload, config.error_correction),
@@ -111,6 +117,9 @@ class Simulator:
             self._check(states[i], rng.choice(AXES), returned=False)
             for i in route.control
         )
+        run = BlockRun(states, route, controls, (), ())
+        if run.aborted:
+            return run
         values = [self.code.sample(bits, rng) for bits in symbols]
         decoys = tuple(
             self._check(states[i], rng.choice(AXES), returned=True) for i in route.decoy
@@ -149,7 +158,8 @@ class Simulator:
         measured = self.backend.measure_returned(state, axis, value * MESSAGE_DIRECTION)
         baseline = self.backend.expect_returned(state, axis).mean
         response = self.backend.message_response(state, axis)
-        decoded = (measured - baseline) / response
+        # Without any signal reaching Bob, his best guess is m = 0.
+        decoded = (measured - baseline) / response if response else 0.0
         return Message(
             state.index,
             bits,

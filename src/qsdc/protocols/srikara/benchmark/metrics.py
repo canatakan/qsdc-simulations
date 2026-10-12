@@ -46,8 +46,8 @@ class RunMetrics:
         return self.error_bits / released if released else None
 
     @property
-    def raw_bit_error_rate(self) -> float:
-        return self.raw_error_bits / self.raw_bits
+    def raw_bit_error_rate(self) -> float | None:
+        return self.raw_error_bits / self.raw_bits if self.raw_bits else None
 
     @property
     def erasure_rate(self) -> float:

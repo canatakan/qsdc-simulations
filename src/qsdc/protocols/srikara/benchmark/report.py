@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import shutil
 from collections import Counter
 from dataclasses import fields
@@ -87,8 +88,9 @@ def write_report(result: BenchmarkResult, root: Path) -> Path:
 
 
 def rerender(results: Path) -> None:
+    result = load_result(results)
     shutil.rmtree(results.parent / "plots", ignore_errors=True)
-    _write(load_result(results), results.parent)
+    _write(result, results.parent)
 
 
 def load_result(results: Path) -> BenchmarkResult:
@@ -233,7 +235,9 @@ def write_index(root: Path) -> Path:
     shutil.copy(TEMPLATES / "style.css", root / "style.css")
     index = root / "index.html"
     index.write_text(
-        _templates.get_template("index.html").render(title=root.name, groups=groups)
+        _templates.get_template("index.html").render(
+            title=root.name.replace("_", " ").capitalize(), groups=groups
+        )
     )
     return index
 
@@ -298,7 +302,11 @@ def _rate(run: RunResult, rate: str) -> str:
     value = getattr(run.metrics, rate)
     if value is None:
         return "—"
-    return f"{value:.4f}" if rate.endswith("per_state") else f"{value:.2%}"
+    text = "{:.4f}" if rate.endswith("per_state") else "{:.2%}"
+    interval = run.interval(rate)
+    if math.isnan(interval):
+        return text.format(value)
+    return f"{text.format(value)} ± {text.format(interval)}"
 
 
 def _seconds(seconds: float) -> str:
