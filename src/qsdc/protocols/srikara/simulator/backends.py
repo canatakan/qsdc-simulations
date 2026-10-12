@@ -94,14 +94,9 @@ class AnalyticBackend(Backend):
 
 
 class StrawberryFieldsBackend(Backend):
-    def __init__(self, noise: NoiseConfig, sampled: bool):
+    def __init__(self, noise: NoiseConfig):
         self.noise = noise
-        self.sampled = sampled
         self._responses: dict[tuple[float, float], complex] = {}
-
-    def begin_run(self, seed: int) -> None:
-        if self.sampled:
-            np.random.seed(seed)
 
     def measure_control(self, state: PreparedState, axis: Quadrature) -> float:
         return self._measure(
@@ -134,17 +129,10 @@ class StrawberryFieldsBackend(Backend):
             self._responses[key] = complex(q, p)
         return axis.component(self._responses[key])
 
-    def _measure(self, program: Program, axis: Quadrature, detector: Detector) -> float:
-        if not self.sampled:
-            return self._expect(program, axis, detector).mean
-        with program.context as q:
-            ops.MeasureHomodyne(axis.angle) | q[0]
-        value = float(Engine("gaussian").run(program).samples[0, 0]) / SF_SCALE
-        # Drawn even without electronic noise, so every case uses the same random stream.
-        value += np.random.normal(
-            0.0, sqrt(detector.electronic_variance * VACUUM_VARIANCE)
-        )
-        return value
+    @abstractmethod
+    def _measure(
+        self, program: Program, axis: Quadrature, detector: Detector
+    ) -> float: ...
 
     @staticmethod
     def _expect(program: Program, axis: Quadrature, detector: Detector) -> Expectation:
@@ -184,7 +172,33 @@ class StrawberryFieldsBackend(Backend):
         ops.ThermalLossChannel(forward.transmittance, forward.nbar) | mode
 
 
+class SFAnalyticBackend(StrawberryFieldsBackend):
+    # Reads out the exact mean of each circuit
+
+    def _measure(self, program: Program, axis: Quadrature, detector: Detector) -> float:
+        return self._expect(program, axis, detector).mean
+
+
+class SFSampledBackend(StrawberryFieldsBackend):
+    # Reads out a homodyne sample of each circuit
+
+    def begin_run(self, seed: int) -> None:
+        np.random.seed(seed)
+
+    def _measure(self, program: Program, axis: Quadrature, detector: Detector) -> float:
+        with program.context as q:
+            ops.MeasureHomodyne(axis.angle) | q[0]
+        value = float(Engine("gaussian").run(program).samples[0, 0]) / SF_SCALE
+        # Drawn even without electronic noise, so every case uses the same random stream.
+        value += np.random.normal(
+            0.0, sqrt(detector.electronic_variance * VACUUM_VARIANCE)
+        )
+        return value
+
+
 def make_backend(config: SimulatorConfig) -> Backend:
     if config.backend == "analytic":
         return AnalyticBackend()
-    return StrawberryFieldsBackend(config.noise, sampled=config.backend == "sf-sampled")
+    if config.backend == "sf":
+        return SFAnalyticBackend(config.noise)
+    return SFSampledBackend(config.noise)
