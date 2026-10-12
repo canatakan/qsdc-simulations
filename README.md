@@ -1,14 +1,9 @@
 # QSDC Simulations
 
-Independent QSDC protocol simulators organized by protocol/paper reference.
-
-Importable code lives under `src/qsdc`, reusable utilities live under
-`src/qsdc/common`, protocol implementations live under
-`src/qsdc/protocols/<protocol>`, and demos live next to each protocol as `demo.py`.
+Simulators for quantum secure direct communication (QSDC) protocols, one
+package per paper. There is currently one: [`srikara`](#srikara-protocol).
 
 ## Setup
-
-From this repository root:
 
 ```bash
 python -m venv .venv
@@ -17,59 +12,42 @@ python -m pip install --upgrade pip
 make install
 ```
 
-## Simulators
+`make install` adds two commands to `.venv/bin`: `srikara-demo` and
+`srikara-benchmark`. To run the tests, use `make test` for everything or
+`make srikara/test` for the Srikara tests only.
 
-- `srikara`: CV QSDC Gaussian-states simulator with analytic and Strawberry Fields backends.
+## Layout
 
-  The payload can optionally be protected by a parity bit per symbol, after
-  the parity bit of Cao et al.'s Gaussian-mapping QSDC, or by extended Hamming SECDED (8,4,4)
-  coding with a depth-3 interleaver. Failed blocks can be retried with an
-  explicit bound.
+| Path | Contents |
+| --- | --- |
+| `src/qsdc/common/` | Paper-independent helpers: bits, random sources, quadratures, error correction |
+| `src/qsdc/protocols/srikara/simulator/` | The protocol and its backends |
+| `src/qsdc/protocols/srikara/benchmark/` | Studies, metrics and reports |
+| `src/qsdc/protocols/srikara/demo.py` | The demo |
+| `tests/` | Tests, laid out like `src/` |
 
-  > Reference: S. Srikara, K. Thapliyal, and A. Pathak, Continuous variable direct secure quantum communication using gaussian states, Quantum Inf. Process. 19, 1 (2020).
+## Srikara protocol
 
-## Commands
+> S. Srikara, K. Thapliyal, and A. Pathak, Continuous variable direct secure
+> quantum communication using gaussian states, Quantum Inf. Process. 19, 1 (2020).
 
-`make install` installs the package with two commands, `srikara-demo` and
-`srikara-benchmark`, into `.venv/bin`. Use them after
-`source .venv/bin/activate`, or call them as `.venv/bin/srikara-demo`.
+Alice sends a message to Bob over two optical passes. Each 3-bit symbol uses
+4 squeezed coherent states:
 
-```bash
-make test
-make srikara/test
-```
+1. Bob prepares the states with random α, r and θ and sends them to Alice.
+2. Alice checks half of them (the controls) against the values Bob reveals.
+   If any control check fails, the run aborts here.
+3. Alice displaces a quarter (the messages) by m(1 + i), where the interval of
+   m encodes 3 bits. She leaves the last quarter (the decoys) unchanged and
+   sends both back.
+4. Bob unsqueezes and measures the returned states, checks the decoys, and
+   decodes m from the messages.
 
-### Demo
+A run is accepted when every control and decoy check falls within
+`tolerance_sigmas` of its expected value. `AGENTS.md` lists every step and
+formula.
 
-`srikara-demo` sends a text message, prints one line per send and every protocol
-step of one block. `--simulator` picks a configuration from the benchmark catalog,
-`--noise` a noise baseline, `--block` the block to show and `--trace` adds the noise
-path of its modes. `srikara-demo --help` lists all options.
-
-```bash
-srikara-demo "hello"
-srikara-demo "hello" --simulator baseline --noise clean
-srikara-demo "hello" --noise metro_10km --block 3 --trace
-```
-
-### Benchmarks
-
-```bash
-srikara-benchmark list
-srikara-benchmark run --study theta_fixed
-srikara-benchmark rerender
-```
-
-`rerender` rebuilds every report's plots, `runs.csv`, `report.html` and the index
-from its `results.json`, without simulating again, for example after a change
-to the report layout. A `results.json` that no longer matches the current
-configuration (such as one written before a config field was renamed) stops
-`rerender` before anything in its report is changed.
-
-## Srikara simulator
-
-`SimulatorConfig` (`srikara/config.py`) holds every choice for one simulator; its
-defaults are the noiseless paper setting.
+### Usage
 
 ```python
 from qsdc.protocols.srikara.config import SimulatorConfig
@@ -80,95 +58,130 @@ transmission = SrikaraSimulator(config).transmit("101001110010")
 assert transmission.recovered_bits == "101001110010"
 ```
 
-The payload is split into blocks (`simulator/transport.py`), whose size
-depends on `error_correction`:
+`SimulatorConfig` (`config.py`) holds every option. Its defaults are the
+noiseless paper setting. `recovered_bits` is set only when every block was
+released.
 
-- `none`: one symbol carrying 3 payload bits.
-- `parity`: one symbol carrying 2 payload bits and a parity bit. Cao et al. add an
-  odd parity bit to each 3-bit box but do not map it onto the quadrature; here it
-  is part of the symbol. Blocks alternate between odd and even parity, so the
-  sent symbols cover all eight intervals equally and the mean of m stays zero,
-  which Cao et al. require. A parity bit detects an odd number of wrong bits but cannot locate
-  them. With Gray-coded intervals the valid symbols are every second interval,
-  so an error into a neighbouring interval is always detected.
-- `secded`: 12 payload bits coded as three interleaved extended Hamming (8, 4)
-  codewords, sent as 8 symbols. One wrong symbol is corrected.
+### Backends
 
-Each block runs the protocol once with 4 states per symbol
-(`simulator/protocol.py`). As in the paper, a failed control check aborts the
-run before Alice encodes anything, so an aborted run has no decoy checks and
-no message measurements. A run is accepted when all of its control and decoy
-checks fall within `tolerance_sigmas`. A rejected block, or one whose code
-detects an error it cannot correct, is sent again up to `max_attempts` times.
-`recovered_bits` is only set when every block was recovered.
+| `backend` | Behaviour |
+| --- | --- |
+| `analytic` | The paper's algebra. Ignores `noise`. |
+| `sf` | Strawberry Fields Gaussian circuits with noise, read out as exact means |
+| `sf-sampled` | The same circuits, read out as homodyne samples |
 
-The squeezing angle matters: Alice displaces along the diagonal 1 + i, and
-after Bob's unsqueezing the better quadrature carries it with gain
-cosh r + √2 sinh r at θ = 5π/4 (or 7π/4) but only e^-r at θ = π/2. With the
-aligned measurement below, the best angle is θ = 3π/2: the displacement is
-stretched by e^r along the diagonal, and Bob reads √2·e^r per unit m_A.
+The Strawberry Fields backends model `noise` as a thermal loss channel in each
+direction, Alice's memory, and each party's detector efficiency and electronic
+noise. Checks compare against the expectation of the same noisy circuit. If
+no signal reaches Bob, he decodes m = 0.
 
-`axis_policy` decides which quadrature Bob measures on a message mode:
+### Measurement axis
 
-- `random`: q or p at random, as in the paper.
-- `best_qp`: whichever of q and p responds more to Alice's displacement.
-- `aligned`: the quadrature along Alice's displacement after unsqueezing, which
-  Bob can compute because he chose s. It reads the full displacement, about 15%
-  more signal than `best_qp` at θ = 5π/4. This goes beyond the paper; it
-  only needs Bob's local oscillator phase set per mode, like any homodyne
-  basis choice.
+`axis_policy` sets the quadrature Bob measures on a message mode. Control and
+decoy checks always measure q or p at random.
 
-Control and decoy checks always measure q or p at random.
+| `axis_policy` | Bob measures |
+| --- | --- |
+| `random` | q or p at random, as in the paper |
+| `best_qp` | whichever of q and p responds more to Alice's displacement |
+| `aligned` | the quadrature along the unsqueezed displacement, which Bob computes from s |
 
-Backends (`simulator/backends.py`):
+The squeezing angle sets how much signal Bob reads per unit m:
 
-- `analytic`: the paper's algebra, noiseless.
-- `sf`: Strawberry Fields Gaussian circuits, read out as exact means.
-- `sf-sampled`: the same circuits, read out as homodyne samples.
+- `aligned` reads the most at θ = 3π/2: √2·e^r.
+- q or p alone read the most at θ = 5π/4 or 7π/4: cosh r + √2 sinh r. That is
+  about 15% less than `aligned` at the same angle.
+- The signal is weakest at θ = π/2.
 
-Both Strawberry Fields backends apply `SimulatorConfig.noise`: a thermal loss
-channel in each direction, Alice's memory, and each party's detector efficiency
-and electronic noise. Checks compare measurements against the expectation of
-the noisy circuit, so honest noise is not mistaken for an eavesdropper.
-When no message signal reaches Bob (zero backward transmittance or detector
-efficiency), he decodes m = 0.
+### Intervals
+
+| `intervals` | Layout |
+| --- | --- |
+| `default` | The paper's 8 intervals of m, labelled in binary order |
+| `gray` | The same intervals with Gray labels, so neighbouring intervals differ by one bit |
+| `gaussian_gray` | Cao et al.'s equiprobable intervals for Gaussian m, with Gray labels |
+
+Cao et al. give their intervals for V_A = 8 SNU and a vacuum standard
+deviation of 1. Here they are scaled to the paper's mean energy of 64/3 SNU and
+to this simulator's vacuum standard deviation of 1/2. Only the layout differs
+from `gray`.
+
+### Error correction and retries
+
+| `error_correction` | Payload bits per block | Symbols per block | States per block | Effect |
+| --- | --- | --- | --- | --- |
+| `none` | 3 | 1 | 4 | none |
+| `parity` | 2 | 1 | 4 | detects an odd number of wrong bits |
+| `secded` | 12 | 8 | 32 | corrects one wrong symbol per block |
+
+- **Parity:** the parity bit is part of the symbol. Blocks alternate between
+  odd and even parity, so all 8 intervals are used and m stays zero-mean, as
+  Cao et al. require. With Gray labels, an error into a neighbouring interval is
+  always detected.
+- **SECDED:** the block is three extended Hamming (8, 4) codewords,
+  interleaved so each symbol carries one bit of each codeword.
+- **Retries:** a block is sent again, up to `max_attempts` sends in total, when
+  its run is rejected or its code finds an error it cannot correct. Each send
+  draws fresh states.
+- **Padding:** the last block is padded with zeros. The padding is removed
+  after decoding.
+
+## Demo
+
+`srikara-demo` sends a text message. It prints one line per send, then every
+protocol step of one block. It uses the `retry` simulator under `lab` noise
+unless told otherwise.
+
+```bash
+srikara-demo "hello"
+srikara-demo "hello" --simulator baseline --noise clean
+srikara-demo "hello" --noise metro_10km --block 3 --trace
+```
+
+| Option | Effect |
+| --- | --- |
+| `--simulator`, `--noise` | A simulator preset and a noise baseline from the [catalog](#catalog) |
+| `--block` | The block to show step by step, counted from 0 (default: the one with the most sends) |
+| `--trace` | Adds the noise path of each mode in that block |
+
+`srikara-demo --help` lists every option.
 
 ## Benchmarks
 
-A `Benchmark` is a name, a tuple of `Case`s and the names of its plotted axes:
-no axes draws a comparison, one a sweep, two a heatmap. Each case is a
-`SimulatorConfig`, a `Workload` (payload size, probability of a one, seed), a
-series name, an optional label, and its coordinates `at` on those axes.
+### Running
 
-```python
-from pathlib import Path
-
-from qsdc.protocols.srikara.benchmark.benchmark import Benchmark, Case, Workload, run_benchmark
-from qsdc.protocols.srikara.benchmark.catalog import SIMULATORS
-from qsdc.protocols.srikara.benchmark.report import write_report
-
-benchmark = Benchmark(
-    "one_probability",
-    tuple(Case(SIMULATORS["optimized"], Workload(payload_bits=1024, one_probability=p), at=(p,)) for p in (0.1, 0.5, 0.9)),
-    axes=("Probability of one",),
-)
-print(write_report(run_benchmark(benchmark), Path("results")) / "report.html")
+```bash
+srikara-benchmark list                                  # list the studies
+srikara-benchmark run                                   # run every study
+srikara-benchmark run --study theta_band --repetitions 3
+srikara-benchmark run --skip-existing                   # resume an interrupted run
+srikara-benchmark index                                 # rebuild results/index.html
+srikara-benchmark rerender                              # rebuild reports without simulating
 ```
 
-Every case sends a random payload of 10,000 bits (`Workload`). The presets
-and the studies are YAML files in `benchmark/catalog/`:
+- `--repetitions N` reruns every case with N seeds and pools their counts. The
+  first seed is the configured one.
+- `--skip-existing` skips studies that already have a report.
+- `rerender` rebuilds the plots, CSV and HTML from each `results.json`.
 
-- `simulators.yaml`: named simulator configurations, each optionally extending
-  another one (`baseline` is the paper's protocol, `optimized` combines the
-  aligned measurement, Gray labels and the θ band).
-- `noises.yaml`: noise baselines, each with the source of its values.
-- `studies.yaml`: the studies, each run under the noise baselines it lists
-  (`lab` by default), which become the series of its report. A study lists its
-  cases, or has one or two axes whose
-  values make one case per point. Cases change fields by dotted path, such as
-  `squeeze_r.value` or `noise.forward.transmittance`.
+### Catalog
 
-The noise baselines:
+The presets and studies are YAML files in `benchmark/catalog/`.
+
+**Simulator presets** (`simulators.yaml`). `best_qp` and `aligned` extend
+`baseline`; every later preset extends the row above it:
+
+| Preset | Change |
+| --- | --- |
+| `baseline` | The paper's protocol: `sf-sampled`, θ uniform over 0 to 2π, 3σ checks, r = 0.576 (5 dB) |
+| `best_qp` | `baseline` with `best_qp` measurement |
+| `aligned` | `baseline` with `aligned` measurement |
+| `gray` | Gray labels |
+| `optimized` | θ uniform within 3π/2 ± π/4 |
+| `parity` | Parity error detection |
+| `retry` | Up to 3 sends per block |
+
+**Noise baselines** (`noises.yaml`, with the source of each value):
 
 | Baseline | Fibre per direction | Excess noise | Detectors | Memory |
 | --- | --- | --- | --- | --- |
@@ -178,97 +191,71 @@ The noise baselines:
 | `metro_10km` | 10 km | 0.01 SNU | η = 0.8, 0.1 SNU | 0.9 |
 | `record_27km` | 27.27 km, ultralow loss | 0.0015 SNU | η = 0.613, 0.122 SNU | 0.9 |
 
-`record_27km` is the shortest point of Zhang et al., PRL 125, 010502 (2020).
-Phase noise is not modelled yet.
+`record_27km` is the shortest link of Zhang et al., PRL 125, 010502 (2020).
 
-There are 19 built-in studies, so a full run writes 19 reports.
-Most run under `lab` only, because their conclusion does not depend on the noise
-level. The comparisons where it does (`noise_profiles`, `optimization_comparison`,
-`axis_comparison`, `interval_comparison`, `error_correction_comparison`) run
-under every baseline, so each baseline is one color in the same report.
-`error_correction_comparison`
-compares no coding, and parity and SECDED each with and without retries.
+**Studies** (`studies.yaml`). There are 19. Each case sends a random
+10,000-bit payload under `optimized` unless the study says otherwise.
 
-The optimized simulator measures along Alice's displacement (`aligned`), uses
-the paper's intervals with Gray labels (`gray`), θ drawn uniformly from 3π/2 ± π/4 and
-r = 0.576, which is 5 dB of squeezing; the paper specifies neither.
-The optimization steps add parity error detection and then retries.
+| Group | Studies | Noise |
+| --- | --- | --- |
+| Reference | `ideal_backend_check`, `paper_baseline`, `noise_profiles` | `clean`; `noise_profiles` uses all five |
+| Signal | `squeezing_r`, `squeezing_distributions`, `theta_fixed`, `theta_band`, `r_theta_heatmap` | `lab` |
+| Optimizations | `optimization_comparison`, `axis_comparison`, `interval_comparison`, `error_correction_comparison` | all five |
+| Protocol | `tolerance_safety`, `one_probability` | `lab` |
+| Hardware | `channel_transmittance`, `thermal_occupation`, `detector_efficiency`, `electronic_noise`, `memory_efficiency` | `lab` |
 
-`interval_comparison` compares the three interval codes: the paper's
-(`default`), the paper's with Gray labels (`gray`), and Cao et al.'s Gaussian
-intervals with Gray labels (`gaussian_gray`), with m drawn from the Gaussian
-inside each interval. Cao et al. give the equiprobable intervals for
-V_A = 8 SNU (their Table I); here they are scaled to the paper's mean energy of
-64/3 ≈ 21.3 SNU, so the comparison shows only the effect of the layout. Cao's
-quadratures also have a vacuum standard deviation of 1 and this simulator's
-1/2, which halves their bounds.
+A study either lists its cases or sweeps one or two axes. Cases change fields
+by dotted path, such as `noise.forward.transmittance`. Each noise baseline is
+one series in the report. `error_correction_comparison` covers no coding,
+parity and SECDED, with retries for parity and SECDED only.
 
-The squeezing sweep goes up to r = 1.5 (13 dB) as an idealized trend: the simulated squeezed states are pure,
-without the anti-squeezing noise that limits real squeezers.
+### Custom benchmarks
 
-Run the studies with `srikara-benchmark` (in `.venv/bin`):
+A `Benchmark` is a name, its `Case`s and its axis names: no axes gives a
+comparison, one a sweep, two a heatmap. A `Case` is a `SimulatorConfig`, a
+`Workload` (payload size, probability of a one, seed), a series, an optional
+label and its coordinates `at`.
 
-```bash
-srikara-benchmark list
-srikara-benchmark run --study optimization_comparison
-srikara-benchmark run --repetitions 3
-srikara-benchmark run --skip-existing
-srikara-benchmark index
+```python
+from pathlib import Path
+
+from qsdc.protocols.srikara.benchmark.benchmark import Benchmark, Case, Workload, run_benchmark
+from qsdc.protocols.srikara.benchmark.catalog import SIMULATORS
+from qsdc.protocols.srikara.benchmark.report import write_report
+
+cases = tuple(
+    Case(SIMULATORS["optimized"], Workload(payload_bits=1024, one_probability=p), at=(p,))
+    for p in (0.1, 0.5, 0.9)
+)
+benchmark = Benchmark("one_probability", cases, axes=("Probability of one",))
+print(write_report(run_benchmark(benchmark), Path("results")) / "report.html")
 ```
 
-`run` defaults to every study
-and one repetition. `--repetitions N` reruns every case with N independent
-seeds (the first is the configured one), and rates pool all repetitions.
-`--skip-existing` skips studies that already have a report,
-so an interrupted run can be resumed. Reports go to
-`results/<study>/run_<time>/`:
+### Output
 
-- `report.html`: a results table with one row per case, plots, a table of sent
-  vs. decoded symbols for each case, and the parameters shared by all cases.
-  The summary cards show totals (cases × repetitions, prepared states,
-  simulation time); delivery and information values appear there only for a
-  single-case study, because the rates of different cases do not add up.
-- `results.json`: every case's configuration, counts, rates and
-  per-repetition counts.
-- `runs.csv`: one row per case, with a column per configuration field, axis,
-  metric and sent → decoded symbol pair.
+Each run writes `results/<study>/run_<time>/`, and `results/index.html` links
+the latest run of every study.
 
-`results/index.html` lists the latest execution of every study.
+| File | Contents |
+| --- | --- |
+| `report.html` | One row per case, plots, sent vs. decoded symbol tables, shared parameters |
+| `results.json` | Each case's configuration, counts, rates and per-repetition counts |
+| `runs.csv` | One row per case: configuration, axes, metrics and symbol counts |
 
-Measurements (`benchmark/metrics.py`) are counts; rates are derived from them.
-A payload is split into blocks, and a block is sent again (a retry) when the
-checks reject it or its code detects an error it cannot correct, while
-attempts remain.
+### Metrics
 
-- Blocks, retries: blocks in the payload, and extra sends of failed blocks.
-- Rejected by checks: sends whose control or decoy checks failed. A failed
-  control check aborts the send before anything returns to Bob.
-- Uncorrectable: sends that passed the checks, but where parity or SECDED
-  detected an error it could not correct.
-- Bit error rate: wrong bits / bits in released blocks (undefined when nothing
-  was released).
-- Raw bit error rate: wrong symbol bits before error correction, over every
-  symbol Bob measured (sends rejected by the decoy check included, aborted ones
-  have none); with parity or SECDED this counts the code bits too.
-- Erasure rate: bits in blocks that were never released / payload bits.
-- Delivered: correct bits in released blocks / payload bits, which equals
-  (1 − erasure rate)(1 − bit error rate).
-- Delivered bits per state: the same correct bits / all prepared states,
-  retries included. Without error correction Bob cannot tell which bits are
-  wrong, so read it together with the bit error rate.
-- Raw-symbol MI per state (`information_per_state`): the empirical mutual
-  information between sent and decoded 3-bit symbols, over every symbol Bob
-  measured, times those symbols / all prepared states. It describes the raw
-  symbol channel, not the payload rate: it is at most 3/4, and does not
-  subtract parity or SECDED redundancy, the known parity schedule or repeated
-  sends of the same block. With alternating parity an ideal channel reaches
-  3/4 although it carries 1/2 payload bit per state. Aborted sends lower it,
-  since their states count but they measure no symbols.
-- Rejection rate: sends rejected by the checks / all sends. It grows with the
-  number of checks per send: up to 3 without error correction, 24 with SECDED.
-- Check failure rate: failed checks / control and decoy checks made, which does
-  not depend on the block size. On an honest channel it is the Gaussian tail
-  probability of the tolerance, e.g. 0.27% at 3σ.
+`benchmark/metrics.py` records counts and derives every rate from them.
+Repetitions are pooled by adding their counts. A send is one run of a block;
+a released block is one that passed its checks and its code.
 
-With several repetitions, rates are calculated from the counts of all
-repetitions.
+| Metric | Definition |
+| --- | --- |
+| Bit error rate | Wrong bits / bits in released blocks (undefined if nothing was released) |
+| Erasure rate | Bits in blocks never released / payload bits |
+| Delivered | Correct released bits / payload bits |
+| Delivered bits per state | Correct released bits / all prepared states, retries included |
+| Raw bit error rate | Wrong symbol bits before correction / symbol bits measured, code bits included |
+| Raw-symbol MI per state | Mutual information between sent and decoded symbols × symbols measured / prepared states |
+| Rejection rate | Sends rejected by a check / all sends |
+| Check failure rate | Failed checks / checks made |
+| Uncorrectable | Sends that passed the checks but whose code found an error it could not correct |
