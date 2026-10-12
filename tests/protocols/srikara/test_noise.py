@@ -12,7 +12,7 @@ from qsdc.protocols.srikara.config import (
 )
 from qsdc.protocols.srikara.simulator.backends import (
     PreparedState,
-    StrawberryFieldsBackend,
+    SFSampledBackend,
 )
 from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
 
@@ -24,9 +24,7 @@ def test_returned_expectation_follows_the_gaussian_channel_formulas():
         backward=Channel(transmittance=0.64, nbar=0.5),
         bob_detector=Detector(efficiency=0.64, electronic_variance=0.5),
     )
-    expectation = StrawberryFieldsBackend(noise, sampled=True).expect_returned(
-        COHERENT, Q
-    )
+    expectation = SFSampledBackend(noise).expect_returned(COHERENT, Q)
 
     vacuum = 0.25
     after_channel = 0.64 * vacuum + 0.36 * (2 * 0.5 + 1) * vacuum
@@ -37,7 +35,7 @@ def test_returned_expectation_follows_the_gaussian_channel_formulas():
 
 def test_memory_loss_attenuates_bobs_state_but_not_alices_message():
     noise = NoiseConfig(memory=Memory(seconds=np.log(1 / 0.64), lifetime_seconds=1.0))
-    backend = StrawberryFieldsBackend(noise, sampled=True)
+    backend = SFSampledBackend(noise)
 
     assert backend.expect_returned(COHERENT, Q).mean == pytest.approx(0.8 * 1.5)
     assert backend.message_response(COHERENT, Q) == pytest.approx(1.0)
@@ -48,7 +46,7 @@ def test_sampled_measurements_scatter_around_the_expectation():
         forward=Channel(transmittance=0.9, nbar=0.1),
         alice_detector=Detector(efficiency=0.8, electronic_variance=0.5),
     )
-    backend = StrawberryFieldsBackend(noise, sampled=True)
+    backend = SFSampledBackend(noise)
     state = PreparedState(index=0, alpha=1 - 0.5j, squeeze_r=0.6, theta=0.3)
     backend.begin_run(5)
 
