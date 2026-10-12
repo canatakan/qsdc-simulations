@@ -54,6 +54,10 @@ class BlockRun:
     messages: tuple[Message, ...]
 
     @property
+    def aborted(self) -> bool:
+        return not all(check.passed for check in self.controls)
+
+    @property
     def accepted(self) -> bool:
         return all(check.passed for check in self.controls + self.decoys)
 
@@ -127,6 +131,9 @@ class SrikaraSimulator:
             self._check(states[i], rng.choice(AXES), returned=False)
             for i in route.control
         )
+        run = BlockRun(states, route, controls, (), ())
+        if run.aborted:
+            return run
         values = [self.code.sample(bits, rng) for bits in symbols]
         decoys = tuple(
             self._check(states[i], rng.choice(AXES), returned=True) for i in route.decoy

@@ -64,7 +64,9 @@ def test_partial_delivery_counts_erasures_and_retry_states(reject_every_other_ru
         retried.delivered_bits_per_state,
     ) == (32, 0.5, 12 / 32)
     assert (retried.blocks, retried.retries, retried.rejected) == (4, 4, 4)
-    assert (retried.checks, retried.failed_checks) == (24, 8)
+    # Aborted sends end after their 2 control checks; accepted ones also check a decoy.
+    assert (retried.checks, retried.failed_checks) == (20, 8)
+    assert retried.raw_bits == 12
 
 
 def test_bit_error_rate_is_undefined_when_nothing_is_released(eavesdropper):

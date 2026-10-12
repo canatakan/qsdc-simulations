@@ -94,7 +94,9 @@ depends on `error_correction`:
   codewords, sent as 8 symbols. One wrong symbol is corrected.
 
 Each block runs the protocol once with 4 states per symbol
-(`simulator/protocol.py`). A run is accepted when all of its control and decoy
+(`simulator/protocol.py`). As in the paper, a failed control check aborts the
+run before Alice encodes anything, so an aborted run has no decoy checks and
+no message measurements. A run is accepted when all of its control and decoy
 checks fall within `tolerance_sigmas`. A rejected block, or one whose code
 detects an error it cannot correct, is sent again up to `max_attempts` times.
 `recovered_bits` is only set when every block was recovered.
@@ -235,14 +237,15 @@ checks reject it or its code detects an error it cannot correct, while
 attempts remain.
 
 - Blocks, retries: blocks in the payload, and extra sends of failed blocks.
-- Rejected by checks: sends whose control or decoy checks failed.
+- Rejected by checks: sends whose control or decoy checks failed. A failed
+  control check aborts the send before anything returns to Bob.
 - Uncorrectable: sends that passed the checks, but where parity or SECDED
   detected an error it could not correct.
 - Bit error rate: wrong bits / bits in released blocks (undefined when nothing
   was released).
-- Raw bit error rate: wrong symbol bits before error correction, over all
-  sends, rejected ones included; with parity or SECDED this counts the code
-  bits too.
+- Raw bit error rate: wrong symbol bits before error correction, over every
+  symbol Bob measured (sends rejected by the decoy check included, aborted ones
+  have none); with parity or SECDED this counts the code bits too.
 - Erasure rate: bits in blocks that were never released / payload bits.
 - Delivered: correct bits in released blocks / payload bits, which equals
   (1 − erasure rate)(1 − bit error rate).
@@ -255,8 +258,8 @@ attempts remain.
   sent, so it is below 3/4 for short or biased payloads, and at most 1/2 with
   parity, which only ever sends 4 of the 8 symbols.
 - Rejection rate: sends rejected by the checks / all sends. It grows with the
-  number of checks per send: 3 without error correction, 24 with SECDED.
-- Check failure rate: failed checks / all control and decoy checks, which does
+  number of checks per send: up to 3 without error correction, 24 with SECDED.
+- Check failure rate: failed checks / control and decoy checks made, which does
   not depend on the block size. On an honest channel it is the Gaussian tail
   probability of the tolerance, e.g. 0.27% at 3σ.
 

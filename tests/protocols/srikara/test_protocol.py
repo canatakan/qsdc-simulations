@@ -90,6 +90,19 @@ def test_rejected_blocks_are_retried_until_recovered(reject_every_other_run):
     )
 
 
+def test_a_failed_control_check_aborts_before_alice_sends_anything_back(
+    reject_every_other_run,
+):
+    transmission = SrikaraSimulator(
+        SimulatorConfig(max_attempts=2), reject_every_other_run()
+    ).transmit(PAYLOAD)
+
+    aborted = [attempt.run for attempt in transmission.attempts if attempt.number == 0]
+    assert all(run.aborted and not run.accepted for run in aborted)
+    assert all(run.decoys == () and run.messages == () for run in aborted)
+    assert all(len(run.states) == 4 for run in aborted)
+
+
 def test_aligned_axis_reads_the_full_message_displacement():
     backend = AnalyticBackend()
     config = SimulatorConfig(axis_policy="aligned")
