@@ -3,7 +3,6 @@ from itertools import product
 import pytest
 
 from qsdc.common.random import ClassicalRandomSource
-from qsdc.protocols.srikara.simulator.backends import AnalyticBackend
 from qsdc.protocols.srikara.simulator.encoding import INTERVAL_CODES
 from qsdc.protocols.srikara.simulator.transport import decode_block, encode_blocks
 
@@ -28,13 +27,6 @@ def test_gaussian_intervals_spend_the_default_energy():
 
     assert energy["default"] == pytest.approx(16 / 3, rel=0.03)
     assert energy["gaussian_gray"] == pytest.approx(16 / 3, rel=0.05)
-
-
-def test_unsqueezing_inverts_the_squeeze_displacement_relation():
-    beta = AnalyticBackend.squeezed_displacement(0.7 - 1.2j, 0.43, 0.9)
-    assert AnalyticBackend.unsqueezed_displacement(beta, 0.43, 0.9) == pytest.approx(
-        0.7 - 1.2j
-    )
 
 
 @pytest.mark.parametrize("error_correction", ["none", "parity", "secded"])

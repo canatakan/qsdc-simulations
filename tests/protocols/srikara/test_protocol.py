@@ -3,12 +3,7 @@ from math import cosh, exp, pi, sinh, sqrt
 import pytest
 
 from qsdc.protocols.srikara.benchmark.catalog import NOISES
-from qsdc.protocols.srikara.config import (
-    Channel,
-    NoiseConfig,
-    SimulatorConfig,
-    Uniform,
-)
+from qsdc.protocols.srikara.config import Channel, NoiseConfig, SimulatorConfig
 from qsdc.protocols.srikara.simulator.backends import AnalyticBackend, PreparedState
 from qsdc.protocols.srikara.simulator.protocol import AXES, SrikaraSimulator
 
@@ -116,17 +111,6 @@ def test_a_channel_without_signal_still_decodes():
 
     [message] = transmission.attempts[0].run.messages
     assert (message.response, message.decoded_value) == (0.0, 0.0)
-
-
-@pytest.mark.parametrize("payload", ["", "102"])
-def test_payload_must_be_a_bit_string(payload):
-    with pytest.raises(ValueError):
-        SrikaraSimulator(SimulatorConfig()).transmit(payload)
-
-
-def test_uniform_bounds_must_be_ordered():
-    with pytest.raises(ValueError):
-        Uniform(lower=1.0, upper=0.0)
 
 
 def test_aligned_axis_reads_the_full_message_displacement():

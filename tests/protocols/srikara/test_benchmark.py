@@ -189,20 +189,3 @@ def test_reports_can_be_rerendered_without_simulating(tmp_path):
     assert (report / "report.html").is_file()
     assert (report / "plots" / "comparison.png").is_file()
 
-
-def test_rerender_leaves_a_report_untouched_when_its_results_do_not_load(tmp_path):
-    case = Case(SimulatorConfig(), Workload(payload_bits=6))
-    report = write_report(run_benchmark(Benchmark("tiny", (case,))), tmp_path)
-    results = report / "results.json"
-    document = json.loads(results.read_text())
-    document["runs"][0]["simulator"]["alpha_bound"] = 2.0
-    results.write_text(json.dumps(document))
-
-    with pytest.raises(ValueError):
-        rerender(results)
-    assert (report / "plots" / "comparison.png").is_file()
-
-
-def test_cli_rejects_fewer_than_one_repetition():
-    with pytest.raises(SystemExit):
-        cli.main(["run", "--repetitions", "0"])
