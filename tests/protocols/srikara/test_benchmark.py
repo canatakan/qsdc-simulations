@@ -69,6 +69,18 @@ def test_partial_delivery_counts_erasures_and_retry_states(reject_every_other_ru
     assert retried.raw_bits == 12
 
 
+def test_raw_bit_error_rate_is_undefined_when_every_send_is_aborted(
+    reject_every_other_run,
+):
+    metrics = measure(
+        SrikaraSimulator(SimulatorConfig(), reject_every_other_run()).transmit("101"),
+        0.0,
+    )
+
+    assert metrics.raw_bits == 0
+    assert metrics.as_dict()["raw_bit_error_rate"] is None
+
+
 def test_bit_error_rate_is_undefined_when_nothing_is_released(eavesdropper):
     metrics = measure(
         SrikaraSimulator(SimulatorConfig(), eavesdropper()).transmit(PAYLOAD), 0.0
@@ -188,4 +200,3 @@ def test_reports_can_be_rerendered_without_simulating(tmp_path):
     rerender(report / "results.json")
     assert (report / "report.html").is_file()
     assert (report / "plots" / "comparison.png").is_file()
-
