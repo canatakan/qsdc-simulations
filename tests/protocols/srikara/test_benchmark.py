@@ -57,6 +57,7 @@ def test_partial_delivery_counts_erasures_and_retry_states(reject_every_other_ru
         6,
         0.0,
     )
+
     assert retried.delivered_fraction == 1.0
     assert (
         retried.states,
@@ -64,6 +65,7 @@ def test_partial_delivery_counts_erasures_and_retry_states(reject_every_other_ru
         retried.delivered_bits_per_state,
     ) == (32, 0.5, 12 / 32)
     assert (retried.blocks, retried.retries, retried.rejected) == (4, 4, 4)
+
     # Aborted sends end after their 2 control checks; accepted ones also check a decoy.
     assert (retried.checks, retried.failed_checks) == (20, 8)
     assert retried.raw_bits == 12
@@ -100,6 +102,7 @@ def test_noise_sweeps_change_only_their_component():
         assert noise.forward.transmittance == noise.backward.transmittance == case.at[0]
         assert noise.forward.nbar == lab.forward.nbar
         assert noise.alice_detector == lab.alice_detector
+
     for case in by_name["detector_efficiency"].cases:
         noise = case.simulator.noise
         assert noise.bob_detector.efficiency == case.at[0]
@@ -119,6 +122,7 @@ def test_noise_dependent_comparisons_run_every_case_under_every_baseline():
     assert [case.series for case in ladder.cases] == [
         noise for noise in NOISES for _ in range(steps)
     ]
+
     for case in ladder.cases:
         assert case.simulator.noise == NOISES[case.series]
 
@@ -160,6 +164,7 @@ def test_heatmap_report_has_one_figure_per_series(tmp_path):
         "heatmap_1.png",
         "heatmap_2.png",
     ]
+
     runs = json.loads((report / "results.json").read_text())["runs"]
     assert {run["metrics"]["delivered_fraction"] for run in runs} == {1.0}
 
@@ -181,8 +186,10 @@ def test_cli_runs_a_study_into_a_browsable_report(tmp_path, monkeypatch):
     assert document["benchmark"]["layout"] == "comparison"
     assert len(document["runs"]) == 9
     assert {run["workload"]["payload_bits"] for run in document["runs"]} == {6}
+
     with (results.parent / "runs.csv").open() as handle:
         assert len(list(csv.DictReader(handle))) == 9
+
     assert (results.parent / "plots" / "comparison.png").is_file()
     assert (
         "Squeezing r: U[0.115, 1.151]" in (results.parent / "report.html").read_text()
@@ -196,7 +203,9 @@ def test_reports_can_be_rerendered_without_simulating(tmp_path):
     report = write_report(result, tmp_path)
 
     assert load_result(report / "results.json").runs == result.runs
+
     (report / "report.html").unlink()
     rerender(report / "results.json")
+
     assert (report / "report.html").is_file()
     assert (report / "plots" / "comparison.png").is_file()

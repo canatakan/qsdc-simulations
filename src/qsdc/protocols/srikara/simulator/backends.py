@@ -58,18 +58,16 @@ class AnalyticBackend(Backend):
         alpha: complex, squeeze_r: float, theta: float
     ) -> complex:
         """beta = alpha cosh r + e^{i theta} alpha* sinh r"""
-        return alpha * cosh(squeeze_r) + exp(1j * theta) * alpha.conjugate() * sinh(
-            squeeze_r
-        )
+        conjugate_part = exp(1j * theta) * alpha.conjugate() * sinh(squeeze_r)
+        return alpha * cosh(squeeze_r) + conjugate_part
 
     @staticmethod
     def unsqueezed_displacement(
         beta: complex, squeeze_r: float, theta: float
     ) -> complex:
         """Delta = beta cosh r - e^{i theta} beta* sinh r"""
-        return beta * cosh(squeeze_r) - exp(1j * theta) * beta.conjugate() * sinh(
-            squeeze_r
-        )
+        conjugate_part = exp(1j * theta) * beta.conjugate() * sinh(squeeze_r)
+        return beta * cosh(squeeze_r) - conjugate_part
 
     def measure_control(self, state: PreparedState, axis: Quadrature) -> float:
         return axis.component(state.alpha)
@@ -121,12 +119,14 @@ class StrawberryFieldsBackend(Backend):
         )
 
     def message_response(self, state: PreparedState, axis: Quadrature) -> float:
+        # The response depends only on r and theta, so it is cached per pair.
         key = (state.squeeze_r, state.theta)
         if key not in self._responses:
             unit = PreparedState(state.index, 0j, state.squeeze_r, state.theta)
             program = self._returned_program(unit, MESSAGE_DIRECTION)
             q, p = Engine("gaussian").run(program).state.means() / SF_SCALE
             self._responses[key] = complex(q, p)
+
         return axis.component(self._responses[key])
 
     @abstractmethod
@@ -139,9 +139,11 @@ class StrawberryFieldsBackend(Backend):
         mean, variance = (
             Engine("gaussian").run(program).state.quad_expectation(0, axis.angle)
         )
+
         variance = (
             variance / SF_SCALE**2 + detector.electronic_variance * VACUUM_VARIANCE
         )
+
         return Expectation(float(mean) / SF_SCALE, sqrt(variance))
 
     def _control_program(self, state: PreparedState) -> Program:
@@ -150,10 +152,12 @@ class StrawberryFieldsBackend(Backend):
             self._send(state, q[0])
             ops.Sgate(state.squeeze_r, state.theta) | q[0]
             ops.LossChannel(self.noise.alice_detector.efficiency) | q[0]
+
         return program
 
     def _returned_program(self, state: PreparedState, beta: complex) -> Program:
         memory, backward = self.noise.memory, self.noise.backward
+
         program = Program(1)
         with program.context as q:
             self._send(state, q[0])
@@ -162,10 +166,12 @@ class StrawberryFieldsBackend(Backend):
             ops.ThermalLossChannel(backward.transmittance, backward.nbar) | q[0]
             ops.Sgate(state.squeeze_r, state.theta) | q[0]
             ops.LossChannel(self.noise.bob_detector.efficiency) | q[0]
+
         return program
 
     def _send(self, state: PreparedState, mode: object) -> None:
         forward = self.noise.forward
+
         ops.Dgate(*polar(state.alpha)) | mode
         # Strawberry Fields' squeezing sign convention is opposite to the paper's.
         ops.Sgate(-state.squeeze_r, state.theta) | mode
@@ -188,17 +194,21 @@ class SFSampledBackend(StrawberryFieldsBackend):
     def _measure(self, program: Program, axis: Quadrature, detector: Detector) -> float:
         with program.context as q:
             ops.MeasureHomodyne(axis.angle) | q[0]
+
         value = float(Engine("gaussian").run(program).samples[0, 0]) / SF_SCALE
         # Drawn even without electronic noise, so every case uses the same random stream.
         value += np.random.normal(
             0.0, sqrt(detector.electronic_variance * VACUUM_VARIANCE)
         )
+
         return value
 
 
 def make_backend(config: SimulatorConfig) -> Backend:
     if config.backend == "analytic":
         return AnalyticBackend()
+
     if config.backend == "sf":
         return SFAnalyticBackend(config.noise)
+
     return SFSampledBackend(config.noise)

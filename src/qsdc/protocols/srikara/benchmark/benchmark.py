@@ -59,6 +59,8 @@ class RunResult:
         reps = self.repetitions
         if len(reps) < 2:
             return nan
+
+        # Jackknife: pool every repetition but one, once per repetition.
         values = [
             getattr(pool(reps[:i] + reps[i + 1 :]), metric) for i in range(len(reps))
         ]
@@ -66,8 +68,10 @@ class RunResult:
         n = len(values)
         if n < 2:
             return nan
+
         mean = fmean(values)
         error = sqrt((n - 1) / n * sum((value - mean) ** 2 for value in values))
+
         return t.ppf((1 + confidence) / 2, n - 1) * error
 
 
@@ -78,29 +82,32 @@ class BenchmarkResult:
     seconds: float
 
 
+def reseed(config: Config, repetition: int) -> Config:
+    seed = derive_seed(config.seed, "repetition", repetition)
+    return config.model_copy(update={"seed": seed})
+
+
 def run_benchmark(benchmark: Benchmark, repetitions: int = 1) -> BenchmarkResult:
     started = perf_counter()
     payloads: dict[Workload, str] = {}
+
     runs = []
     for case in benchmark.cases:
         samples = []
         for repetition in range(repetitions):
+            # The first repetition uses the configured seeds, the others fresh ones.
             simulator, workload = case.simulator, case.workload
             if repetition:
-                simulator = simulator.model_copy(
-                    update={
-                        "seed": derive_seed(simulator.seed, "repetition", repetition)
-                    }
-                )
-                workload = workload.model_copy(
-                    update={
-                        "seed": derive_seed(workload.seed, "repetition", repetition)
-                    }
-                )
+                simulator = reseed(simulator, repetition)
+                workload = reseed(workload, repetition)
+
             if workload not in payloads:
                 payloads[workload] = workload.payload()
+
             case_started = perf_counter()
             transmission = SrikaraSimulator(simulator).transmit(payloads[workload])
             samples.append(measure(transmission, perf_counter() - case_started))
+
         runs.append(RunResult(case, pool(samples), tuple(samples)))
+
     return BenchmarkResult(benchmark, tuple(runs), perf_counter() - started)

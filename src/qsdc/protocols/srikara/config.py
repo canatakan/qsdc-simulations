@@ -32,6 +32,7 @@ class Uniform(Config):
     def _ordered(self) -> Uniform:
         if self.lower > self.upper:
             raise ValueError("lower must not exceed upper")
+
         return self
 
     def sample(self, rng: RandomSource) -> float:
@@ -80,16 +81,20 @@ class SimulatorConfig(Config):
     backend: Literal["analytic", "sf", "sf-sampled"] = "analytic"
     random_source: Literal["classical", "sf-bs-qrng"] = "classical"
     seed: int = 11
+
     noise: NoiseConfig = NoiseConfig()
+
     alpha_variance_snu: NonNegative = 64 / 3
     squeeze_r: Distribution = Uniform(lower=0.115, upper=0.576)
     theta_pi: Distribution = Uniform(lower=0.0, upper=2.0)
     tolerance_sigmas: Positive = 1.0
+
     intervals: Literal[
         "default",
         "gray",
         "gaussian_gray",
     ] = "default"
     axis_policy: Literal["random", "best_qp", "aligned"] = "random"
+
     error_correction: Literal["none", "parity", "secded"] = "none"
     max_attempts: Annotated[int, Field(ge=1)] = 1

@@ -66,6 +66,7 @@ class RunMetrics:
         total = sum(self.symbol_counts)
         sent = [sum(self.symbol_counts[8 * s : 8 * s + 8]) for s in range(8)]
         decoded = [sum(self.symbol_counts[d::8]) for d in range(8)]
+
         return sum(
             count / total * log2(count * total / (sent[i // 8] * decoded[i % 8]))
             for i, count in enumerate(self.symbol_counts)
@@ -98,9 +99,11 @@ def measure(transmission: Transmission, seconds: float) -> RunMetrics:
         for attempt in transmission.attempts
         for check in attempt.run.controls + attempt.run.decoys
     ]
+
     symbol_counts = [0] * 64
     for m in messages:
         symbol_counts[8 * int(m.sent_bits, 2) + int(m.decoded_bits, 2)] += 1
+
     return RunMetrics(
         payload_bits=sum(len(attempt.block.bits) for attempt in finals),
         error_bits=sum(
@@ -131,5 +134,7 @@ def pool(metrics: Sequence[RunMetrics]) -> RunMetrics:
         for field in fields(RunMetrics)
         if field.name != "symbol_counts"
     }
+
     counts = tuple(sum(column) for column in zip(*(m.symbol_counts for m in metrics)))
+
     return RunMetrics(**totals, symbol_counts=counts)

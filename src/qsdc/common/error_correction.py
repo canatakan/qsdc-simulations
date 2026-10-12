@@ -28,4 +28,5 @@ def secded_decode(word: str) -> str | None:
     for codeword, data in CODEWORDS.items():
         if hamming_distance(word, codeword) <= 1:
             return data
+
     return None

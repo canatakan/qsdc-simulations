@@ -36,10 +36,13 @@ class UniformIntervalCode(IntervalCode):
 
     def sample(self, bits: str, rng: RandomSource) -> float:
         lower, upper = self.interval(bits)
+
+        # The open outer intervals are sampled over one tail width.
         if lower == -inf:
             lower = upper - self.tail_width
         if upper == inf:
             upper = lower + self.tail_width
+
         return rng.uniform(lower, upper)
 
 
@@ -50,6 +53,7 @@ class GaussianIntervalCode(IntervalCode):
     def sample(self, bits: str, rng: RandomSource) -> float:
         gaussian = NormalDist(0.0, self.sigma)
         lower, upper = self.interval(bits)
+
         return gaussian.inv_cdf(rng.uniform(gaussian.cdf(lower), gaussian.cdf(upper)))
 
 
@@ -57,6 +61,7 @@ DEFAULT = UniformIntervalCode(
     BINARY_LABELS, (-inf, -3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0, inf), tail_width=1.0
 )
 DEFAULT_VARIANCE_SNU = 64 / 3
+
 # Table I of Cao et al. (V_A = 8 SNU), scaled to the default's energy.
 CAO_BOUNDS_SNU = (-3.2537, -1.9077, -0.9012, 0.0, 0.9012, 1.9077, 3.2537)
 CAO_SCALE = sqrt(DEFAULT_VARIANCE_SNU / 8.0 * VACUUM_VARIANCE)
