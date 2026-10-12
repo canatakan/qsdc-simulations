@@ -4,8 +4,7 @@ Independent QSDC protocol simulators organized by protocol/paper reference.
 
 Importable code lives under `src/qsdc`, reusable utilities live under
 `src/qsdc/common`, protocol implementations live under
-`src/qsdc/protocols/<protocol>`, demos live next to each protocol as `demo.py`, and paper
-notes live under `docs/protocols/<protocol>`.
+`src/qsdc/protocols/<protocol>`, and demos live next to each protocol as `demo.py`.
 
 ## Setup
 
@@ -160,7 +159,8 @@ Every case sends a random payload of 10,000 bits (`Workload`). The presets
 and the studies are YAML files in `benchmark/catalog/`:
 
 - `simulators.yaml`: named simulator configurations, each optionally extending
-  another one (`baseline` is the paper's protocol, `optimized` the best one).
+  another one (`baseline` is the paper's protocol, `optimized` combines the
+  aligned measurement, Gray labels and the θ band).
 - `noises.yaml`: noise baselines, each with the source of its values.
 - `studies.yaml`: the studies, each run under the noise baselines it lists
   (`lab` by default), which become the series of its report. A study lists its
@@ -181,13 +181,13 @@ The noise baselines:
 `record_27km` is the shortest point of Zhang et al., PRL 125, 010502 (2020).
 Phase noise is not modelled yet.
 
-There are 18 built-in studies, so a full run writes 18 reports.
+There are 19 built-in studies, so a full run writes 19 reports.
 Most run under `lab` only, because their conclusion does not depend on the noise
 level. The comparisons where it does (`noise_profiles`, `optimization_comparison`,
 `axis_comparison`, `interval_comparison`, `error_correction_comparison`) run
 under every baseline, so each baseline is one color in the same report.
 `error_correction_comparison`
-compares no coding, parity and SECDED, each with and without retries.
+compares no coding, and parity and SECDED each with and without retries.
 
 The optimized simulator measures along Alice's displacement (`aligned`), uses
 the paper's intervals with Gray labels (`gray`), θ drawn uniformly from 3π/2 ± π/4 and
@@ -255,12 +255,15 @@ attempts remain.
   (1 − erasure rate)(1 − bit error rate).
 - Delivered bits per state: the same correct bits / all prepared states,
   retries included. Without error correction Bob cannot tell which bits are
-  wrong, so compare coded and uncoded cases by information per state.
-- Information per state: mutual information between sent and decoded symbols
-  (before correction, all sends) / all prepared states, the rate an ideal code
-  could reach on the channel. It is bounded by the entropy of the symbols
-  sent, so it is below 3/4 for short or biased payloads, and at most 1/2 with
-  parity, which only ever sends 4 of the 8 symbols.
+  wrong, so read it together with the bit error rate.
+- Raw-symbol MI per state (`information_per_state`): the empirical mutual
+  information between sent and decoded 3-bit symbols, over every symbol Bob
+  measured, times those symbols / all prepared states. It describes the raw
+  symbol channel, not the payload rate: it is at most 3/4, and does not
+  subtract parity or SECDED redundancy, the known parity schedule or repeated
+  sends of the same block. With alternating parity an ideal channel reaches
+  3/4 although it carries 1/2 payload bit per state. Aborted sends lower it,
+  since their states count but they measure no symbols.
 - Rejection rate: sends rejected by the checks / all sends. It grows with the
   number of checks per send: up to 3 without error correction, 24 with SECDED.
 - Check failure rate: failed checks / control and decoy checks made, which does

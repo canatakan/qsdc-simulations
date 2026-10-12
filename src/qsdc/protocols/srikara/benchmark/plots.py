@@ -16,7 +16,7 @@ from qsdc.protocols.srikara.benchmark.benchmark import BenchmarkResult, RunResul
 PLOTTED = {
     "bit_error_rate": "Bit error rate",
     "delivered_bits_per_state": "Delivered bits / state",
-    "information_per_state": "Mutual information / state",
+    "information_per_state": "Raw-symbol MI / state",
     "rejection_rate": "Sends rejected by the checks",
 }
 HEATMAP_METRICS = ("bit_error_rate", "delivered_bits_per_state")
