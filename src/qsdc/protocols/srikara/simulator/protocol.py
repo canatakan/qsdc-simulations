@@ -172,7 +172,8 @@ class SrikaraSimulator:
         measured = self.backend.measure_returned(state, axis, value * MESSAGE_DIRECTION)
         baseline = self.backend.expect_returned(state, axis).mean
         response = self.backend.message_response(state, axis)
-        decoded = (measured - baseline) / response
+        # Without any signal reaching Bob, his best guess is m = 0.
+        decoded = (measured - baseline) / response if response else 0.0
         return Message(
             state.index,
             bits,

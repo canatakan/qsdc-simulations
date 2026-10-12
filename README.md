@@ -129,6 +129,8 @@ Both Strawberry Fields backends apply `SimulatorConfig.noise`: a thermal loss
 channel in each direction, Alice's memory, and each party's detector efficiency
 and electronic noise. Checks compare measurements against the expectation of
 the noisy circuit, so honest noise is not mistaken for an eavesdropper.
+When no message signal reaches Bob (zero backward transmittance or detector
+efficiency), he decodes m = 0.
 
 ## Benchmarks
 

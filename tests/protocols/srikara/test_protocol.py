@@ -3,7 +3,7 @@ from math import cosh, exp, pi, sinh, sqrt
 import pytest
 
 from qsdc.protocols.srikara.benchmark.catalog import NOISES
-from qsdc.protocols.srikara.config import SimulatorConfig
+from qsdc.protocols.srikara.config import Channel, NoiseConfig, SimulatorConfig
 from qsdc.protocols.srikara.simulator.backends import AnalyticBackend, PreparedState
 from qsdc.protocols.srikara.simulator.protocol import AXES, SrikaraSimulator
 
@@ -101,6 +101,16 @@ def test_a_failed_control_check_aborts_before_alice_sends_anything_back(
     assert all(run.aborted and not run.accepted for run in aborted)
     assert all(run.decoys == () and run.messages == () for run in aborted)
     assert all(len(run.states) == 4 for run in aborted)
+
+
+def test_a_channel_without_signal_still_decodes():
+    config = SimulatorConfig(
+        backend="sf", noise=NoiseConfig(backward=Channel(transmittance=0.0))
+    )
+    transmission = SrikaraSimulator(config).transmit("101")
+
+    [message] = transmission.attempts[0].run.messages
+    assert (message.response, message.decoded_value) == (0.0, 0.0)
 
 
 def test_aligned_axis_reads_the_full_message_displacement():
