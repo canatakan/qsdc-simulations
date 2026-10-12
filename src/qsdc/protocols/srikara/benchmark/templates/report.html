@@ -31,6 +31,7 @@
 
   <section>
     <h2>Results</h2>
+    {% if summary.repetitions > 1 %}<p>± and error bars: 95% confidence interval of the mean over {{ summary.repetitions }} repetitions (Student's t).</p>{% endif %}
     <div class="table">
       <table>
         <thead>

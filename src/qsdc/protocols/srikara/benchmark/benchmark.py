@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import nan, sqrt
+from statistics import stdev
 from time import perf_counter
 from typing import Annotated
 
 from pydantic import Field
+from scipy.stats import t
 
 from qsdc.common.random import ClassicalRandomSource, derive_seed, weighted_random_bits
 from qsdc.protocols.srikara.benchmark.metrics import RunMetrics, measure, pool
@@ -51,6 +54,14 @@ class RunResult:
     case: Case
     metrics: RunMetrics
     repetitions: tuple[RunMetrics, ...]
+
+    def interval(self, metric: str, confidence: float = 0.95) -> float:
+        values = [getattr(m, metric) for m in self.repetitions]
+        values = [value for value in values if value is not None]
+        if len(values) < 2:
+            return nan
+        quantile = t.ppf((1 + confidence) / 2, len(values) - 1)
+        return quantile * stdev(values) / sqrt(len(values))
 
 
 @dataclass(frozen=True)

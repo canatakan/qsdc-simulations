@@ -51,12 +51,25 @@ def _comparison(result: BenchmarkResult, labels: list[str]) -> Figure:
     positions = np.arange(len(runs))
     for axis, (metric, title) in zip(axes.flat, PLOTTED.items()):
         values = [_value(run, metric) for run in runs]
-        bars = axis.barh(positions, np.nan_to_num(values), color=colors)
-        axis.bar_label(
-            bars, labels=[_format(metric, value) for value in values], padding=3
+        errors = np.nan_to_num([run.interval(metric) for run in runs])
+        axis.barh(
+            positions,
+            np.nan_to_num(values),
+            xerr=errors,
+            color=colors,
+            error_kw={"capsize": 3, "elinewidth": 1},
         )
+        for position, value, error in zip(positions, values, errors):
+            axis.annotate(
+                _format(metric, value),
+                (np.nan_to_num(value) + error, position),
+                xytext=(4, 0),
+                textcoords="offset points",
+                va="center",
+            )
         axis.set_yticks(positions, labels)
-        axis.set_xlim(0.0, max(0.01, 1.25 * np.nanmax([0.0, *values])))
+        highest = np.nanmax([0.0, *(np.nan_to_num(values) + errors)])
+        axis.set_xlim(0.0, max(0.01, 1.25 * highest))
         _style(axis, title, metric, axis.xaxis)
     axes[0, 0].invert_yaxis()
     if len(series) > 1:
@@ -81,11 +94,16 @@ def _sweep(result: BenchmarkResult) -> Figure:
     for axis, (metric, title) in zip(axes.flat, PLOTTED.items()):
         for name in series:
             points = sorted(
-                (*run.case.at, _value(run, metric))
+                (*run.case.at, _value(run, metric), run.interval(metric))
                 for run in runs
                 if run.case.series == name
             )
-            axis.plot(*zip(*points), marker="o", linewidth=2.0, label=name)
+            x, y, error = (np.array(column) for column in zip(*points))
+            error = np.nan_to_num(error)
+            line = axis.plot(x, y, marker="o", linewidth=2.0, label=name)[0]
+            axis.fill_between(
+                x, y - error, y + error, color=line.get_color(), alpha=0.2, linewidth=0
+            )
         axis.set_xlabel(result.benchmark.axes[0])
         axis.set_xticks(sorted({run.case.at[0] for run in runs}))
         axis.set_ylim(0.0, max(0.01, axis.get_ylim()[1]))

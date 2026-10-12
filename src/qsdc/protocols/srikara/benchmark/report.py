@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import shutil
 from collections import Counter
 from dataclasses import fields
@@ -299,7 +300,11 @@ def _rate(run: RunResult, rate: str) -> str:
     value = getattr(run.metrics, rate)
     if value is None:
         return "—"
-    return f"{value:.4f}" if rate.endswith("per_state") else f"{value:.2%}"
+    text = "{:.4f}" if rate.endswith("per_state") else "{:.2%}"
+    interval = run.interval(rate)
+    if math.isnan(interval):
+        return text.format(value)
+    return f"{text.format(value)} ± {text.format(interval)}"
 
 
 def _seconds(seconds: float) -> str:
