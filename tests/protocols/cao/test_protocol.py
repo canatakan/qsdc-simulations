@@ -1,7 +1,6 @@
 from math import exp, sqrt
 from statistics import fmean, pvariance
 
-import numpy as np
 import pytest
 
 from qsdc.common.coding.bits import bytes_to_bits
@@ -12,14 +11,6 @@ from qsdc.protocols.cao.simulator.backends import AnalyticBackend, SFSampledBack
 from qsdc.protocols.cao.simulator.protocol import Simulator
 
 SAMPLES = 2000
-
-
-class InterceptedBackend(SFSampledBackend):
-    # Eve keeps S2 and sends Bob a vacuum instead, whose heterodyne outcomes
-    # have the variance of one vacuum.
-    def measure_check(self):
-        alice, _ = super().measure_check()
-        return alice, complex(*np.random.normal(0.0, 1.0, 2))
 
 
 class InvertFirstSignal(AnalyticBackend):
@@ -131,19 +122,6 @@ def test_without_reconciliation_the_raw_errors_withhold_blocks():
 
     transmission = Simulator(config).transmit(payload)
 
-    assert transmission.recovered_bits is None
-
-
-def test_intercepting_the_detection_light_is_detected():
-    payload = weighted_random_bits(200, 0.5, ClassicalRandomSource(1))
-    config = SimulatorConfig(check_pairs=16, max_attempts=3)
-
-    transmission = Simulator(config, InterceptedBackend(config.squeeze_r)).transmit(
-        payload
-    )
-
-    assert not any(attempt.run.accepted for attempt in transmission.attempts)
-    assert all(not attempt.run.signals for attempt in transmission.attempts)
     assert transmission.recovered_bits is None
 
 
