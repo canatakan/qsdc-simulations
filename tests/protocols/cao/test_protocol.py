@@ -8,10 +8,7 @@ from qsdc.common.coding.bits import bytes_to_bits
 from qsdc.common.random import ClassicalRandomSource, weighted_random_bits
 from qsdc.protocols.cao.config import NOISES, Reconciliation, SimulatorConfig
 from qsdc.protocols.cao.constants import EPR_BOUND
-from qsdc.protocols.cao.simulator.backends import (
-    AnalyticBackend,
-    SFSampledBackend,
-)
+from qsdc.protocols.cao.simulator.backends import AnalyticBackend, SFSampledBackend
 from qsdc.protocols.cao.simulator.protocol import Simulator
 
 SAMPLES = 2000

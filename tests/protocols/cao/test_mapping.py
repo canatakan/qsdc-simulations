@@ -6,8 +6,8 @@ import pytest
 from qsdc.common.random import ClassicalRandomSource, RandomSource, weighted_random_bits
 from qsdc.protocols.cao.config import SimulatorConfig
 from qsdc.protocols.cao.simulator.mapping import (
+    Box,
     interval_code,
-    map_box,
     restore_block,
     restore_message,
     uniformize_block,
@@ -37,7 +37,7 @@ def test_reproduces_the_worked_example_of_figure_3():
     assert uniformize_block("0001", rng) == "01010010"
 
     rng = ScriptedRandom([0, 1, 0, 2, 1, 1, 0, 1, 0, 0, 1, 0])
-    boxes = [map_box(payload, 1, rng) for payload in ("01", "01", "00", "10")]
+    boxes = [Box.map(payload, 1, rng) for payload in ("01", "01", "00", "10")]
 
     assert [box.bits + box.parity for box in boxes] == ["0100", "1011", "0001", "1000"]
     assert [box.unmap(box.bits) for box in boxes] == ["01", "01", "00", "10"]
@@ -79,7 +79,7 @@ def test_message_uniformization_balances_a_biased_payload():
 def test_boxes_carry_detection_and_odd_parity_bits():
     rng = ClassicalRandomSource(2)
     for payload in ("00", "01", "10", "11"):
-        box = map_box(payload, 2, rng)
+        box = Box.map(payload, 2, rng)
 
         assert len(box.bits) == 4 and len(box.detection) == 2
         assert box.unmap(box.bits) == payload
@@ -88,7 +88,7 @@ def test_boxes_carry_detection_and_odd_parity_bits():
 
 
 def test_a_wrong_bit_fails_parity():
-    box = map_box("01", 1, ClassicalRandomSource(4))
+    box = Box.map("01", 1, ClassicalRandomSource(4))
     flipped = "".join("1" if bit == "0" else "0" for bit in box.bits[:1]) + box.bits[1:]
 
     assert not box.parity_matches(flipped)
@@ -103,7 +103,7 @@ def test_mapping_keeps_the_gaussian_of_a_biased_payload():
     for block in encode_blocks(payload, config.block_bits):
         bits = uniformize_block(block.uniformized, rng)
         for i in range(0, len(bits), config.box_bits):
-            box = map_box(bits[i : i + config.box_bits], config.detection_bits, rng)
+            box = Box.map(bits[i : i + config.box_bits], config.detection_bits, rng)
             values.append(code.sample(box.bits, rng))
 
     assert abs(fmean(values)) < 0.05 * sqrt(config.modulation_variance_snu)

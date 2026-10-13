@@ -51,14 +51,19 @@ class SimulatorConfig(Config):
     backend: Literal["analytic", "sf", "sf-sampled"] = "sf-sampled"
     random_source: Literal["classical", "sf-bs-qrng"] = "classical"
     seed: int = 11
+
     noise: NoiseConfig = NoiseConfig()
+
     squeeze_r: NonNegative = acosh(9.0) / 2
     modulation_variance_snu: Positive = 8.0
+
     boxes: PositiveInt = 512
     box_bits: PositiveInt = 2
     detection_bits: PositiveInt = 1
+
     check_pairs: PositiveInt = 64
     check_tolerance_sigmas: Positive = 3.0
+
     reconciliation: Optional[Reconciliation] = Reconciliation()  # noqa: UP045
     max_attempts: PositiveInt = 1
 
@@ -81,6 +86,7 @@ class SimulatorConfig(Config):
         if self.reconciliation is None:
             # Both uniformizations double the bits.
             return self.payload_bits // 4
+
         margin = self.reconciliation.secrecy_margin
         return self.payload_bits - self.public_bits - margin
 
@@ -88,9 +94,11 @@ class SimulatorConfig(Config):
     def _message_fits(self) -> SimulatorConfig:
         if self.reconciliation is None and self.payload_bits % 4:
             raise ValueError("the payload bits must be divisible by 4")
+
         if self.block_bits < 1:
             raise ValueError(
                 "no secure message bits are left: the announced parities, the "
                 "syndrome and the secrecy margin cover all payload bits"
             )
+
         return self

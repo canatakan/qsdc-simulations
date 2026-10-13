@@ -5,11 +5,10 @@ import pytest
 
 from qsdc.common.random import ClassicalRandomSource
 from qsdc.protocols.cao.config import SimulatorConfig
-from qsdc.protocols.cao.simulator.mapping import interval_code, map_box
+from qsdc.protocols.cao.simulator.mapping import Box, interval_code
 from qsdc.protocols.cao.simulator.postprocessing import (
     Estimate,
     confidences,
-    estimate,
     reconciliation_code,
 )
 
@@ -19,7 +18,7 @@ def test_estimate_recovers_the_gain_and_the_noise():
     g2 = rng.normal(0, sqrt(8), 20_000)
     measured = 0.6 * g2 + rng.normal(0, 0.3, g2.size)
 
-    result = estimate(g2, measured)
+    result = Estimate.fit(g2, measured)
 
     assert result.gain == pytest.approx(0.6, rel=0.01)
     assert result.noise_variance == pytest.approx(0.09, rel=0.05)
@@ -28,7 +27,7 @@ def test_estimate_recovers_the_gain_and_the_noise():
 def test_confidences_follow_the_value_and_the_announced_detection_bits():
     config = SimulatorConfig()
     code = interval_code(config)
-    box = map_box("10", 1, ClassicalRandomSource(2))
+    box = Box.map("10", 1, ClassicalRandomSource(2))
     lower, upper = code.interval(box.bits)
     centre = (lower + upper) / 2 if upper < 10 else lower + 0.5
 

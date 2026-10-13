@@ -38,6 +38,7 @@ def main() -> None:
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+
     parser.add_argument("message", nargs="?", default="hello")
     parser.add_argument("--noise", choices=list(NOISES), default="clean")
     parser.add_argument("--backend", choices=("analytic", "sf", "sf-sampled"))
@@ -62,10 +63,12 @@ def main() -> None:
     parser.add_argument(
         "--rows", type=int, default=8, help="boxes and checks shown per table"
     )
+
     args = parser.parse_args()
     if not args.message:
         parser.error("the message must not be empty")
 
+    # The defaults, with the options given on the command line.
     fields = (
         "backend",
         "random_source",
@@ -75,16 +78,19 @@ def main() -> None:
         "max_attempts",
     )
     update = {f: getattr(args, f) for f in fields if getattr(args, f) is not None}
+
     if args.no_reconciliation:
         update["reconciliation"] = None
     elif args.syndrome_fraction is not None:
         update["reconciliation"] = Reconciliation(
             syndrome_fraction=args.syndrome_fraction
         )
+
     try:
         config = SimulatorConfig(noise=NOISES[args.noise], **update)
     except ValidationError as error:
         parser.error(str(error.errors()[0]["msg"]))
+
     payload = bytes_to_bits(args.message.encode())
     transmission = Simulator(config).transmit(payload)
     blocks = group_by_block(transmission)
@@ -95,9 +101,11 @@ def main() -> None:
         f"{transmission.attempts[0].run.pairs} EPR pairs per send"
     )
     show_sends(blocks)
+
     number = args.block if args.block is not None else most_eventful(blocks)
     for attempt in blocks[number]:
         show_attempt(attempt, number, config, args.rows)
+
     show_result(args.message, payload, transmission)
 
 
@@ -105,6 +113,7 @@ def group_by_block(transmission: Transmission) -> list[list[Attempt]]:
     blocks: dict[int, list[Attempt]] = {}
     for attempt in transmission.attempts:
         blocks.setdefault(attempt.block.offset, []).append(attempt)
+
     return list(blocks.values())
 
 
@@ -116,13 +125,14 @@ def most_eventful(blocks: list[list[Attempt]]) -> int:
 
 
 def wrong_boxes(attempt: Attempt) -> int:
-    return sum(s.decoded_bits != s.box.bits for s in attempt.run.signals)
+    return sum(not s.correct for s in attempt.run.signals)
 
 
 def show_settings(config: SimulatorConfig, noise: str) -> None:
     header(f"Cao et al., noise '{noise}'")
     width = config.box_bits + config.detection_bits
     settings = config.reconciliation
+
     table(
         ("Setting", "Value"),
         [
@@ -159,6 +169,7 @@ def show_settings(config: SimulatorConfig, noise: str) -> None:
             ("Sends per block", f"at most {config.max_attempts}"),
         ],
     )
+
     n = config.noise
     print(
         f"\nFibre T = {n.channel.transmittance:g} (nbar {n.channel.nbar:g}), "
@@ -169,6 +180,7 @@ def show_settings(config: SimulatorConfig, noise: str) -> None:
 
 def show_sends(blocks: list[list[Attempt]]) -> None:
     header("Sends")
+
     rows = []
     for number, sends in enumerate(blocks):
         block = sends[0].block
@@ -186,6 +198,7 @@ def show_sends(blocks: list[list[Attempt]]) -> None:
                     outcome(attempt),
                 )
             )
+
     table(
         ("Block", "Bits", "Send", "Channel", "Auth", "Wrong boxes", "Result"),
         rows,
@@ -193,17 +206,19 @@ def show_sends(blocks: list[list[Attempt]]) -> None:
 
 
 def failures(stage: Stage) -> str:
-    return f"{sum(not c.passed for c in stage.checks)}/{len(stage.checks)}"
+    return f"{stage.failed}/{len(stage.checks)}"
 
 
 def outcome(attempt: Attempt) -> str:
     run = attempt.run
     if not run.accepted:
         return "terminated"
+
     if attempt.decoded_bits is None:
         if run.syndrome is not None:
             return "reconciliation failed, withheld"
         return "error detected, withheld"
+
     errors = hamming_distance(attempt.decoded_bits, attempt.block.bits)
     return "released" if not errors else f"released, {errors} wrong bit(s)"
 
@@ -223,9 +238,11 @@ def show_attempt(
 
     step("2. Channel detection: both heterodyne the positions Alice picks (Eq. 5)")
     show_stage(run.channel, rows)
+
     if run.authentication is not None:
         step("3. Authentication: the same test on positions Bob picks")
         show_stage(run.authentication, rows)
+
     if not run.accepted:
         print("-> communication terminated")
         return
@@ -243,6 +260,7 @@ def show_attempt(
     else:
         print(f"Message uniformization  {shortened(block.uniformized)}")
         print(f"Block uniformization    {shortened(payloads)}")
+
     table(
         ("Box", "Payload", "Detection at", "Mapped", "Parity", "Interval"),
         [
@@ -277,6 +295,7 @@ def show_attempt(
     more(signals, rows)
 
     step("7. Postprocessing")
+
     n = config.noise
     expected = sqrt(n.bob_detector.efficiency * n.channel.transmittance / 2)
     print("(i) Parameter estimation: Alice reveals G2, Bob fits P_m = t G2 + noise")
@@ -284,6 +303,7 @@ def show_attempt(
         f"    t = {run.estimate.gain:.4f} (expected {expected:.4f}), "
         f"noise variance {run.estimate.noise_variance:.4f} SNU"
     )
+
     reconciled = run.reconciled
     reconciling = run.syndrome is not None
     if reconciling:
@@ -294,9 +314,11 @@ def show_attempt(
         )
     else:
         print("(ii) No reconciliation: every box must pass its detection and parity")
+
     headers = ("j", "X_m / t", "Decoded", "Mapped", "Detection", "Parity", "Payload")
     if reconciling:
         headers += ("Reconciled",)
+
     width = config.box_bits
     table_rows = []
     for i, s in enumerate(signals[:rows]):
@@ -309,17 +331,21 @@ def show_attempt(
             "ok" if s.parity_valid else "FAIL",
             s.decoded_payload,
         )
+
         if reconciling:
             corrected = reconciled[i * width : (i + 1) * width] if reconciled else "-"
             row += (corrected,)
         table_rows.append(row)
+
     table(headers, table_rows)
     more(signals, rows)
+
     raw = "".join(s.decoded_payload for s in signals)
     print(
         f"Wrong payload bits before reconciliation: "
         f"{hamming_distance(raw, payloads)} / {len(payloads)}"
     )
+
     if reconciling:
         if reconciled is None:
             print("LDPC decoding did not converge")
@@ -328,6 +354,7 @@ def show_attempt(
                 "Wrong payload bits after reconciliation: "
                 f"{hamming_distance(reconciled, payloads)}"
             )
+
     if attempt.decoded_bits is not None and reconciled is not None:
         print(
             f"(iii) Privacy amplification: hash of {shortened(reconciled, 24)} -> "
@@ -339,6 +366,7 @@ def show_attempt(
             f"{shortened(restore_block(raw), 24)} -> "
             f"{shortened(attempt.decoded_bits, 24)}"
         )
+
     print(f"-> {outcome(attempt)}")
 
 
@@ -357,6 +385,7 @@ def show_stage(stage: Stage, rows: int) -> None:
         ],
     )
     more(stage.checks, rows)
+
     verdict = "passed" if stage.accepted else "failed"
     print(
         f"{failures(stage)} above {EPR_BOUND:g}, rate {stage.failure_rate:.3f} "
@@ -370,21 +399,25 @@ def show_result(text: str, payload: str, transmission: Transmission) -> None:
     attempts = transmission.attempts
     finals = transmission.final_attempts
     signals = [s for attempt in attempts for s in attempt.run.signals]
+
     retries = len(attempts) - len(finals)
     terminated = sum(not a.run.accepted for a in attempts)
     print(f"Sends: {len(attempts)} for {len(finals)} blocks ({retries} retries)")
     print(f"Terminated by the checks: {terminated}")
     print(f"EPR pairs prepared: {sum(a.run.pairs for a in attempts)}")
-    wrong = sum(s.decoded_bits != s.box.bits for s in signals)
+
+    wrong = sum(not s.correct for s in signals)
     print(f"Boxes decoded into a wrong interval: {wrong} / {len(signals)}")
     revealed = sum(len(a.run.syndrome) for a in attempts if a.run.syndrome)
     if revealed:
         print(f"Syndrome bits revealed: {revealed}")
+
     recovered = transmission.recovered_bits
     if recovered is None:
         missing = sum(a.decoded_bits is None for a in finals)
         print(f"No message released: {missing} block(s) failed every send.")
         return
+
     received = bits_to_bytes(recovered).decode(errors="replace")
     print(
         f"Released bit errors: {hamming_distance(recovered, payload)} / {len(payload)}"

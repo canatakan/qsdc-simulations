@@ -6,20 +6,20 @@ from math import exp, sqrt
 from qsdc.common import transmission
 from qsdc.common.coding.universal_hash import UniversalHash
 from qsdc.common.random import RandomSource, derive_seed, make_random_source
-from qsdc.protocols.cao.config import SimulatorConfig
-from qsdc.protocols.cao.constants import EPR_BOUND
-from qsdc.protocols.cao.simulator import postprocessing
-from qsdc.protocols.cao.simulator.backends import Backend, make_backend
-from qsdc.protocols.cao.simulator.mapping import (
+
+from ..config import SimulatorConfig
+from ..constants import EPR_BOUND
+from . import postprocessing
+from .backends import Backend, make_backend
+from .mapping import (
     Box,
     interval_code,
-    map_box,
     restore_block,
     restore_message,
     uniformize_block,
     uniformize_message,
 )
-from qsdc.protocols.cao.simulator.postprocessing import Estimate
+from .postprocessing import Estimate
 
 
 @dataclass(frozen=True)
@@ -31,10 +31,12 @@ class Block(transmission.Block):
 def encode_blocks(payload: str, block_bits: int) -> list[Block]:
     padded = payload.ljust(-(-len(payload) // block_bits) * block_bits, "0")
     uniformized = uniformize_message(padded)
+
     blocks = []
     for i in range(0, len(payload), block_bits):
         message_part = uniformized[2 * i : 2 * (i + block_bits)]
         blocks.append(Block(i, payload[i : i + block_bits], uniformized=message_part))
+
     return blocks
 
 
@@ -44,12 +46,14 @@ def amplify_blocks(
     # The payload is a random input whose hash is the message, so the public
     # bits hide the message while they are fewer than the random bits.
     block_bits = amplifier.output_bits
+
     blocks = []
     for i in range(0, len(payload), block_bits):
         bits = payload[i : i + block_bits]
         randomness = "".join(rng.choice("01") for _ in range(amplifier.free_bits))
         hashed = amplifier.preimage(bits.ljust(block_bits, "0"), randomness)
         blocks.append(Block(i, bits, payload=hashed))
+
     return blocks
 
 
@@ -61,8 +65,10 @@ class Check:
 
     @property
     def statistic(self) -> float:
+        # Eq. 5: X_m^2 + P_m^2, below 2 for an entangled pair.
         x = (self.alice.real - self.bob.real) / sqrt(2)
         p = (self.alice.imag + self.bob.imag) / sqrt(2)
+
         return x * x + p * p
 
     @property
@@ -77,8 +83,12 @@ class Stage:
     threshold: float
 
     @property
+    def failed(self) -> int:
+        return sum(not check.passed for check in self.checks)
+
+    @property
     def failure_rate(self) -> float:
-        return sum(not check.passed for check in self.checks) / len(self.checks)
+        return self.failed / len(self.checks)
 
     @property
     def accepted(self) -> bool:
@@ -94,6 +104,10 @@ class Signal:
     measured: complex
     decoded_value: float
     decoded_bits: str
+
+    @property
+    def correct(self) -> bool:
+        return self.decoded_bits == self.box.bits
 
     @property
     def detection_valid(self) -> bool:
@@ -145,12 +159,14 @@ class Simulator:
         self.config = config
         self.backend = backend or make_backend(config)
         self.code = interval_code(config)
+
         # Bob calibrates the checks to the honest channel he expects.
         sigma = self.backend.check_sigma()
         self.expected_failure_rate = exp(-EPR_BOUND / (2 * sigma**2))
         rate = self.expected_failure_rate
         margin = sqrt(rate * (1 - rate) / config.check_pairs)
         self.check_threshold = rate + config.check_tolerance_sigmas * margin
+
         self.reconciliation = None
         self.amplifier = None
         if config.reconciliation is not None:
@@ -176,6 +192,7 @@ class Simulator:
         config = self.config
         if self.amplifier is None:
             return encode_blocks(payload, config.block_bits)
+
         seed = derive_seed(config.seed, "privacy amplification")
         rng = make_random_source(config.random_source, seed)
         return amplify_blocks(payload, self.amplifier, rng)
@@ -234,6 +251,7 @@ class Simulator:
         checks = self.config.check_pairs
         count = 2 * checks + self.config.boxes
         shuffled = rng.shuffled(range(count))
+
         return Positions(
             count,
             channel=sorted(shuffled[:checks]),
@@ -246,6 +264,7 @@ class Simulator:
         for index in positions:
             alice, bob = self.backend.measure_check()
             checks.append(Check(index, alice, bob))
+
         return Stage(tuple(checks), self.expected_failure_rate, self.check_threshold)
 
     def map_boxes(self, block: Block, rng: RandomSource) -> list[Box]:
@@ -254,24 +273,29 @@ class Simulator:
             bits = block.payload
         else:
             bits = uniformize_block(block.uniformized, rng)
+
         width = config.box_bits
         boxes = []
         for i in range(0, len(bits), width):
-            boxes.append(map_box(bits[i : i + width], config.detection_bits, rng))
+            boxes.append(Box.map(bits[i : i + width], config.detection_bits, rng))
+
         return boxes
 
     def modulate(self, g1: list[float], rng: RandomSource) -> list[complex]:
         sigma = sqrt(self.config.modulation_variance_snu)
         g2 = [rng.gauss(sigma) for _ in g1]
+
         displacements = []
         for x, p in zip(g1, g2):
             displacements.append(complex(x, p))
+
         return displacements
 
     def measure(self, displacements: list[complex]) -> list[complex]:
         measured = []
         for displacement in displacements:
             measured.append(self.backend.measure_signal(displacement))
+
         return measured
 
     def estimate_channel(
@@ -280,7 +304,8 @@ class Simulator:
         # P_m carries only G2, so Bob fits P_m = gain * G2 + noise.
         g2 = [displacement.imag for displacement in displacements]
         p = [value.imag for value in measured]
-        return postprocessing.estimate(g2, p)
+
+        return Estimate.fit(g2, p)
 
     def decode(
         self,
@@ -305,11 +330,13 @@ class Simulator:
                     decoded_bits=self.code.decode(value),
                 )
             )
+
         return tuple(signals)
 
     def restore(self, signals: tuple[Signal, ...]) -> str | None:
         if not all(signal.valid for signal in signals):
             return None
+
         payload = "".join(signal.decoded_payload for signal in signals)
         return restore_message(restore_block(payload))
 
@@ -318,15 +345,18 @@ class Simulator:
         bit_confidences = postprocessing.confidences(
             boxes, values, self.code, run.estimate
         )
+
         syndrome, reconciled = postprocessing.reconcile(
             self.reconciliation,
             boxes,
             bit_confidences,
             self.config.reconciliation.max_iterations,
         )
+
         return replace(run, syndrome=syndrome, reconciled=reconciled)
 
     def amplify(self, reconciled: str | None) -> str | None:
         if reconciled is None:
             return None
+
         return self.amplifier.hash(reconciled)

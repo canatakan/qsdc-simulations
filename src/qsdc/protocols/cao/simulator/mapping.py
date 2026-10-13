@@ -6,7 +6,8 @@ from math import sqrt
 from qsdc.common.coding.error_correction import parity_decode, parity_encode
 from qsdc.common.coding.intervals import GaussianIntervalCode, binary_labels
 from qsdc.common.random import RandomSource
-from qsdc.protocols.cao.config import SimulatorConfig
+
+from ..config import SimulatorConfig
 
 MESSAGE_CODEWORDS = {"0": ("01", "10"), "1": ("00", "11")}
 BLOCK_CODEWORDS = {"0": ("00", "01"), "1": ("10", "11")}
@@ -18,6 +19,7 @@ def uniformize_message(bits: str) -> str:
     for bit in bits:
         pairs.append(MESSAGE_CODEWORDS[bit][seen[bit] % 2])
         seen[bit] += 1
+
     return "".join(pairs)
 
 
@@ -41,6 +43,20 @@ class Box:
     detection: tuple[int, ...]
     parity: str
 
+    @classmethod
+    def map(cls, payload: str, detection_bits: int, rng: RandomSource) -> Box:
+        # Random detection bits go to random positions among the payload bits.
+        width = len(payload) + detection_bits
+        detection = tuple(sorted(rng.shuffled(range(width))[:detection_bits]))
+
+        remaining = iter(payload)
+        bits = "".join(
+            rng.choice("01") if i in detection else next(remaining)
+            for i in range(width)
+        )
+
+        return cls(payload, bits, detection, parity_encode(bits)[-1])
+
     @property
     def detection_values(self) -> str:
         return "".join(self.bits[i] for i in self.detection)
@@ -48,6 +64,10 @@ class Box:
     @property
     def payload_parity(self) -> str:
         return str((1 + int(self.parity) + self.detection_values.count("1")) % 2)
+
+    @property
+    def payload_positions(self) -> list[int]:
+        return [i for i in range(len(self.bits)) if i not in self.detection]
 
     def unmap(self, bits: str) -> str:
         return "".join(bit for i, bit in enumerate(bits) if i not in self.detection)
@@ -57,16 +77,6 @@ class Box:
 
     def parity_matches(self, bits: str) -> bool:
         return parity_decode(bits + self.parity) is not None
-
-
-def map_box(payload: str, detection_bits: int, rng: RandomSource) -> Box:
-    width = len(payload) + detection_bits
-    detection = tuple(sorted(rng.shuffled(range(width))[:detection_bits]))
-    remaining = iter(payload)
-    bits = "".join(
-        rng.choice("01") if i in detection else next(remaining) for i in range(width)
-    )
-    return Box(payload, bits, detection, parity_encode(bits)[-1])
 
 
 def interval_code(config: SimulatorConfig) -> GaussianIntervalCode:

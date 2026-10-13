@@ -11,8 +11,9 @@ from strawberryfields import Engine, Program, ops
 
 from qsdc.common.config.noise import Channel, Detector, Memory
 from qsdc.common.quadrature import P, Q, Quadrature
-from qsdc.protocols.cao.config import NoiseConfig, SimulatorConfig
-from qsdc.protocols.cao.constants import VACUUM_VARIANCE
+
+from ..config import NoiseConfig, SimulatorConfig
+from ..constants import VACUUM_VARIANCE
 
 Link = Union[Channel, Memory]
 # A heterodyne reads x and p of a mode; a homodyne reads one quadrature of it.
@@ -55,6 +56,7 @@ class AnalyticBackend(Backend):
         # so Var(x_S1 - x_S2) = 2 e^-2r: the EPR correlation.
         variance = cosh(2 * self.squeeze_r) * VACUUM_VARIANCE
         covariance = sinh(2 * self.squeeze_r) * VACUUM_VARIANCE
+
         return variance, covariance
 
     def measure_check(self) -> tuple[complex, complex]:
@@ -64,8 +66,10 @@ class AnalyticBackend(Backend):
         # A heterodyne splits each beam with a vacuum, which halves the variance
         # plus one vacuum and the covariance alone.
         variance, covariance = self.prepare_pair()
+
         heterodyne = (variance + VACUUM_VARIANCE) / 2
         correlation = covariance / 2
+
         return sqrt(heterodyne - correlation)
 
     def measure_signal(self, displacement: complex) -> complex:
@@ -89,6 +93,7 @@ class StrawberryFieldsBackend(Backend):
             self._check_program(),
             ((1, noise.alice_detector), (0, noise.bob_detector)),
         )
+
         return alice, bob
 
     def check_sigma(self) -> float:
@@ -97,6 +102,7 @@ class StrawberryFieldsBackend(Backend):
         noise = self.noise
         alice_x, bob_x = 1, 0
         covariance = Engine("gaussian").run(self._check_program()).state.cov()
+
         alice = (covariance[alice_x, alice_x] + VACUUM_VARIANCE) / 2
         bob = (covariance[bob_x, bob_x] + VACUUM_VARIANCE) / 2
         correlation = covariance[alice_x, bob_x] / 2
@@ -104,6 +110,7 @@ class StrawberryFieldsBackend(Backend):
             noise.alice_detector.electronic_variance
             + noise.bob_detector.electronic_variance
         ) * VACUUM_VARIANCE
+
         variance = (alice + bob - 2 * correlation + electronic) / 2
         return sqrt(float(variance))
 
@@ -113,6 +120,7 @@ class StrawberryFieldsBackend(Backend):
             self._signal_program(displacement),
             ((1, Q, detector), (0, P, detector)),
         )
+
         return complex(x, p)
 
     @abstractmethod
@@ -130,6 +138,7 @@ class StrawberryFieldsBackend(Backend):
         # detector loss comes before the heterodyne, which equals the same loss
         # on both of its outputs.
         noise = self.noise
+
         program = Program(4)
         with program.context as q:
             self._prepare_pair(q)
@@ -137,6 +146,7 @@ class StrawberryFieldsBackend(Backend):
             self._transmit(q, 0, 3, noise.channel)
             ops.LossChannel(noise.alice_detector.efficiency) | q[1]
             ops.LossChannel(noise.bob_detector.efficiency) | q[0]
+
         return program
 
     def _signal_program(self, displacement: complex) -> Program:
@@ -145,25 +155,30 @@ class StrawberryFieldsBackend(Backend):
         # Bob reads x on mode 1 and p on mode 0.
         noise = self.noise
         signal, detection = 1, 0
+
         program = Program(6)
         with program.context as q:
             self._prepare_pair(q)
             self._transmit(q, signal, 2, noise.alice_memory)
+
             # A displacement d moves the quadratures by d when alpha = d / 2.
             ops.Dgate(abs(displacement) / 2, phase(displacement)) | q[signal]
             self._transmit(q, signal, 3, noise.channel)
             self._transmit(q, detection, 4, noise.channel)
             self._transmit(q, detection, 5, noise.bob_memory)
+
             # Eq. 6: X of (S_info - S2)/sqrt2 and P of (S_info + S2)/sqrt2.
             ops.BSgate(pi / 4, 0.0) | (q[signal], q[detection])
             ops.LossChannel(noise.bob_detector.efficiency) | q[signal]
             ops.LossChannel(noise.bob_detector.efficiency) | q[detection]
+
         return program
 
     def _prepare_pair(self, q: object) -> None:
         # Eqs. 1-4: an x-squeezed and a p-squeezed vacuum on a 50:50 beam
         # splitter. Mode 1 becomes S1, and mode 0 rotated by pi becomes S2.
         r = self.squeeze_r
+
         ops.Sgate(r, 0.0) | q[0]
         ops.Sgate(r, pi) | q[1]
         ops.BSgate(pi / 4, 0.0) | (q[0], q[1])
@@ -186,18 +201,21 @@ class SFAnalyticBackend(StrawberryFieldsBackend):
         self, program: Program, readouts: Sequence[HeterodyneReadout]
     ) -> list[complex]:
         state = Engine("gaussian").run(program).state
+
         values = []
         for mode, _ in readouts:
             x = state.quad_expectation(mode, Q.angle)[0]
             p = state.quad_expectation(mode, P.angle)[0]
             # The heterodyne's beam splitter halves the power.
             values.append(complex(x, p) / sqrt(2))
+
         return values
 
     def _measure_homodyne(
         self, program: Program, readouts: Sequence[HomodyneReadout]
     ) -> list[float]:
         state = Engine("gaussian").run(program).state
+
         return [
             float(state.quad_expectation(mode, axis.angle)[0])
             for mode, axis, _ in readouts
@@ -216,7 +234,9 @@ class SFSampledBackend(StrawberryFieldsBackend):
         with program.context as q:
             for mode, _ in readouts:
                 ops.MeasureHeterodyne() | q[mode]
+
         samples = Engine("gaussian").run(program).samples[0]
+
         values = []
         for mode, detector in readouts:
             # Strawberry Fields returns alpha with x = 2 Re(alpha), the
@@ -225,6 +245,7 @@ class SFSampledBackend(StrawberryFieldsBackend):
             value = sqrt(2) * complex(samples[mode])
             value += complex(*self._electronic_noise(detector, 2))
             values.append(value)
+
         return values
 
     def _measure_homodyne(
@@ -233,11 +254,14 @@ class SFSampledBackend(StrawberryFieldsBackend):
         with program.context as q:
             for mode, axis, _ in readouts:
                 ops.MeasureHomodyne(axis.angle) | q[mode]
+
         samples = Engine("gaussian").run(program).samples[0]
+
         values = []
         for mode, _, detector in readouts:
             (noise,) = self._electronic_noise(detector, 1)
             values.append(float(samples[mode]) + noise)
+
         return values
 
     @staticmethod
@@ -251,6 +275,8 @@ class SFSampledBackend(StrawberryFieldsBackend):
 def make_backend(config: SimulatorConfig) -> Backend:
     if config.backend == "analytic":
         return AnalyticBackend(config.squeeze_r)
+
     if config.backend == "sf":
         return SFAnalyticBackend(config.squeeze_r, config.noise)
+
     return SFSampledBackend(config.squeeze_r, config.noise)
