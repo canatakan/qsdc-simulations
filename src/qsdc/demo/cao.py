@@ -20,7 +20,6 @@ from math import e, log10, sqrt
 from pydantic import ValidationError
 
 from qsdc.common.coding.bits import bits_to_bytes, bytes_to_bits, hamming_distance
-from qsdc.common.utils import header, interval, step, table
 from qsdc.protocols.cao.config import (
     NOISES,
     SYNDROME_FRACTIONS,
@@ -35,6 +34,8 @@ from qsdc.protocols.cao.simulator.protocol import (
     Stage,
     Transmission,
 )
+
+from .console import header, interval, step, table
 
 
 def main() -> None:

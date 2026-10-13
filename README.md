@@ -3,7 +3,7 @@
 Simulators for quantum secure direct communication (QSDC) protocols, one
 package per paper: [`srikara`](#srikara-protocol) and [`cao`](#cao-protocol).
 The [benchmark](#benchmarks) package runs their simulators in studies and
-writes reports.
+writes reports, and the [demo](#demo) package walks through one transmission.
 
 ## Setup
 
@@ -25,19 +25,20 @@ protocol and its studies, or `make benchmark/test` for the benchmark package.
 | --- | --- |
 | `src/qsdc/common/config/` | Configuration base classes, value types, noise models and the noise baselines |
 | `src/qsdc/common/coding/` | Bits, interval codes, parity, SECDED, LDPC and the universal hash |
-| `src/qsdc/common/` | Quadratures, random sources, block transmission with retries, console tables |
+| `src/qsdc/common/` | Quadratures, random sources, block transmission with retries |
 | `src/qsdc/protocols/<protocol>/simulator/` | The protocol's simulator and its backends |
 | `src/qsdc/protocols/<protocol>/config.py`, `constants.py` | Its settings, noise configurations, fixed values and unit conventions |
 | `src/qsdc/protocols/<protocol>/presets.yaml` | Its named simulator configurations |
-| `src/qsdc/protocols/<protocol>/demo.py` | Its demo |
 | `src/qsdc/benchmark/` | The benchmark runner, metrics, the `Suite` base class and the command line |
 | `src/qsdc/benchmark/studies/` | The catalog that builds studies from `studies.yaml` |
 | `src/qsdc/benchmark/studies/<protocol>/` | A protocol's suite and its studies |
 | `src/qsdc/benchmark/report/` | Reports: results, CSV, plots, and the HTML templates and stylesheet |
 | `src/qsdc/benchmark/results/<protocol>/` | The benchmark results of each protocol (not tracked by git) |
+| `src/qsdc/demo/<protocol>.py` | A protocol's demo |
+| `src/qsdc/demo/console.py` | The demos' headers and tables |
 | `tests/` | Tests, laid out like `src/` |
 
-The protocols do not import the benchmark. A suite in
+The protocols import neither the benchmark nor the demos. A suite in
 `benchmark/studies/<protocol>/` runs the protocol's simulator and measures its
 transmissions.
 
@@ -263,7 +264,7 @@ reconciliation removes these errors.
 
 ## Demo
 
-`srikara-demo` sends a text message. It prints one line per send, then every
+The demos are in `src/qsdc/demo/`. `srikara-demo` sends a text message. It prints one line per send, then every
 protocol step of one block. It uses the `retry` simulator under `lab` noise
 unless told otherwise.
 

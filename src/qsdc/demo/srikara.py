@@ -29,7 +29,6 @@ from qsdc.common.coding.bits import bits_to_bytes, bytes_to_bits, hamming_distan
 from qsdc.common.coding.error_correction import secded_decode, secded_encode
 from qsdc.common.config.noise import Detector
 from qsdc.common.quadrature import Quadrature
-from qsdc.common.utils import header, interval, step, table
 from qsdc.protocols.srikara.config import NOISES, PRESETS, SimulatorConfig
 from qsdc.protocols.srikara.constants import MESSAGE_DIRECTION, VACUUM_VARIANCE
 from qsdc.protocols.srikara.simulator.backends import (
@@ -46,6 +45,8 @@ from qsdc.protocols.srikara.simulator.protocol import (
     Transmission,
 )
 from qsdc.protocols.srikara.simulator.transport import odd_parity
+
+from .console import header, interval, step, table
 
 
 def main() -> None:
