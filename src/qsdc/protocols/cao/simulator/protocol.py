@@ -128,7 +128,6 @@ class Signal:
 
 @dataclass(frozen=True)
 class Positions:
-    # Where the pairs of a block go: the two checks and the boxes.
     count: int
     channel: list[int]
     authentication: list[int]

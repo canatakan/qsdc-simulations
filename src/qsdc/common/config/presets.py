@@ -11,7 +11,6 @@ ConfigT = TypeVar("ConfigT", bound=Config)
 
 
 def load_presets(path: Path, config: type[ConfigT]) -> dict[str, ConfigT]:
-    # Named configurations. A preset may extend another and change its fields.
     specs = yaml.safe_load(path.read_text())
 
     return {name: config.model_validate(_resolve(name, specs)) for name in specs}

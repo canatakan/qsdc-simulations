@@ -10,8 +10,6 @@ from .metrics import RunMetrics
 
 
 class Suite(ABC):
-    # One protocol's benchmark: how to run and measure its simulator, its
-    # studies, and where its results go. Its report is templates/<name>/report.html.
     name: str
     config: type[Config]
     presets: dict[str, Config]
@@ -28,14 +26,10 @@ class Suite(ABC):
     ) -> RunMetrics: ...
 
     @abstractmethod
-    def parameters(self, config: Config) -> dict[str, str]:
-        # The settings a report shows for one case, by name.
-        ...
+    def parameters(self, config: Config) -> dict[str, str]: ...
 
     @abstractmethod
-    def symbols(self, config: Config) -> tuple[str, ...]:
-        # The symbol labels, in the order of the counts in RunMetrics.
-        ...
+    def symbols(self, config: Config) -> tuple[str, ...]: ...
 
     @property
     def title(self) -> str:

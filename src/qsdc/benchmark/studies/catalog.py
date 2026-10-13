@@ -17,9 +17,6 @@ def assign(document: dict, path: str, value: object) -> None:
 
 
 class Catalog:
-    # A suite's studies.yaml: the default preset and noise, the groups of the
-    # report index and the studies.
-
     def __init__(self, suite: Suite):
         self.suite = suite
         self.specs = yaml.safe_load(suite.studies.read_text())
@@ -33,8 +30,6 @@ class Catalog:
         return list(self.specs["studies"])
 
     def study_order(self, name: str) -> tuple[int, int]:
-        # A study's place in the catalog: its group, then the study itself.
-        # Unknown names go last.
         groups = list(self.groups)
         group = self.study_groups.get(name)
         names = list(self.study_groups)

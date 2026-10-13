@@ -73,7 +73,6 @@ def main() -> None:
     if not args.message:
         parser.error("the message must not be empty")
 
-    # The defaults, with the options given on the command line.
     fields = (
         "backend",
         "random_source",

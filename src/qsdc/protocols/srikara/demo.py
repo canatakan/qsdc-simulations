@@ -72,7 +72,6 @@ def main() -> None:
     if not args.message:
         parser.error("the message must not be empty")
 
-    # The chosen preset, with the options given on the command line.
     update = {"noise": NOISES[args.noise]}
     for field in ("backend", "random_source", "seed"):
         if getattr(args, field) is not None:

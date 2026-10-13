@@ -209,7 +209,6 @@ def write_index(root: Path, suite: Suite) -> Path:
     latest: dict[str, tuple[Path, dict]] = {}
     executions: Counter[str] = Counter()
 
-    # The latest run of each study, and how many runs it has.
     for path in sorted(root.rglob("results.json")):
         document = json.loads(path.read_text())
         name = document["benchmark"]["name"]
@@ -256,7 +255,6 @@ def _symbol_matrix(suite: Suite, run: RunResult) -> dict[str, object]:
         [metrics.symbol_count(int(s, 2), int(d, 2)) for d in labels] for s in labels
     ]
 
-    # Each row shares out the decodings of one sent symbol.
     rows = []
     for label, row in zip(labels, counts):
         total = sum(row) or 1

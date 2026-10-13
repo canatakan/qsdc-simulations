@@ -14,7 +14,6 @@ from ...suite import Suite
 
 
 class CaoSuite(Suite):
-    # A state is an EPR pair, and a symbol is a box with its detection bits.
     name = "cao"
     config = SimulatorConfig
     presets = PRESETS

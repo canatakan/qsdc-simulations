@@ -97,7 +97,6 @@ class RunMetrics:
         return self.failed_checks / self.checks
 
     def symbol_count(self, sent: int, decoded: int) -> int:
-        # The counts are ordered by sent symbol, then decoded symbol.
         return self.symbol_counts[self.alphabet * sent + decoded]
 
     def as_dict(self) -> dict[str, object]:
@@ -106,14 +105,12 @@ class RunMetrics:
 
     @classmethod
     def from_dict(cls, values: dict) -> RunMetrics:
-        # The inverse of as_dict
         counts = {field.name: values[field.name] for field in fields(cls)}
         counts["symbol_counts"] = tuple(counts["symbol_counts"])
         return cls(**counts)
 
     @classmethod
     def pool(cls, metrics: Sequence[RunMetrics]) -> RunMetrics:
-        # Repetitions are pooled by adding their counts.
         totals = {
             field.name: sum(getattr(m, field.name) for m in metrics)
             for field in fields(cls)
@@ -127,7 +124,6 @@ class RunMetrics:
 
 
 def count_blocks(transmission: Transmission) -> dict[str, int]:
-    # What happened to the payload, from its blocks and their sends.
     finals = transmission.final_attempts
     released = [attempt for attempt in finals if attempt.decoded_bits is not None]
 
