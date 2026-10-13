@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass, fields
-from math import log2
+from math import isqrt, log2
 
 from qsdc.common.coding.bits import hamming_distance
-
-from ..simulator.protocol import Transmission
+from qsdc.common.transmission import Transmission
 
 RATES = (
     "bit_error_rate",
@@ -63,15 +62,21 @@ class RunMetrics:
         return self.delivered_bits / self.states
 
     @property
+    def alphabet(self) -> int:
+        # The number of symbols. There is one count per sent and decoded pair.
+        return isqrt(len(self.symbol_counts))
+
+    @property
     def information_per_symbol(self) -> float:
         # Mutual information between the sent and the decoded symbol.
+        n = self.alphabet
         total = sum(self.symbol_counts)
-        sent = [sum(self.symbol_count(s, d) for d in range(8)) for s in range(8)]
-        decoded = [sum(self.symbol_count(s, d) for s in range(8)) for d in range(8)]
+        sent = [sum(self.symbol_count(s, d) for d in range(n)) for s in range(n)]
+        decoded = [sum(self.symbol_count(s, d) for s in range(n)) for d in range(n)]
 
         information = 0.0
-        for s in range(8):
-            for d in range(8):
+        for s in range(n):
+            for d in range(n):
                 count = self.symbol_count(s, d)
                 if count:
                     ratio = count * total / (sent[s] * decoded[d])
@@ -91,13 +96,9 @@ class RunMetrics:
     def check_failure_rate(self) -> float:
         return self.failed_checks / self.checks
 
-    @staticmethod
-    def symbol_index(sent: int, decoded: int) -> int:
-        # The 64 symbol counts are ordered by sent symbol, then decoded symbol.
-        return 8 * sent + decoded
-
     def symbol_count(self, sent: int, decoded: int) -> int:
-        return self.symbol_counts[self.symbol_index(sent, decoded)]
+        # The counts are ordered by sent symbol, then decoded symbol.
+        return self.symbol_counts[self.alphabet * sent + decoded]
 
     def as_dict(self) -> dict[str, object]:
         rates = {rate: getattr(self, rate) for rate in RATES}
@@ -109,49 +110,6 @@ class RunMetrics:
         counts = {field.name: values[field.name] for field in fields(cls)}
         counts["symbol_counts"] = tuple(counts["symbol_counts"])
         return cls(**counts)
-
-    @classmethod
-    def measure(cls, transmission: Transmission, seconds: float) -> RunMetrics:
-        finals = transmission.final_attempts
-        released = [attempt for attempt in finals if attempt.decoded_bits is not None]
-        messages = [
-            m for attempt in transmission.attempts for m in attempt.run.messages
-        ]
-        checks = [
-            check
-            for attempt in transmission.attempts
-            for check in attempt.run.controls + attempt.run.decoys
-        ]
-
-        symbol_counts = [0] * 64
-        for m in messages:
-            index = cls.symbol_index(int(m.sent_bits, 2), int(m.decoded_bits, 2))
-            symbol_counts[index] += 1
-
-        return cls(
-            payload_bits=sum(len(attempt.block.bits) for attempt in finals),
-            error_bits=sum(
-                hamming_distance(a.block.bits, a.decoded_bits) for a in released
-            ),
-            erased_bits=sum(
-                len(a.block.bits) for a in finals if a.decoded_bits is None
-            ),
-            raw_bits=3 * len(messages),
-            raw_error_bits=sum(
-                hamming_distance(m.sent_bits, m.decoded_bits) for m in messages
-            ),
-            states=sum(len(attempt.run.states) for attempt in transmission.attempts),
-            blocks=len(finals),
-            retries=len(transmission.attempts) - len(finals),
-            rejected=sum(not a.run.accepted for a in transmission.attempts),
-            checks=len(checks),
-            failed_checks=sum(not check.passed for check in checks),
-            uncorrectable=sum(
-                a.run.accepted and a.decoded_bits is None for a in transmission.attempts
-            ),
-            seconds=seconds,
-            symbol_counts=tuple(symbol_counts),
-        )
 
     @classmethod
     def pool(cls, metrics: Sequence[RunMetrics]) -> RunMetrics:
@@ -166,3 +124,33 @@ class RunMetrics:
         counts = tuple(sum(column) for column in columns)
 
         return cls(**totals, symbol_counts=counts)
+
+
+def count_blocks(transmission: Transmission) -> dict[str, int]:
+    # What happened to the payload, from its blocks and their sends.
+    finals = transmission.final_attempts
+    released = [attempt for attempt in finals if attempt.decoded_bits is not None]
+
+    return {
+        "payload_bits": sum(len(attempt.block.bits) for attempt in finals),
+        "error_bits": sum(
+            hamming_distance(a.block.bits, a.decoded_bits) for a in released
+        ),
+        "erased_bits": sum(len(a.block.bits) for a in finals if a.decoded_bits is None),
+        "blocks": len(finals),
+        "retries": len(transmission.attempts) - len(finals),
+        "rejected": sum(not a.run.accepted for a in transmission.attempts),
+        "uncorrectable": sum(
+            a.run.accepted and a.decoded_bits is None for a in transmission.attempts
+        ),
+    }
+
+
+def count_symbols(symbols: Iterable[tuple[str, str]], width: int) -> tuple[int, ...]:
+    # How often each sent symbol of width bits was decoded as each symbol.
+    n = 2**width
+    counts = [0] * (n * n)
+    for sent, decoded in symbols:
+        counts[n * int(sent, 2) + int(decoded, 2)] += 1
+
+    return tuple(counts)

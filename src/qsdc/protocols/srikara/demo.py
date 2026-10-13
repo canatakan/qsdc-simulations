@@ -3,7 +3,7 @@
 Prints the settings, one line per send, every protocol step of one block and the
 recovered message. --trace adds the noise path of that block's modes.
 
-Simulators (from the benchmark catalog):
+Simulator presets (presets.yaml):
     baseline   the paper's protocol
     aligned    + measurement along Alice's displacement
     gray       + Gray-labelled intervals
@@ -30,8 +30,7 @@ from qsdc.common.coding.error_correction import secded_decode, secded_encode
 from qsdc.common.config.noise import Detector
 from qsdc.common.quadrature import Quadrature
 from qsdc.common.utils import header, interval, step, table
-from qsdc.protocols.srikara.benchmark.catalog import NOISES, SIMULATORS
-from qsdc.protocols.srikara.config import SimulatorConfig
+from qsdc.protocols.srikara.config import NOISES, PRESETS, SimulatorConfig
 from qsdc.protocols.srikara.constants import MESSAGE_DIRECTION, VACUUM_VARIANCE
 from qsdc.protocols.srikara.simulator.backends import (
     SF_SCALE,
@@ -43,7 +42,7 @@ from qsdc.protocols.srikara.simulator.protocol import (
     Attempt,
     Check,
     Message,
-    Simulator,
+    SrikaraSimulator,
     Transmission,
 )
 from qsdc.protocols.srikara.simulator.transport import odd_parity
@@ -57,7 +56,7 @@ def main() -> None:
     )
 
     parser.add_argument("message", nargs="?", default="hello")
-    parser.add_argument("--simulator", choices=list(SIMULATORS), default="retry")
+    parser.add_argument("--simulator", choices=list(PRESETS), default="retry")
     parser.add_argument("--noise", choices=list(NOISES), default="lab")
     parser.add_argument("--backend", choices=("analytic", "sf", "sf-sampled"))
     parser.add_argument("--random-source", choices=("classical", "sf-bs-qrng"))
@@ -78,10 +77,10 @@ def main() -> None:
     for field in ("backend", "random_source", "seed"):
         if getattr(args, field) is not None:
             update[field] = getattr(args, field)
-    config = SIMULATORS[args.simulator].model_copy(update=update)
+    config = PRESETS[args.simulator].model_copy(update=update)
 
     payload = bytes_to_bits(args.message.encode())
-    transmission = Simulator(config).transmit(payload)
+    transmission = SrikaraSimulator(config).transmit(payload)
     blocks = group_by_block(transmission)
 
     show_settings(config, args.simulator, args.noise)

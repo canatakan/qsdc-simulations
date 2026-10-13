@@ -1,0 +1,39 @@
+simulator: reconciled
+noise: [clean]
+
+# Groups the report index files the studies under, in display order.
+groups:
+  reference: {title: Reference}
+  postprocessing: {title: Postprocessing}
+  signal: {title: Signal parameters}
+
+studies:
+  noise_profiles:
+    group: reference
+    noise: [clean, lab, metro_5km, metro_10km, record_27km]
+    cases:
+      - {}
+
+  paper_comparison:
+    group: reference
+    noise: [clean, lab]
+    cases:
+      - {simulator: paper, label: Paper mapping}
+      - {simulator: reconciled, label: Reconciliation and privacy amplification}
+      - {simulator: retry, label: "+ up to 3 sends per block"}
+
+  syndrome_fraction:
+    group: postprocessing
+    noise: [clean, lab, metro_5km]
+    axes:
+      - name: Syndrome fraction
+        set: [reconciliation.syndrome_fraction]
+        values: [0.1, 0.15, 0.2, 0.3, 0.4]
+
+  squeezing_r:
+    group: signal
+    noise: [clean, lab]
+    axes:
+      - name: Squeezing r
+        set: [squeeze_r]
+        values: [0.576, 0.921, 1.151, 1.444, 1.727]

@@ -1,0 +1,11 @@
+# The paper's mapping without error correction: a block is released only when
+# every box passes its detection and parity bits.
+paper:
+  reconciliation: null
+
+# Postprocessing with reconciliation and privacy amplification.
+reconciled: {}
+
+retry:
+  extends: reconciled
+  max_attempts: 3

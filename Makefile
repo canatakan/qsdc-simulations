@@ -9,10 +9,13 @@ test:
 	python -m pytest
 
 cao/test:
-	python -m pytest tests/protocols/cao
+	python -m pytest tests/protocols/cao tests/benchmark/studies/cao
 
 srikara/test:
-	python -m pytest tests/protocols/srikara
+	python -m pytest tests/protocols/srikara tests/benchmark/studies/srikara
+
+benchmark/test:
+	python -m pytest tests/benchmark
 
 clean:
 	find . -type d -name "__pycache__" -prune -exec rm -rf {} +

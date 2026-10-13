@@ -2,6 +2,8 @@
 
 Simulators for quantum secure direct communication (QSDC) protocols, one
 package per paper: [`srikara`](#srikara-protocol) and [`cao`](#cao-protocol).
+The [benchmark](#benchmarks) package runs their simulators in studies and
+writes reports.
 
 ## Setup
 
@@ -12,9 +14,10 @@ python -m pip install --upgrade pip
 make install
 ```
 
-`make install` adds three commands to `.venv/bin`: `srikara-demo`,
-`srikara-benchmark` and `cao-demo`. To run the tests, use `make test` for
-everything, or `make srikara/test` and `make cao/test` for one protocol.
+`make install` adds four commands to `.venv/bin`: `srikara-demo`,
+`srikara-benchmark`, `cao-demo` and `cao-benchmark`. To run the tests, use
+`make test` for everything, `make srikara/test` and `make cao/test` for one
+protocol and its studies, or `make benchmark/test` for the benchmark package.
 
 ## Layout
 
@@ -23,11 +26,18 @@ everything, or `make srikara/test` and `make cao/test` for one protocol.
 | `src/qsdc/common/config/` | Configuration base classes, value types, noise models and the noise baselines |
 | `src/qsdc/common/coding/` | Bits, interval codes, parity, SECDED, LDPC and the universal hash |
 | `src/qsdc/common/` | Quadratures, random sources, block transmission with retries, console tables |
-| `src/qsdc/protocols/<protocol>/simulator/` | The protocol and its backends |
-| `src/qsdc/protocols/<protocol>/config.py`, `constants.py` | Its settings, fixed values and unit conventions |
+| `src/qsdc/protocols/<protocol>/simulator/` | The protocol's simulator and its backends |
+| `src/qsdc/protocols/<protocol>/config.py`, `constants.py` | Its settings, noise configurations, fixed values and unit conventions |
+| `src/qsdc/protocols/<protocol>/presets.yaml` | Its named simulator configurations |
 | `src/qsdc/protocols/<protocol>/demo.py` | Its demo |
-| `src/qsdc/protocols/srikara/benchmark/` | Studies, metrics and reports |
+| `src/qsdc/benchmark/` | The benchmark runner, metrics, plots, reports and command line |
+| `src/qsdc/benchmark/studies/<protocol>/` | A protocol's suite and its studies |
+| `src/qsdc/benchmark/templates/` | The report templates and the stylesheet |
 | `tests/` | Tests, laid out like `src/` |
+
+The protocols do not import the benchmark. A suite in
+`benchmark/studies/<protocol>/` runs the protocol's simulator and measures its
+transmissions.
 
 ## Srikara protocol
 
@@ -53,16 +63,17 @@ A run is accepted when every control and decoy check falls within
 
 ```python
 from qsdc.protocols.srikara.config import SimulatorConfig
-from qsdc.protocols.srikara.simulator.protocol import Simulator
+from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
 
 config = SimulatorConfig(error_correction="secded", max_attempts=3)
-transmission = Simulator(config).transmit("101001110010")
+transmission = SrikaraSimulator(config).transmit("101001110010")
 assert transmission.recovered_bits == "101001110010"
 ```
 
 `SimulatorConfig` (`config.py`) holds every option. Its defaults are the
 noiseless paper setting. `recovered_bits` is set only when every block was
-released.
+released. `PRESETS` and `NOISES` in `config.py` hold the
+[simulator presets](#presets) and the [noise baselines](#noise-baselines).
 
 ### Backends
 
@@ -159,9 +170,9 @@ paper.
 
 ```python
 from qsdc.protocols.cao.config import SimulatorConfig
-from qsdc.protocols.cao.simulator.protocol import Simulator
+from qsdc.protocols.cao.simulator.protocol import CaoSimulator
 
-transmission = Simulator(SimulatorConfig(max_attempts=3)).transmit("1010")
+transmission = CaoSimulator(SimulatorConfig(max_attempts=3)).transmit("1010")
 ```
 
 `SimulatorConfig` (`config.py`) holds every option. A block has 512 boxes, so
@@ -262,7 +273,7 @@ srikara-demo "hello" --noise metro_10km --block 3 --trace
 
 | Option | Effect |
 | --- | --- |
-| `--simulator`, `--noise` | A simulator preset and a noise baseline from the [catalog](#catalog) |
+| `--simulator`, `--noise` | A [simulator preset](#presets) and a [noise baseline](#noise-baselines) |
 | `--block` | The block to show step by step, counted from 0 (default: the one with the most sends) |
 | `--trace` | Adds the noise path of each mode in that block |
 
@@ -287,6 +298,18 @@ cao-demo "hello" --noise lab --syndrome-fraction 0.3
 
 ## Benchmarks
 
+The benchmark package (`src/qsdc/benchmark/`) runs a protocol's simulator over
+studies and writes their reports. It has one suite per protocol in
+`studies/<protocol>/`, each extending `Suite` from `benchmark/suite.py`:
+
+| File | Contents |
+| --- | --- |
+| `suite.py` | Runs the simulator, measures its transmissions, and names the report's settings and symbols |
+| `studies.yaml` | The studies |
+
+The HTML and CSS are in `benchmark/templates/`: each protocol's report in
+`<protocol>/report.html`, and the study index and the stylesheet shared.
+
 ### Running
 
 ```bash
@@ -298,17 +321,21 @@ srikara-benchmark index                                 # rebuild results/index.
 srikara-benchmark rerender                              # rebuild reports without simulating
 ```
 
+`cao-benchmark` takes the same commands. Srikara writes to `results/` and Cao
+to `results-cao/`; `--output-root` writes elsewhere.
+
 - `--repetitions N` reruns every case with N seeds and pools their counts. The
   first seed is the configured one.
 - `--skip-existing` skips studies that already have a report.
 - `rerender` rebuilds the plots, CSV and HTML from each `results.json`.
 
-### Catalog
+### Presets
 
-The presets and studies are YAML files in `benchmark/catalog/`.
+Each protocol names its simulator configurations in its `presets.yaml`. A
+preset may extend another and change its fields.
 
-**Simulator presets** (`simulators.yaml`). `best_qp` and `aligned` extend
-`baseline`; every later preset extends the row above it:
+**Srikara.** `best_qp` and `aligned` extend `baseline`; every later preset
+extends the row above it:
 
 | Preset | Change |
 | --- | --- |
@@ -320,9 +347,19 @@ The presets and studies are YAML files in `benchmark/catalog/`.
 | `parity` | Parity error detection |
 | `retry` | Up to 3 sends per block |
 
-**Noise baselines** (`src/qsdc/common/config/noises.yaml`, with the source of
-each value). They are shared with Cao. A baseline is one fibre pass, one memory
-and one detector; Srikara uses the fibre in both directions:
+**Cao.**
+
+| Preset | Change |
+| --- | --- |
+| `paper` | The paper's mapping without error correction: a block is released only when every box passes its detection and parity bits |
+| `reconciled` | The defaults: reconciliation and privacy amplification |
+| `retry` | `reconciled` with up to 3 sends per block |
+
+### Noise baselines
+
+The baselines are in `src/qsdc/common/config/noises.yaml`, with the source of
+each value, and both protocols use them. A baseline is one fibre pass, one
+memory and one detector; Srikara uses the fibre in both directions:
 
 | Baseline | Fibre per pass | Excess noise | Detectors | Memory |
 | --- | --- | --- | --- | --- |
@@ -334,8 +371,14 @@ and one detector; Srikara uses the fibre in both directions:
 
 `record_27km` is the shortest link of Zhang et al., PRL 125, 010502 (2020).
 
-**Studies** (`studies.yaml`). There are 19. Each case sends a random
-10,000-bit payload under `optimized` unless the study says otherwise.
+### Studies
+
+A study either lists its cases or sweeps one or two axes. Cases change fields
+by dotted path, such as `noise.forward.transmittance`. Each noise baseline is
+one series in the report. Each case sends a random 10,000-bit payload.
+
+**Srikara** has 19 studies. A case runs `optimized` unless the study says
+otherwise.
 
 | Group | Studies | Noise |
 | --- | --- | --- |
@@ -345,37 +388,47 @@ and one detector; Srikara uses the fibre in both directions:
 | Protocol | `tolerance_safety`, `one_probability` | `lab` |
 | Hardware | `channel_transmittance`, `thermal_occupation`, `detector_efficiency`, `electronic_noise`, `memory_efficiency` | `lab` |
 
-A study either lists its cases or sweeps one or two axes. Cases change fields
-by dotted path, such as `noise.forward.transmittance`. Each noise baseline is
-one series in the report. `error_correction_comparison` covers no coding,
-parity and SECDED, with retries for parity and SECDED only.
+`error_correction_comparison` covers no coding, parity and SECDED, with retries
+for parity and SECDED only.
+
+**Cao** has 4 studies. A case runs `reconciled` unless the study says
+otherwise.
+
+| Group | Studies | Noise |
+| --- | --- | --- |
+| Reference | `noise_profiles`, `paper_comparison` | all five for `noise_profiles`; `clean` and `lab` for `paper_comparison`, which compares the presets |
+| Postprocessing | `syndrome_fraction` | `clean`, `lab`, `metro_5km` |
+| Signal | `squeezing_r` | `clean`, `lab` |
 
 ### Custom benchmarks
 
-A `Benchmark` is a name, its `Case`s and its axis names: no axes gives a
-comparison, one a sweep, two a heatmap. A `Case` is a `SimulatorConfig`, a
-`Workload` (payload size, probability of a one, seed), a series, an optional
+A `Benchmark` is a suite, a name, its `Case`s and its axis names: no axes gives
+a comparison, one a sweep, two a heatmap. A `Case` is a simulator configuration,
+a `Workload` (payload size, probability of a one, seed), a series, an optional
 label and its coordinates `at`.
 
 ```python
 from pathlib import Path
 
-from qsdc.protocols.srikara.benchmark.benchmark import Benchmark, Case, Workload, run_benchmark
-from qsdc.protocols.srikara.benchmark.catalog import SIMULATORS
-from qsdc.protocols.srikara.benchmark.report import write_report
+from qsdc.benchmark.benchmark import Benchmark, Case, Workload, run_benchmark
+from qsdc.benchmark.report import write_report
+from qsdc.benchmark.studies.srikara.suite import SRIKARA
+from qsdc.protocols.srikara.config import PRESETS
 
 cases = tuple(
-    Case(SIMULATORS["optimized"], Workload(payload_bits=1024, one_probability=p), at=(p,))
+    Case(PRESETS["optimized"], Workload(payload_bits=1024, one_probability=p), at=(p,))
     for p in (0.1, 0.5, 0.9)
 )
-benchmark = Benchmark("one_probability", cases, axes=("Probability of one",))
+benchmark = Benchmark(SRIKARA, "one_probability", cases, axes=("Probability of one",))
 print(write_report(run_benchmark(benchmark), Path("results")) / "report.html")
 ```
 
+`CAO` in `qsdc.benchmark.studies.cao.suite` does the same for Cao.
+
 ### Output
 
-Each run writes `results/<study>/run_<time>/`, and `results/index.html` links
-the latest run of every study.
+Each run writes `<output-root>/<study>/run_<time>/`, and
+`<output-root>/index.html` links the latest run of every study.
 
 | File | Contents |
 | --- | --- |
@@ -385,9 +438,11 @@ the latest run of every study.
 
 ### Metrics
 
-`benchmark/metrics.py` records counts and derives every rate from them.
+`benchmark/metrics.py` records counts and derives every rate from them; each
+suite's `measure` takes the counts from its protocol's transmission.
 Repetitions are pooled by adding their counts. A send is one run of a block;
-a released block is one that passed its checks and its code.
+a released block is one that passed its checks and its code. For Cao, a state
+is an EPR pair and a symbol is a box with its detection bit.
 
 | Metric | Definition |
 | --- | --- |

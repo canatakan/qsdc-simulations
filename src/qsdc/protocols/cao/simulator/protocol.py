@@ -154,7 +154,7 @@ Attempt = transmission.Attempt[Block, BlockRun]
 Transmission = transmission.Transmission[Block, BlockRun]
 
 
-class Simulator:
+class CaoSimulator:
     def __init__(self, config: SimulatorConfig, backend: Backend | None = None):
         self.config = config
         self.backend = backend or make_backend(config)
