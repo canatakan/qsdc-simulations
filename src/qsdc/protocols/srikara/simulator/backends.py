@@ -8,10 +8,11 @@ from math import cosh, sinh, sqrt
 import numpy as np
 from strawberryfields import Engine, Program, hbar, ops
 
-from qsdc.common.quadrature import VACUUM_VARIANCE, Quadrature
+from qsdc.common.config.noise import Detector
+from qsdc.common.quadrature import Quadrature
 
-from ..config import Detector, NoiseConfig, SimulatorConfig
-from .encoding import MESSAGE_DIRECTION
+from ..config import NoiseConfig, SimulatorConfig
+from ..constants import MESSAGE_DIRECTION, VACUUM_VARIANCE
 
 SF_SCALE = sqrt(2.0 * hbar)
 

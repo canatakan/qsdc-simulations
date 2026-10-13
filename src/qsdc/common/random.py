@@ -9,8 +9,6 @@ from random import Random
 from typing import TypeVar
 
 import numpy as np
-import strawberryfields as sf
-from strawberryfields import ops
 
 T = TypeVar("T")
 
@@ -85,6 +83,9 @@ class SFBeamSplitterQRNG(RandomSource):
         return value
 
     def _refill(self) -> None:
+        import strawberryfields as sf
+        from strawberryfields import ops
+
         program = sf.Program(2)
         with program.context as q:
             ops.Fock(1) | q[0]

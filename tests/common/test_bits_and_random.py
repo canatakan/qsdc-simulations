@@ -1,12 +1,22 @@
 import pytest
 
-from qsdc.common.bits import bits_to_bytes, bytes_to_bits
+from qsdc.common.coding.bits import (
+    array_to_bits,
+    bits_to_array,
+    bits_to_bytes,
+    bytes_to_bits,
+)
 from qsdc.common.random import make_random_source, weighted_random_bits
 
 
 def test_bytes_round_trip_through_bits():
     assert bytes_to_bits(b"\x05") == "00000101"
     assert bits_to_bytes(bytes_to_bits("QSDC ✓".encode())) == "QSDC ✓".encode()
+
+
+def test_bits_round_trip_through_arrays():
+    assert bits_to_array("0110").tolist() == [0, 1, 1, 0]
+    assert array_to_bits(bits_to_array("100101")) == "100101"
 
 
 def test_weighted_bits_follow_the_one_probability():

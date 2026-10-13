@@ -4,20 +4,19 @@ from dataclasses import dataclass
 from math import nan, sqrt
 from statistics import fmean
 from time import perf_counter
-from typing import Annotated
 
-from pydantic import Field
 from scipy.stats import t
 
+from qsdc.common.config.base import Config, Fraction, PositiveInt
 from qsdc.common.random import ClassicalRandomSource, derive_seed, weighted_random_bits
 
-from ..config import Config, Fraction, SimulatorConfig
-from ..simulator.protocol import SrikaraSimulator
+from ..config import SimulatorConfig
+from ..simulator.protocol import Simulator
 from .metrics import RunMetrics
 
 
 class Workload(Config):
-    payload_bits: Annotated[int, Field(ge=1)] = 10_000
+    payload_bits: PositiveInt = 10_000
     one_probability: Fraction = 0.5
     seed: int = 33
 
@@ -116,7 +115,7 @@ def run_benchmark(benchmark: Benchmark, repetitions: int = 1) -> BenchmarkResult
                 payloads[workload] = workload.payload()
 
             case_started = perf_counter()
-            transmission = SrikaraSimulator(simulator).transmit(payloads[workload])
+            transmission = Simulator(simulator).transmit(payloads[workload])
             samples.append(
                 RunMetrics.measure(transmission, perf_counter() - case_started)
             )

@@ -2,7 +2,7 @@ from itertools import combinations, product
 
 import pytest
 
-from qsdc.common.error_correction import (
+from qsdc.common.coding.error_correction import (
     parity_decode,
     parity_encode,
     secded_decode,

@@ -1,72 +1,18 @@
 from __future__ import annotations
 
-from math import exp
-from typing import Annotated, Literal, Union
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from qsdc.common.config.base import (
+    Config,
+    Distribution,
+    NonNegative,
+    Positive,
+    PositiveInt,
+    Uniform,
+)
+from qsdc.common.config.noise import Channel, Detector, Environment, Memory
 
-from qsdc.common.random import RandomSource
-
-
-class Config(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
-
-
-class Fixed(Config):
-    kind: Literal["fixed"] = "fixed"
-    value: float
-
-    def sample(self, rng: RandomSource) -> float:
-        return self.value
-
-    def __str__(self) -> str:
-        return f"{self.value:g}"
-
-
-class Uniform(Config):
-    kind: Literal["uniform"] = "uniform"
-    lower: float
-    upper: float
-
-    @model_validator(mode="after")
-    def _ordered(self) -> Uniform:
-        if self.lower > self.upper:
-            raise ValueError("lower must not exceed upper")
-
-        return self
-
-    def sample(self, rng: RandomSource) -> float:
-        return rng.uniform(self.lower, self.upper)
-
-    def __str__(self) -> str:
-        return f"U[{self.lower:g}, {self.upper:g}]"
-
-
-Distribution = Annotated[Union[Fixed, Uniform], Field(discriminator="kind")]
-Fraction = Annotated[float, Field(ge=0.0, le=1.0)]
-NonNegative = Annotated[float, Field(ge=0.0)]
-Positive = Annotated[float, Field(gt=0.0)]
-
-
-class Channel(Config):
-    transmittance: Fraction = 1.0
-    nbar: NonNegative = 0.0
-
-
-class Memory(Config):
-    seconds: NonNegative = 0.0
-    lifetime_seconds: Positive = 1.0
-    efficiency: Fraction = 1.0
-    nbar: NonNegative = 0.0
-
-    @property
-    def transmittance(self) -> float:
-        return self.efficiency * exp(-self.seconds / self.lifetime_seconds)
-
-
-class Detector(Config):
-    efficiency: Fraction = 1.0
-    electronic_variance: NonNegative = 0.0
+from .constants import MESSAGE_VARIANCE_SNU
 
 
 class NoiseConfig(Config):
@@ -76,6 +22,16 @@ class NoiseConfig(Config):
     alice_detector: Detector = Detector()
     bob_detector: Detector = Detector()
 
+    @classmethod
+    def from_environment(cls, environment: Environment) -> NoiseConfig:
+        return cls(
+            forward=environment.fibre,
+            memory=environment.memory,
+            backward=environment.fibre,
+            alice_detector=environment.detector,
+            bob_detector=environment.detector,
+        )
+
 
 class SimulatorConfig(Config):
     backend: Literal["analytic", "sf", "sf-sampled"] = "analytic"
@@ -84,7 +40,7 @@ class SimulatorConfig(Config):
 
     noise: NoiseConfig = NoiseConfig()
 
-    alpha_variance_snu: NonNegative = 64 / 3
+    alpha_variance_snu: NonNegative = MESSAGE_VARIANCE_SNU
     squeeze_r: Distribution = Uniform(lower=0.115, upper=0.576)
     theta_pi: Distribution = Uniform(lower=0.0, upper=2.0)
     tolerance_sigmas: Positive = 1.0
@@ -97,4 +53,4 @@ class SimulatorConfig(Config):
     axis_policy: Literal["random", "best_qp", "aligned"] = "random"
 
     error_correction: Literal["none", "parity", "secded"] = "none"
-    max_attempts: Annotated[int, Field(ge=1)] = 1
+    max_attempts: PositiveInt = 1

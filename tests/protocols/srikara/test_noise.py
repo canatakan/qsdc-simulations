@@ -1,17 +1,12 @@
 import numpy as np
 import pytest
 
+from qsdc.common.config.noise import Channel, Detector, Memory
 from qsdc.common.quadrature import Q
 from qsdc.protocols.srikara.benchmark.catalog import NOISES
-from qsdc.protocols.srikara.config import (
-    Channel,
-    Detector,
-    Memory,
-    NoiseConfig,
-    SimulatorConfig,
-)
+from qsdc.protocols.srikara.config import NoiseConfig, SimulatorConfig
 from qsdc.protocols.srikara.simulator.backends import PreparedState, SFSampledBackend
-from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
+from qsdc.protocols.srikara.simulator.protocol import Simulator
 
 COHERENT = PreparedState(index=0, alpha=1.5 + 0j, squeeze_r=0.0, theta=0.0)
 
@@ -62,6 +57,6 @@ def test_calibrated_checks_accept_an_honest_noisy_channel():
     config = SimulatorConfig(
         backend="sf-sampled", noise=NOISES["metro_10km"], tolerance_sigmas=4.0
     )
-    transmission = SrikaraSimulator(config).transmit("101001110010" * 3)
+    transmission = Simulator(config).transmit("101001110010" * 3)
 
     assert all(attempt.run.accepted for attempt in transmission.attempts)

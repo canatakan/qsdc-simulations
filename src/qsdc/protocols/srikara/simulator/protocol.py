@@ -3,12 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from math import pi, sqrt
 
-from qsdc.common.quadrature import VACUUM_VARIANCE, P, Q, Quadrature
-from qsdc.common.random import RandomSource, derive_seed, make_random_source
+from qsdc.common import transmission
+from qsdc.common.quadrature import P, Q, Quadrature
+from qsdc.common.random import RandomSource, make_random_source
 
 from ..config import SimulatorConfig
+from ..constants import MESSAGE_DIRECTION, STATES_PER_SYMBOL, VACUUM_VARIANCE
 from .backends import Backend, Expectation, PreparedState, make_backend
-from .encoding import INTERVAL_CODES, MESSAGE_DIRECTION
+from .encoding import INTERVAL_CODES
 from .routing import ModeRoute, route_modes
 from .transport import Block, decode_block, encode_blocks
 
@@ -59,31 +61,11 @@ class BlockRun:
         return all(check.passed for check in self.controls + self.decoys)
 
 
-@dataclass(frozen=True)
-class Attempt:
-    block: Block
-    number: int
-    run: BlockRun
-    decoded_bits: str | None
+Attempt = transmission.Attempt[Block, BlockRun]
+Transmission = transmission.Transmission[Block, BlockRun]
 
 
-@dataclass(frozen=True)
-class Transmission:
-    attempts: tuple[Attempt, ...]
-
-    @property
-    def final_attempts(self) -> list[Attempt]:
-        return list(
-            {attempt.block.offset: attempt for attempt in self.attempts}.values()
-        )
-
-    @property
-    def recovered_bits(self) -> str | None:
-        decoded = [attempt.decoded_bits for attempt in self.final_attempts]
-        return None if None in decoded else "".join(decoded)
-
-
-class SrikaraSimulator:
+class Simulator:
     def __init__(self, config: SimulatorConfig, backend: Backend | None = None):
         self.config = config
         self.backend = backend or make_backend(config)
@@ -94,20 +76,12 @@ class SrikaraSimulator:
             raise ValueError("payload must be a non-empty string of 0s and 1s")
 
         config = self.config
-        attempts = []
-        for block_index, block in enumerate(
-            encode_blocks(payload, config.error_correction)
-        ):
-            # A block is sent again with fresh states until it is released.
-            for number in range(config.max_attempts):
-                seed = derive_seed(config.seed, block_index, number)
-                run, decoded = self.send_block(block, seed)
-                attempts.append(Attempt(block, number, run, decoded))
-
-                if decoded is not None:
-                    break
-
-        return Transmission(tuple(attempts))
+        return transmission.send_blocks(
+            encode_blocks(payload, config.error_correction),
+            config.seed,
+            config.max_attempts,
+            self.send_block,
+        )
 
     def send_block(self, block: Block, seed: int) -> tuple[BlockRun, str | None]:
         rng = make_random_source(self.config.random_source, seed)
@@ -115,7 +89,7 @@ class SrikaraSimulator:
         symbols = block.symbols
 
         # 1. Bob prepares squeezed coherent states with random alpha, r and theta.
-        states = self.prepare_states(4 * len(symbols), rng)
+        states = self.prepare_states(STATES_PER_SYMBOL * len(symbols), rng)
 
         # 2. Alice splits the states into controls, messages and decoys.
         route = route_modes(len(states), rng)

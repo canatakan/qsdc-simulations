@@ -5,6 +5,8 @@ from pathlib import Path
 
 import yaml
 
+from qsdc.common.config.noise import BASELINES
+
 from ...config import NoiseConfig, SimulatorConfig
 from ..benchmark import Benchmark, Case, Workload
 
@@ -29,7 +31,8 @@ def assign(document: dict, path: str, value: object) -> None:
 
 
 NOISES = {
-    name: NoiseConfig.model_validate(spec) for name, spec in load("noises").items()
+    name: NoiseConfig.from_environment(environment)
+    for name, environment in BASELINES.items()
 }
 
 SIMULATOR_SPECS = load("simulators")

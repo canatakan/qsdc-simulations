@@ -21,27 +21,29 @@ from __future__ import annotations
 
 import argparse
 from cmath import polar
-from math import inf, pi, sqrt
+from math import pi, sqrt
 
 from strawberryfields import Engine, Program, ops
 
-from qsdc.common.bits import bits_to_bytes, bytes_to_bits, hamming_distance
-from qsdc.common.error_correction import secded_decode, secded_encode
+from qsdc.common.coding.bits import bits_to_bytes, bytes_to_bits, hamming_distance
+from qsdc.common.coding.error_correction import secded_decode, secded_encode
+from qsdc.common.config.noise import Detector
 from qsdc.common.quadrature import Quadrature
+from qsdc.common.utils import header, interval, step, table
 from qsdc.protocols.srikara.benchmark.catalog import NOISES, SIMULATORS
-from qsdc.protocols.srikara.config import Detector, SimulatorConfig
+from qsdc.protocols.srikara.config import SimulatorConfig
+from qsdc.protocols.srikara.constants import MESSAGE_DIRECTION, VACUUM_VARIANCE
 from qsdc.protocols.srikara.simulator.backends import (
     SF_SCALE,
-    VACUUM_VARIANCE,
     AnalyticBackend,
     PreparedState,
 )
-from qsdc.protocols.srikara.simulator.encoding import INTERVAL_CODES, MESSAGE_DIRECTION
+from qsdc.protocols.srikara.simulator.encoding import INTERVAL_CODES
 from qsdc.protocols.srikara.simulator.protocol import (
     Attempt,
     Check,
     Message,
-    SrikaraSimulator,
+    Simulator,
     Transmission,
 )
 from qsdc.protocols.srikara.simulator.transport import odd_parity
@@ -79,7 +81,7 @@ def main() -> None:
     config = SIMULATORS[args.simulator].model_copy(update=update)
 
     payload = bytes_to_bits(args.message.encode())
-    transmission = SrikaraSimulator(config).transmit(payload)
+    transmission = Simulator(config).transmit(payload)
     blocks = group_by_block(transmission)
 
     show_settings(config, args.simulator, args.noise)
@@ -461,36 +463,8 @@ def show_result(text: str, payload: str, transmission: Transmission) -> None:
     print(f"Recovered: {received!r} ({'exact' if received == text else 'corrupted'})")
 
 
-def header(title: str) -> None:
-    print(f"\n{title}\n{'=' * len(title)}")
-
-
-def step(title: str) -> None:
-    print(f"\n{title}\n{'-' * len(title)}")
-
-
-def table(
-    headers: tuple[str, ...], rows: list[tuple[object, ...]], indent: str = ""
-) -> None:
-    cells = [tuple(str(cell) for cell in row) for row in rows]
-    widths = [
-        max(len(h), *(len(row[i]) for row in cells)) for i, h in enumerate(headers)
-    ]
-
-    for row in (headers, tuple("-" * w for w in widths), *cells):
-        print(
-            (indent + "  ".join(cell.ljust(w) for cell, w in zip(row, widths))).rstrip()
-        )
-
-
 def cplx(value: complex) -> str:
     return f"{value.real:+.4f}{value.imag:+.4f}i"
-
-
-def interval(lower: float, upper: float) -> str:
-    left = "-inf" if lower == -inf else f"{lower:.4g}"
-    right = "inf" if upper == inf else f"{upper:.4g}"
-    return f"[{left}, {right})"
 
 
 if __name__ == "__main__":
