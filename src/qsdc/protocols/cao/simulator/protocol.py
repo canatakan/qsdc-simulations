@@ -8,6 +8,7 @@ from qsdc.common.coding.universal_hash import UniversalHash
 from qsdc.common.random import RandomSource, derive_seed, make_random_source
 from qsdc.protocols.cao.config import SimulatorConfig
 from qsdc.protocols.cao.constants import EPR_BOUND
+from qsdc.protocols.cao.simulator import postprocessing
 from qsdc.protocols.cao.simulator.backends import Backend, make_backend
 from qsdc.protocols.cao.simulator.mapping import (
     Box,
@@ -18,13 +19,7 @@ from qsdc.protocols.cao.simulator.mapping import (
     uniformize_block,
     uniformize_message,
 )
-from qsdc.protocols.cao.simulator.postprocessing import (
-    Estimate,
-    confidences,
-    estimate,
-    reconcile,
-    reconciliation_code,
-)
+from qsdc.protocols.cao.simulator.postprocessing import Estimate
 
 
 @dataclass(frozen=True)
@@ -118,6 +113,15 @@ class Signal:
 
 
 @dataclass(frozen=True)
+class Positions:
+    # Where the pairs of a block go: the two checks and the boxes.
+    count: int
+    channel: list[int]
+    authentication: list[int]
+    signal: list[int]
+
+
+@dataclass(frozen=True)
 class BlockRun:
     pairs: int
     channel: Stage
@@ -147,113 +151,182 @@ class Simulator:
         rate = self.expected_failure_rate
         margin = sqrt(rate * (1 - rate) / config.check_pairs)
         self.check_threshold = rate + config.check_tolerance_sigmas * margin
+        self.reconciliation = None
         self.amplifier = None
         if config.reconciliation is not None:
+            self.reconciliation = postprocessing.reconciliation_code(config)
             self.amplifier = UniversalHash(
                 config.payload_bits,
                 config.block_bits,
                 seed=derive_seed(config.seed, "universal hash"),
             )
-        self.reconciliation = (
-            reconciliation_code(config) if config.reconciliation else None
-        )
 
     def transmit(self, payload: str) -> Transmission:
         config = self.config
-        if self.amplifier is None:
-            blocks = encode_blocks(payload, config.block_bits)
-        else:
-            seed = derive_seed(config.seed, "privacy amplification")
-            rng = make_random_source(config.random_source, seed)
-            blocks = amplify_blocks(payload, self.amplifier, rng)
         return transmission.send_blocks(
-            blocks,
+            self.split(payload),
             config.seed,
             config.max_attempts,
-            self._send,
+            self.send_block,
         )
 
-    def _send(self, block: Block, seed: int) -> tuple[BlockRun, str | None]:
-        run = self.run_block(block, seed)
-        if not run.accepted:
-            return run, None
-        if self.reconciliation is None:
-            if not all(signal.valid for signal in run.signals):
-                return run, None
-            payload = "".join(signal.decoded_payload for signal in run.signals)
-            message = restore_message(restore_block(payload))
-        elif run.reconciled is None:
-            return run, None
-        else:
-            message = self.amplifier.hash(run.reconciled)
-        return run, message[: len(block.bits)]
-
-    def run_block(self, block: Block, seed: int) -> BlockRun:
+    def split(self, payload: str) -> list[Block]:
+        # With privacy amplification, each block becomes a random payload whose
+        # hash is the message. Without it, the message is uniformized.
         config = self.config
+        if self.amplifier is None:
+            return encode_blocks(payload, config.block_bits)
+        seed = derive_seed(config.seed, "privacy amplification")
         rng = make_random_source(config.random_source, seed)
+        return amplify_blocks(payload, self.amplifier, rng)
+
+    def send_block(self, block: Block, seed: int) -> tuple[BlockRun, str | None]:
+        rng = make_random_source(self.config.random_source, seed)
         self.backend.begin_run(seed)
 
-        checks = config.check_pairs
-        pairs = 2 * checks + config.boxes
-        positions = rng.shuffled(range(pairs))
-        channel_positions = sorted(positions[:checks])
-        authentication_positions = sorted(positions[checks : 2 * checks])
-        signal_positions = sorted(positions[2 * checks :])
+        # 1. Preparation: Alice prepares the EPR pairs, keeps S1 and sends S2.
+        positions = self.prepare_pairs(rng)
 
-        channel = self._stage(channel_positions)
+        # 2. Channel detection: both heterodyne a random group of pairs.
+        channel = self.run_checks(positions.channel)
         if not channel.accepted:
-            return BlockRun(pairs, channel, None)
-        authentication = self._stage(authentication_positions)
-        if not authentication.accepted:
-            return BlockRun(pairs, channel, authentication)
+            return BlockRun(positions.count, channel, None), None
 
+        # 3. Authentication: the same check on another group, published by Bob.
+        authentication = self.run_checks(positions.authentication)
+        if not authentication.accepted:
+            return BlockRun(positions.count, channel, authentication), None
+
+        # 4. Gaussian mapping: Alice maps the block onto boxes and draws G1'.
+        boxes = self.map_boxes(block, rng)
+        g1 = [self.code.sample(box.bits, rng) for box in boxes]
+
+        # 5. Gaussian modulation: Alice displaces S1 by G1' in x and G2 in p.
+        displacements = self.modulate(g1, rng)
+
+        # 6. Measurement: Bob measures S_info jointly with S2.
+        measured = self.measure(displacements)
+
+        # 7a. Parameter estimation: Alice reveals G2, and Bob fits his gain.
+        channel_estimate = self.estimate_channel(displacements, measured)
+        signals = self.decode(
+            positions.signal, boxes, displacements, measured, channel_estimate
+        )
+        run = BlockRun(
+            positions.count, channel, authentication, signals, channel_estimate
+        )
+
+        if self.reconciliation is None:
+            # 7b. Without reconciliation, Bob keeps the block only if every
+            # detection and parity bit matches.
+            message = self.restore(signals)
+        else:
+            # 7b. Reconciliation: Alice's syndrome corrects Bob's payload.
+            run = self.reconcile(run, boxes)
+            # 7c. Privacy amplification: the hash of the payload is the message.
+            message = self.amplify(run.reconciled)
+        if message is None:
+            return run, None
+        return run, message[: len(block.bits)]
+
+    def prepare_pairs(self, rng: RandomSource) -> Positions:
+        # Each pair goes at random to one of the two checks or to a box.
+        checks = self.config.check_pairs
+        count = 2 * checks + self.config.boxes
+        shuffled = rng.shuffled(range(count))
+        return Positions(
+            count,
+            channel=sorted(shuffled[:checks]),
+            authentication=sorted(shuffled[checks : 2 * checks]),
+            signal=sorted(shuffled[2 * checks :]),
+        )
+
+    def run_checks(self, positions: list[int]) -> Stage:
+        checks = []
+        for index in positions:
+            alice, bob = self.backend.measure_check()
+            checks.append(Check(index, alice, bob))
+        return Stage(tuple(checks), self.expected_failure_rate, self.check_threshold)
+
+    def map_boxes(self, block: Block, rng: RandomSource) -> list[Box]:
+        config = self.config
         if block.payload is not None:
             bits = block.payload
         else:
             bits = uniformize_block(block.uniformized, rng)
         width = config.box_bits
-        boxes = [
-            map_box(bits[i : i + width], config.detection_bits, rng)
-            for i in range(0, len(bits), width)
-        ]
-        sigma = sqrt(config.modulation_variance_snu)
-        g1 = [self.code.sample(box.bits, rng) for box in boxes]
-        g2 = [rng.gauss(sigma) for _ in boxes]
-        measured = []
-        for x, p in zip(g1, g2):
-            measured.append(self.backend.measure_signal(complex(x, p)))
+        boxes = []
+        for i in range(0, len(bits), width):
+            boxes.append(map_box(bits[i : i + width], config.detection_bits, rng))
+        return boxes
 
-        channel_estimate = estimate(g2, [m.imag for m in measured])
+    def modulate(self, g1: list[float], rng: RandomSource) -> list[complex]:
+        sigma = sqrt(self.config.modulation_variance_snu)
+        g2 = [rng.gauss(sigma) for _ in g1]
+        displacements = []
+        for x, p in zip(g1, g2):
+            displacements.append(complex(x, p))
+        return displacements
+
+    def measure(self, displacements: list[complex]) -> list[complex]:
+        measured = []
+        for displacement in displacements:
+            measured.append(self.backend.measure_signal(displacement))
+        return measured
+
+    def estimate_channel(
+        self, displacements: list[complex], measured: list[complex]
+    ) -> Estimate:
+        # P_m carries only G2, so Bob fits P_m = gain * G2 + noise.
+        g2 = [displacement.imag for displacement in displacements]
+        p = [value.imag for value in measured]
+        return postprocessing.estimate(g2, p)
+
+    def decode(
+        self,
+        positions: list[int],
+        boxes: list[Box],
+        displacements: list[complex],
+        measured: list[complex],
+        channel_estimate: Estimate,
+    ) -> tuple[Signal, ...]:
+        # Bob divides X_m by his gain and reads the interval it falls in.
         signals = []
         for i, box in enumerate(boxes):
             value = measured[i].real / channel_estimate.gain
             signals.append(
                 Signal(
-                    index=signal_positions[i],
+                    index=positions[i],
                     box=box,
-                    g1=g1[i],
-                    g2=g2[i],
+                    g1=displacements[i].real,
+                    g2=displacements[i].imag,
                     measured=measured[i],
                     decoded_value=value,
                     decoded_bits=self.code.decode(value),
                 )
             )
-        run = BlockRun(pairs, channel, authentication, tuple(signals), channel_estimate)
-        if self.reconciliation is None:
-            return run
+        return tuple(signals)
 
-        values = [signal.decoded_value for signal in signals]
-        bit_confidences = confidences(boxes, values, self.code, channel_estimate)
-        syndrome, reconciled = reconcile(
+    def restore(self, signals: tuple[Signal, ...]) -> str | None:
+        if not all(signal.valid for signal in signals):
+            return None
+        payload = "".join(signal.decoded_payload for signal in signals)
+        return restore_message(restore_block(payload))
+
+    def reconcile(self, run: BlockRun, boxes: list[Box]) -> BlockRun:
+        values = [signal.decoded_value for signal in run.signals]
+        bit_confidences = postprocessing.confidences(
+            boxes, values, self.code, run.estimate
+        )
+        syndrome, reconciled = postprocessing.reconcile(
             self.reconciliation,
             boxes,
             bit_confidences,
-            config.reconciliation.max_iterations,
+            self.config.reconciliation.max_iterations,
         )
         return replace(run, syndrome=syndrome, reconciled=reconciled)
 
-    def _stage(self, positions: list[int]) -> Stage:
-        checks = tuple(
-            Check(index, *self.backend.measure_check()) for index in positions
-        )
-        return Stage(checks, self.expected_failure_rate, self.check_threshold)
+    def amplify(self, reconciled: str | None) -> str | None:
+        if reconciled is None:
+            return None
+        return self.amplifier.hash(reconciled)
