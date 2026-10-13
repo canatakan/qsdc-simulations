@@ -10,11 +10,11 @@ from time import time_ns
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-from .benchmark import Benchmark, BenchmarkResult, Case, RunResult, Workload
-from .catalog import Catalog
-from .metrics import RunMetrics
+from ..benchmark import Benchmark, BenchmarkResult, Case, RunResult, Workload
+from ..metrics import RunMetrics
+from ..studies.catalog import Catalog
+from ..suite import Suite
 from .plots import write_plots
-from .suite import Suite
 
 TEMPLATES = Path(__file__).parent / "templates"
 

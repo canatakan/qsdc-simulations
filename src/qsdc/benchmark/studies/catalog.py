@@ -4,8 +4,8 @@ from itertools import product
 
 import yaml
 
-from .benchmark import Benchmark, Case, Workload
-from .suite import Suite
+from ..benchmark import Benchmark, Case, Workload
+from ..suite import Suite
 
 
 def assign(document: dict, path: str, value: object) -> None:

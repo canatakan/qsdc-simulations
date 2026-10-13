@@ -5,7 +5,7 @@ from dataclasses import replace
 from qsdc.benchmark import cli
 from qsdc.benchmark.benchmark import Benchmark, Case, Workload, run_benchmark
 from qsdc.benchmark.metrics import RunMetrics
-from qsdc.benchmark.report import load_result, rerender, write_report
+from qsdc.benchmark.report.report import load_result, rerender, write_report
 from qsdc.benchmark.studies.srikara.suite import SRIKARA
 from qsdc.protocols.srikara.config import SimulatorConfig
 

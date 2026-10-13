@@ -5,8 +5,8 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .benchmark import Workload, run_benchmark
-from .catalog import Catalog
-from .report import rerender, write_index, write_report
+from .report.report import rerender, write_index, write_report
+from .studies.catalog import Catalog
 from .suite import Suite
 
 WORKLOAD = Workload()

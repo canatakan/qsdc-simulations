@@ -1,8 +1,8 @@
 import pytest
 
 from qsdc.benchmark.benchmark import Workload
-from qsdc.benchmark.catalog import Catalog
 from qsdc.benchmark.metrics import RunMetrics
+from qsdc.benchmark.studies.catalog import Catalog
 from qsdc.benchmark.studies.srikara.suite import SRIKARA
 from qsdc.protocols.srikara.config import NOISES, SimulatorConfig
 from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator

@@ -30,9 +30,10 @@ protocol and its studies, or `make benchmark/test` for the benchmark package.
 | `src/qsdc/protocols/<protocol>/config.py`, `constants.py` | Its settings, noise configurations, fixed values and unit conventions |
 | `src/qsdc/protocols/<protocol>/presets.yaml` | Its named simulator configurations |
 | `src/qsdc/protocols/<protocol>/demo.py` | Its demo |
-| `src/qsdc/benchmark/` | The benchmark runner, metrics, plots, reports and command line |
+| `src/qsdc/benchmark/` | The benchmark runner, metrics, the `Suite` base class and the command line |
+| `src/qsdc/benchmark/studies/` | The catalog that builds studies from `studies.yaml` |
 | `src/qsdc/benchmark/studies/<protocol>/` | A protocol's suite and its studies |
-| `src/qsdc/benchmark/templates/` | The report templates and the stylesheet |
+| `src/qsdc/benchmark/report/` | Reports: results, CSV, plots, and the HTML templates and stylesheet |
 | `tests/` | Tests, laid out like `src/` |
 
 The protocols do not import the benchmark. A suite in
@@ -307,8 +308,9 @@ studies and writes their reports. It has one suite per protocol in
 | `suite.py` | Runs the simulator, measures its transmissions, and names the report's settings and symbols |
 | `studies.yaml` | The studies |
 
-The HTML and CSS are in `benchmark/templates/`: each protocol's report in
-`<protocol>/report.html`, and the study index and the stylesheet shared.
+`studies/catalog.py` builds a suite's studies from its `studies.yaml`.
+`report/` writes the reports; its `templates/` holds each protocol's report in
+`<protocol>/report.html`, and the shared study index and stylesheet.
 
 ### Running
 
@@ -411,7 +413,7 @@ label and its coordinates `at`.
 from pathlib import Path
 
 from qsdc.benchmark.benchmark import Benchmark, Case, Workload, run_benchmark
-from qsdc.benchmark.report import write_report
+from qsdc.benchmark.report.report import write_report
 from qsdc.benchmark.studies.srikara.suite import SRIKARA
 from qsdc.protocols.srikara.config import PRESETS
 

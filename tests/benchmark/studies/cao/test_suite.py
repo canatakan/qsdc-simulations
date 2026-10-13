@@ -2,9 +2,9 @@ import json
 
 from qsdc.benchmark import cli
 from qsdc.benchmark.benchmark import Workload
-from qsdc.benchmark.catalog import Catalog
-from qsdc.benchmark.report import load_result
+from qsdc.benchmark.report.report import load_result
 from qsdc.benchmark.studies.cao.suite import CAO
+from qsdc.benchmark.studies.catalog import Catalog
 from qsdc.protocols.cao.config import NOISES, PRESETS, SimulatorConfig
 from qsdc.protocols.cao.simulator.backends import AnalyticBackend
 from qsdc.protocols.cao.simulator.protocol import CaoSimulator
