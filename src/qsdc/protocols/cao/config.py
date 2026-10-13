@@ -48,6 +48,7 @@ class Reconciliation(Config):
 
 
 class SimulatorConfig(Config):
+    backend: Literal["analytic", "sf", "sf-sampled"] = "sf-sampled"
     random_source: Literal["classical", "sf-bs-qrng"] = "classical"
     seed: int = 11
     noise: NoiseConfig = NoiseConfig()

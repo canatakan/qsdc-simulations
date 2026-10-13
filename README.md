@@ -167,20 +167,30 @@ transmission = Simulator(SimulatorConfig(max_attempts=3)).transmit("1010")
 `SimulatorConfig` (`config.py`) holds every option. A block has 512 boxes, so
 1024 payload bits, which keeps the reconciliation code long enough.
 
-### Noise and checks
+### Backends
 
-`AnalyticBackend` samples the vacuum quadratures and applies the paper's
-linear transformations. `noise` places a noise baseline on the links of the
-paper's Fig. 1: S1 waits in Alice's delay line before she displaces it and
-sends it through the fibre; S2 crosses the same fibre and waits in Bob's delay
-line; each detector adds its loss and electronic noise. The tests check the
-variances against Strawberry Fields.
+| `backend` | Behaviour |
+| --- | --- |
+| `analytic` | The paper's formulas on mean values: Bob reads Alice's displacement / √2, and every check outcome is 0. Ignores `noise`. |
+| `sf` | Strawberry Fields Gaussian circuits with noise, one per check or signal, read out as exact means |
+| `sf-sampled` | The same circuits, read out as homodyne samples (default) |
+
+`noise` places a noise baseline on the links of the paper's Fig. 1: S1 waits
+in Alice's delay line before she displaces it and sends it through the fibre;
+S2 crosses the same fibre and waits in Bob's delay line; each detector adds its
+loss and electronic noise. `sf` and `sf-sampled` build it into the circuits.
+Strawberry Fields 0.23's `ThermalLossChannel` adds its thermal photons to every
+mode of a circuit, so each thermal loss is built from a beam splitter and a
+thermal mode.
+
+### Checks
 
 The paper gives no threshold for the checks. A stage passes when fewer
 positions fail than q + `check_tolerance_sigmas` · √(q(1 − q)/`check_pairs`),
-where q = e^(−1/σ²) is the failure rate of an honest pair, computed from the
-configured noise. An honest position fails 15% of the time on `clean` and 40%
-on `record_27km`.
+where q = e^(−1/σ²) is the failure rate of an honest pair. The backend's
+`check_sigma` gives σ: from the paper's formulas for `analytic`, and from
+the covariance of the noisy circuit for `sf` and `sf-sampled`. An honest
+position fails 15% of the time on `clean` and 40% on `record_27km`.
 
 ### Postprocessing
 

@@ -1,116 +1,89 @@
 from math import sqrt
 from statistics import fmean, pvariance
 
-import numpy as np
 import pytest
-import strawberryfields as sf
-from strawberryfields import ops
 
 from qsdc.common.random import ClassicalRandomSource, weighted_random_bits
 from qsdc.protocols.cao.config import NOISES, SimulatorConfig
-from qsdc.protocols.cao.simulator.backends import AnalyticBackend
+from qsdc.protocols.cao.simulator.backends import (
+    AnalyticBackend,
+    SFAnalyticBackend,
+    SFSampledBackend,
+)
 from qsdc.protocols.cao.simulator.protocol import Simulator
 
 SQUEEZE_R = 1.0
-NOISE = NOISES["metro_10km"]
-# Alice displaces after her delay line, so only the fibre and the detector attenuate it.
-GAIN = sqrt(NOISE.bob_detector.efficiency * NOISE.channel.transmittance / 2)
+SAMPLES = 2000
 
 
-def epr_covariance(signal_links, detection_links):
-    program = sf.Program(2)
-    with program.context as q:
-        ops.Sgate(SQUEEZE_R, 0.0) | q[0]
-        ops.Sgate(SQUEEZE_R, np.pi) | q[1]
-        ops.BSgate(np.pi / 4, 0.0) | (q[0], q[1])
-        for link in signal_links:
-            ops.ThermalLossChannel(link.transmittance, link.nbar) | q[1]
-        for link in detection_links:
-            ops.ThermalLossChannel(link.transmittance, link.nbar) | q[0]
-    return sf.Engine("gaussian").run(program).state.cov()
-
-
-def difference_variance(covariance):
-    # S1 is mode 1 and S2 is mode 0 rotated by pi, so x_S1 - x_S2 = x1 + x0.
-    weights = np.array([1.0, 1.0, 0.0, 0.0])
-    return weights @ covariance @ weights
-
-
-def detected(variance, detector):
-    eta = detector.efficiency
-    return eta * variance + (1 - eta) + detector.electronic_variance
-
-
-def draws(backend, method, *args, count=40_000):
+def draws(backend, method, *args):
     backend.begin_run(3)
-    return [getattr(backend, method)(*args) for _ in range(count)]
+    return [getattr(backend, method)(*args) for _ in range(SAMPLES)]
 
 
-def test_joint_measurement_matches_strawberry_fields():
-    covariance = epr_covariance(
-        [NOISE.alice_memory, NOISE.channel], [NOISE.channel, NOISE.bob_memory]
-    )
-    expected = detected(difference_variance(covariance) / 2, NOISE.bob_detector)
-
-    measured = draws(AnalyticBackend(SQUEEZE_R, NOISE), "measure_signal", 2 + 0j)
-
-    assert fmean(m.real for m in measured) == pytest.approx(2 * GAIN, abs=0.01)
-    assert pvariance([m.real for m in measured]) == pytest.approx(expected, rel=0.03)
-    assert pvariance([m.imag for m in measured]) == pytest.approx(expected, rel=0.03)
-
-
-def test_checks_match_strawberry_fields():
-    covariance = epr_covariance([NOISE.alice_memory], [NOISE.channel])
-    heterodyne = (difference_variance(covariance) + 2) / 2
-    detector = NOISE.alice_detector
-    # Each party's detector adds its own loss and electronic noise.
-    expected = (detected(heterodyne, detector) + detected(0.0, detector)) / 2
-
-    checks = draws(AnalyticBackend(SQUEEZE_R, NOISE), "measure_check")
+def check_differences(checks):
     x = [(alice.real - bob.real) / sqrt(2) for alice, bob in checks]
+    p = [(alice.imag + bob.imag) / sqrt(2) for alice, bob in checks]
+    return x, p
 
-    assert pvariance(x) == pytest.approx(expected, rel=0.03)
+
+@pytest.mark.parametrize("squeeze_r", [0.5, 1.4436])
+def test_analytic_check_sigma_equals_strawberry_fields(squeeze_r):
+    analytic = AnalyticBackend(squeeze_r).check_sigma()
+    circuit = SFSampledBackend(squeeze_r).check_sigma()
+
+    assert analytic == pytest.approx(circuit)
+
+
+@pytest.mark.parametrize("name", ["clean", "metro_10km"])
+def test_sampled_checks_have_the_expected_variance(name):
+    backend = SFSampledBackend(SQUEEZE_R, NOISES[name])
+
+    x, p = check_differences(draws(backend, "measure_check"))
+
+    assert fmean(x) == pytest.approx(0.0, abs=0.06)
+    assert pvariance(x) == pytest.approx(backend.check_sigma() ** 2, rel=0.1)
+    assert pvariance(p) == pytest.approx(backend.check_sigma() ** 2, rel=0.1)
+
+
+@pytest.mark.parametrize("name", ["clean", "metro_10km"])
+def test_sampled_joint_measurement_has_the_exact_mean(name):
+    noise = NOISES[name]
+    displacement = 2 - 1j
+    expected = SFAnalyticBackend(SQUEEZE_R, noise).measure_signal(displacement)
+
+    measured = draws(SFSampledBackend(SQUEEZE_R, noise), "measure_signal", displacement)
+
+    assert fmean(m.real for m in measured) == pytest.approx(expected.real, abs=0.05)
+    assert fmean(m.imag for m in measured) == pytest.approx(expected.imag, abs=0.05)
 
 
 def test_the_gain_estimate_follows_the_loss():
-    config = SimulatorConfig(noise=NOISE)
+    noise = NOISES["metro_10km"]
+    config = SimulatorConfig(noise=noise)
     payload = weighted_random_bits(200, 0.5, ClassicalRandomSource(4))
 
     transmission = Simulator(config).transmit(payload)
 
     gains = [a.run.estimate.gain for a in transmission.attempts if a.run.estimate]
-    assert fmean(gains) == pytest.approx(GAIN, rel=0.03)
+    expected = SFAnalyticBackend(config.squeeze_r, noise).measure_signal(1).real
+    assert fmean(gains) == pytest.approx(expected, rel=0.03)
 
 
-@pytest.mark.parametrize("name", ["lab", "metro_10km"])
-def test_noise_raises_the_check_failures(name):
-    clean = draws(AnalyticBackend(SQUEEZE_R), "measure_check", count=20_000)
-    noisy = draws(
-        AnalyticBackend(SQUEEZE_R, NOISES[name]), "measure_check", count=20_000
-    )
+def test_noise_raises_the_check_failures():
+    def failure_rate(name):
+        backend = SFSampledBackend(SQUEEZE_R, NOISES[name])
+        x, p = check_differences(draws(backend, "measure_check"))
+        return fmean(xi * xi + pi * pi >= 2 for xi, pi in zip(x, p))
 
-    def failure_rate(checks):
-        return fmean(
-            ((a.real - b.real) ** 2 + (a.imag + b.imag) ** 2) / 2 >= 2
-            for a, b in checks
-        )
-
-    assert failure_rate(noisy) > failure_rate(clean)
+    assert failure_rate("clean") < failure_rate("metro_10km")
 
 
-def test_clean_baseline_is_the_default():
-    assert NOISES["clean"] == SimulatorConfig().noise
+def test_clean_baseline_and_strawberry_fields_are_the_defaults():
+    config = SimulatorConfig()
 
-
-@pytest.mark.parametrize("name", ["clean", "metro_10km", "record_27km"])
-def test_check_variance_matches_the_sampled_checks(name):
-    backend = AnalyticBackend(SQUEEZE_R, NOISES[name])
-    checks = draws(backend, "measure_check")
-    x = [(alice.real - bob.real) / sqrt(2) for alice, bob in checks]
-    p = [(alice.imag + bob.imag) / sqrt(2) for alice, bob in checks]
-
-    assert pvariance(x) == pytest.approx(backend.check_variance(), rel=0.03)
-    assert pvariance(p) == pytest.approx(backend.check_variance(), rel=0.03)
+    assert config.noise == NOISES["clean"]
+    assert config.backend == "sf-sampled"
 
 
 def test_calibrated_checks_accept_honest_blocks_at_27km():

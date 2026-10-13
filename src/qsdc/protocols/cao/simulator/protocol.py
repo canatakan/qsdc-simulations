@@ -8,7 +8,7 @@ from qsdc.common.coding.universal_hash import UniversalHash
 from qsdc.common.random import RandomSource, derive_seed, make_random_source
 from qsdc.protocols.cao.config import SimulatorConfig
 from qsdc.protocols.cao.constants import EPR_BOUND
-from qsdc.protocols.cao.simulator.backends import AnalyticBackend
+from qsdc.protocols.cao.simulator.backends import Backend, make_backend
 from qsdc.protocols.cao.simulator.mapping import (
     Box,
     interval_code,
@@ -137,13 +137,13 @@ Transmission = transmission.Transmission[Block, BlockRun]
 
 
 class Simulator:
-    def __init__(self, config: SimulatorConfig, backend: AnalyticBackend | None = None):
+    def __init__(self, config: SimulatorConfig, backend: Backend | None = None):
         self.config = config
-        self.backend = backend or AnalyticBackend(config.squeeze_r, config.noise)
+        self.backend = backend or make_backend(config)
         self.code = interval_code(config)
-        self.expected_failure_rate = exp(
-            -EPR_BOUND / (2 * self.backend.check_variance())
-        )
+        # Bob calibrates the checks to the honest channel he expects.
+        sigma = self.backend.check_sigma()
+        self.expected_failure_rate = exp(-EPR_BOUND / (2 * sigma**2))
         rate = self.expected_failure_rate
         margin = sqrt(rate * (1 - rate) / config.check_pairs)
         self.check_threshold = rate + config.check_tolerance_sigmas * margin

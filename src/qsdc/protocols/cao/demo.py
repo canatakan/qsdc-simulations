@@ -40,6 +40,7 @@ def main() -> None:
     )
     parser.add_argument("message", nargs="?", default="hello")
     parser.add_argument("--noise", choices=list(NOISES), default="clean")
+    parser.add_argument("--backend", choices=("analytic", "sf", "sf-sampled"))
     parser.add_argument("--random-source", choices=("classical", "sf-bs-qrng"))
     parser.add_argument("--seed", type=int)
     parser.add_argument("--squeeze-r", type=float)
@@ -65,7 +66,14 @@ def main() -> None:
     if not args.message:
         parser.error("the message must not be empty")
 
-    fields = ("random_source", "seed", "squeeze_r", "check_pairs", "max_attempts")
+    fields = (
+        "backend",
+        "random_source",
+        "seed",
+        "squeeze_r",
+        "check_pairs",
+        "max_attempts",
+    )
     update = {f: getattr(args, f) for f in fields if getattr(args, f) is not None}
     if args.no_reconciliation:
         update["reconciliation"] = None
@@ -118,6 +126,7 @@ def show_settings(config: SimulatorConfig, noise: str) -> None:
     table(
         ("Setting", "Value"),
         [
+            ("Backend", config.backend),
             ("Random source", f"{config.random_source} (seed {config.seed})"),
             (
                 "Squeezing r",
