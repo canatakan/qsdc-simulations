@@ -21,7 +21,12 @@ from pydantic import ValidationError
 
 from qsdc.common.coding.bits import bits_to_bytes, bytes_to_bits, hamming_distance
 from qsdc.common.utils import header, interval, step, table
-from qsdc.protocols.cao.config import NOISES, Reconciliation, SimulatorConfig
+from qsdc.protocols.cao.config import (
+    NOISES,
+    SYNDROME_FRACTIONS,
+    Reconciliation,
+    SimulatorConfig,
+)
 from qsdc.protocols.cao.constants import EPR_BOUND
 from qsdc.protocols.cao.simulator.mapping import interval_code, restore_block
 from qsdc.protocols.cao.simulator.protocol import (
@@ -55,7 +60,7 @@ def main() -> None:
     parser.add_argument(
         "--syndrome-fraction",
         type=float,
-        help="syndrome bits per payload bit (default 0.3)",
+        help="syndrome bits per payload bit (default: the noise baseline's value)",
     )
     parser.add_argument(
         "--block", type=int, help="block to show in detail (default: most sends)"
@@ -81,10 +86,13 @@ def main() -> None:
 
     if args.no_reconciliation:
         update["reconciliation"] = None
-    elif args.syndrome_fraction is not None:
-        update["reconciliation"] = Reconciliation(
-            syndrome_fraction=args.syndrome_fraction
-        )
+    else:
+        # Each noise baseline has its own syndrome fraction, unless one is given.
+        fraction = args.syndrome_fraction
+        if fraction is None:
+            fraction = SYNDROME_FRACTIONS.get(args.noise)
+        if fraction is not None:
+            update["reconciliation"] = Reconciliation(syndrome_fraction=fraction)
 
     try:
         config = SimulatorConfig(noise=NOISES[args.noise], **update)

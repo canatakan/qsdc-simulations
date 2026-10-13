@@ -39,6 +39,10 @@ NOISES = {
     for name, environment in BASELINES.items()
 }
 
+# The smallest syndrome fraction that reconciled 12 of 12 blocks on each noise
+# baseline. The longer links have none: no fraction leaves message bits.
+SYNDROME_FRACTIONS = {"clean": 0.10, "lab": 0.25, "metro_5km": 0.40}
+
 
 class Reconciliation(Config):
     syndrome_fraction: Fraction = 0.3

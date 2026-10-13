@@ -218,12 +218,15 @@ The tests check that the public bits then reveal nothing about the message.
 What Eve could learn on the quantum channel is not counted; the paper's
 security analysis (Sec. III) is not implemented.
 
-| Baseline | Smallest syndrome fraction that corrected 16 of 16 blocks | Message bits per block |
+`SYNDROME_FRACTIONS` (`config.py`) holds the smallest syndrome fraction that
+reconciled 12 of 12 blocks on each baseline, and `cao-demo` uses it:
+
+| Baseline | Syndrome fraction | Message bits per block |
 | --- | --- | --- |
-| `clean` | 0.15 | 326 |
-| `lab` | 0.3 (default) | 173 |
-| `metro_5km` | 0.4 | 70 |
-| `metro_10km`, `record_27km` | about 0.6 or more | none left; the configuration is rejected |
+| `clean` | 0.10 | 378 |
+| `lab` | 0.25 | 224 |
+| `metro_5km` | 0.40 | 70 |
+| `metro_10km`, `record_27km` | none | even 0.45 reconciles almost no block, and above about 0.47 no message bits are left |
 
 A block that fails its checks or its reconciliation is sent again, up to
 `max_attempts` sends, with the same payload so a retry publishes nothing new.
@@ -238,7 +241,7 @@ only when every box passes its detection and parity bits.
 | `squeeze_r` | arcosh(9)/2 ≈ 1.444 (12.5 dB) | The two-mode squeezed state then has the variance V = V_A + 1 of the paper's security model |
 | `check_pairs` | 64 per stage | Enough positions for a stable failure rate |
 | `check_tolerance_sigmas` | 3 | As in Srikara |
-| `syndrome_fraction` | 0.3 | Enough up to `lab` |
+| `syndrome_fraction` | 0.3 | Enough up to `lab`; `SYNDROME_FRACTIONS` gives each baseline its own |
 
 The modulation is taken literally: Alice displaces by G1' itself, so Bob reads
 G1'/√2 on top of the pair's squeezed noise. About a fifth of the boxes are
@@ -271,13 +274,14 @@ srikara-demo "hello" --noise metro_10km --block 3 --trace
 ```bash
 cao-demo "hello"
 cao-demo "hello" --noise lab --rows 12
-cao-demo "hello" --noise metro_5km --syndrome-fraction 0.4
+cao-demo "hello" --noise metro_5km
+cao-demo "hello" --noise lab --syndrome-fraction 0.3
 ```
 
 | Option | Effect |
 | --- | --- |
 | `--noise` | A noise baseline |
-| `--syndrome-fraction` | Syndrome bits per payload bit |
+| `--syndrome-fraction` | Syndrome bits per payload bit (default: the baseline's value from `SYNDROME_FRACTIONS`) |
 | `--no-reconciliation` | Use the paper's mapping without step 7's error correction |
 | `--rows` | Boxes and checks shown per table (a block has 512 boxes) |
 
