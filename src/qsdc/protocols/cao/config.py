@@ -77,6 +77,9 @@ class SimulatorConfig(Config):
 
     @property
     def syndrome_bits(self) -> int:
+        if self.reconciliation is None:
+            return 0
+
         return round(self.reconciliation.syndrome_fraction * self.payload_bits)
 
     @property
@@ -98,6 +101,9 @@ class SimulatorConfig(Config):
     def _message_fits(self) -> SimulatorConfig:
         if self.reconciliation is None and self.payload_bits % 4:
             raise ValueError("the payload bits must be divisible by 4")
+
+        if self.reconciliation is not None and self.syndrome_bits < 1:
+            raise ValueError("the syndrome fraction leaves no syndrome bits")
 
         if self.block_bits < 1:
             raise ValueError(

@@ -178,6 +178,9 @@ class Simulator:
             )
 
     def transmit(self, payload: str) -> Transmission:
+        if not payload or set(payload) - {"0", "1"}:
+            raise ValueError("payload must be a non-empty string of 0s and 1s")
+
         config = self.config
         return transmission.send_blocks(
             self.split(payload),
