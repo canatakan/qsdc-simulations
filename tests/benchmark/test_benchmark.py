@@ -55,14 +55,15 @@ def test_heatmap_report_has_one_figure_per_series(tmp_path):
     assert {run["metrics"]["delivered_fraction"] for run in runs} == {1.0}
 
 
-def test_cli_runs_a_study_into_a_browsable_report(tmp_path, monkeypatch):
-    monkeypatch.setattr(cli, "WORKLOAD", Workload(payload_bits=6))
+def test_cli_runs_a_study_into_a_browsable_report(tmp_path):
     cli.main(
         SRIKARA,
         [
             "run",
             "--study",
             "squeezing_distributions",
+            "--payload-bits",
+            "6",
             "--output-root",
             str(tmp_path),
         ],

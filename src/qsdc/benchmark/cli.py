@@ -9,11 +9,10 @@ from .report.report import rerender, write_index, write_report
 from .studies.catalog import Catalog
 from .suite import Suite
 
-WORKLOAD = Workload()
-
 
 def main(suite: Suite, argv: Sequence[str] | None = None) -> None:
-    studies = Catalog(suite).studies(WORKLOAD)
+    catalog = Catalog(suite)
+    default = Workload()
 
     parser = argparse.ArgumentParser(
         description=f"Run the built-in {suite.title} benchmark studies and write "
@@ -26,7 +25,7 @@ def main(suite: Suite, argv: Sequence[str] | None = None) -> None:
     run.add_argument(
         "--study",
         action="append",
-        choices=[study.name for study in studies],
+        choices=catalog.names,
         help="repeatable; default: all",
     )
     run.add_argument(
@@ -34,6 +33,12 @@ def main(suite: Suite, argv: Sequence[str] | None = None) -> None:
         type=int,
         default=1,
         help="independent seeds per case, pooled into each result (default: 1)",
+    )
+    run.add_argument(
+        "--payload-bits",
+        type=int,
+        default=default.payload_bits,
+        help=f"random payload bits per case (default: {default.payload_bits})",
     )
     run.add_argument(
         "--skip-existing",
@@ -52,12 +57,13 @@ def main(suite: Suite, argv: Sequence[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     if args.command == "list":
-        for study in studies:
+        for study in catalog.studies(default):
             print(f"{study.name:28} {study.layout:11} {len(study.cases)} runs")
         return
 
     if args.command == "run":
-        for study in studies:
+        workload = Workload(payload_bits=args.payload_bits)
+        for study in catalog.studies(workload):
             if args.study and study.name not in args.study:
                 continue
             done = any((args.output_root / study.name).glob("run_*/results.json"))

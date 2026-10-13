@@ -28,6 +28,10 @@ class Catalog:
             name: spec["group"] for name, spec in self.specs["studies"].items()
         }
 
+    @property
+    def names(self) -> list[str]:
+        return list(self.specs["studies"])
+
     def study_order(self, name: str) -> tuple[int, int]:
         # A study's place in the catalog: its group, then the study itself.
         # Unknown names go last.

@@ -37,10 +37,18 @@ def test_catalog_builds_valid_studies_for_every_baseline():
         assert case.simulator.noise == NOISES[case.series]
 
 
-def test_cli_runs_a_study_into_a_report_that_reloads(tmp_path, monkeypatch):
-    monkeypatch.setattr(cli, "WORKLOAD", Workload(payload_bits=40))
+def test_cli_runs_a_study_into_a_report_that_reloads(tmp_path):
     cli.main(
-        CAO, ["run", "--study", "paper_comparison", "--output-root", str(tmp_path)]
+        CAO,
+        [
+            "run",
+            "--study",
+            "paper_comparison",
+            "--payload-bits",
+            "40",
+            "--output-root",
+            str(tmp_path),
+        ],
     )
 
     [results] = (tmp_path / "paper_comparison").glob("run_*/results.json")

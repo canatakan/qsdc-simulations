@@ -318,6 +318,7 @@ studies and writes their reports. It has one suite per protocol in
 srikara-benchmark list                                  # list the studies
 srikara-benchmark run                                   # run every study
 srikara-benchmark run --study theta_band --repetitions 3
+srikara-benchmark run --payload-bits 1024 --output-root results-1024
 srikara-benchmark run --skip-existing                   # resume an interrupted run
 srikara-benchmark index                                 # rebuild results/index.html
 srikara-benchmark rerender                              # rebuild reports without simulating
@@ -328,6 +329,9 @@ to `results-cao/`; `--output-root` writes elsewhere.
 
 - `--repetitions N` reruns every case with N seeds and pools their counts. The
   first seed is the configured one.
+- `--payload-bits N` sends a random N-bit payload in every case (default:
+  10,000). Runs with another size belong in their own `--output-root`: the
+  index links the latest run of each study, whatever its size.
 - `--skip-existing` skips studies that already have a report.
 - `rerender` rebuilds the plots, CSV and HTML from each `results.json`.
 
@@ -377,7 +381,8 @@ memory and one detector; Srikara uses the fibre in both directions:
 
 A study either lists its cases or sweeps one or two axes. Cases change fields
 by dotted path, such as `noise.forward.transmittance`. Each noise baseline is
-one series in the report. Each case sends a random 10,000-bit payload.
+one series in the report. Each case sends a random 10,000-bit payload unless
+`--payload-bits` says otherwise.
 
 **Srikara** has 19 studies. A case runs `optimized` unless the study says
 otherwise.
