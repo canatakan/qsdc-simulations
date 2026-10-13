@@ -18,8 +18,8 @@ class SrikaraSuite(Suite):
     config = SimulatorConfig
     presets = PRESETS
     noises = NOISES
-    directory = Path(__file__).parent
-    output_root = Path("results")
+    studies = Path(__file__).with_name("studies.yaml")
+    output_root = Path(__file__).parents[2] / "results" / "srikara"
 
     def simulate(self, config: SimulatorConfig, payload: str) -> Transmission:
         return SrikaraSimulator(config).transmit(payload)

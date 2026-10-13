@@ -52,7 +52,12 @@ def main(suite: Suite, argv: Sequence[str] | None = None) -> None:
         help="rebuild every report's plots, CSV and HTML from its results.json",
     )
     for command in (run, index, rerender_parser):
-        command.add_argument("--output-root", type=Path, default=suite.output_root)
+        command.add_argument(
+            "--output-root",
+            type=Path,
+            default=suite.output_root,
+            help=f"default: {suite.output_root}",
+        )
 
     args = parser.parse_args(argv)
 

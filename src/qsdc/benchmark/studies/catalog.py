@@ -22,7 +22,7 @@ class Catalog:
 
     def __init__(self, suite: Suite):
         self.suite = suite
-        self.specs = yaml.safe_load((suite.directory / "studies.yaml").read_text())
+        self.specs = yaml.safe_load(suite.studies.read_text())
         self.groups = self.specs["groups"]
         self.study_groups = {
             name: spec["group"] for name, spec in self.specs["studies"].items()

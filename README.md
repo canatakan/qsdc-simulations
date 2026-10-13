@@ -34,6 +34,7 @@ protocol and its studies, or `make benchmark/test` for the benchmark package.
 | `src/qsdc/benchmark/studies/` | The catalog that builds studies from `studies.yaml` |
 | `src/qsdc/benchmark/studies/<protocol>/` | A protocol's suite and its studies |
 | `src/qsdc/benchmark/report/` | Reports: results, CSV, plots, and the HTML templates and stylesheet |
+| `src/qsdc/benchmark/results/<protocol>/` | The benchmark results of each protocol (not tracked by git) |
 | `tests/` | Tests, laid out like `src/` |
 
 The protocols do not import the benchmark. A suite in
@@ -318,14 +319,15 @@ studies and writes their reports. It has one suite per protocol in
 srikara-benchmark list                                  # list the studies
 srikara-benchmark run                                   # run every study
 srikara-benchmark run --study theta_band --repetitions 3
-srikara-benchmark run --payload-bits 1024 --output-root results-1024
+srikara-benchmark run --payload-bits 1024 --output-root src/qsdc/benchmark/results/srikara-1024
 srikara-benchmark run --skip-existing                   # resume an interrupted run
-srikara-benchmark index                                 # rebuild results/index.html
+srikara-benchmark index                                 # rebuild the study index
 srikara-benchmark rerender                              # rebuild reports without simulating
 ```
 
-`cao-benchmark` takes the same commands. Srikara writes to `results/` and Cao
-to `results-cao/`; `--output-root` writes elsewhere.
+`cao-benchmark` takes the same commands. Each protocol writes to
+`src/qsdc/benchmark/results/<protocol>/`, wherever the command runs from;
+`--output-root` writes elsewhere.
 
 - `--repetitions N` reruns every case with N seeds and pools their counts. The
   first seed is the configured one.
@@ -415,8 +417,6 @@ a `Workload` (payload size, probability of a one, seed), a series, an optional
 label and its coordinates `at`.
 
 ```python
-from pathlib import Path
-
 from qsdc.benchmark.benchmark import Benchmark, Case, Workload, run_benchmark
 from qsdc.benchmark.report.report import write_report
 from qsdc.benchmark.studies.srikara.suite import SRIKARA
@@ -427,7 +427,7 @@ cases = tuple(
     for p in (0.1, 0.5, 0.9)
 )
 benchmark = Benchmark(SRIKARA, "one_probability", cases, axes=("Probability of one",))
-print(write_report(run_benchmark(benchmark), Path("results")) / "report.html")
+print(write_report(run_benchmark(benchmark), SRIKARA.output_root) / "report.html")
 ```
 
 `CAO` in `qsdc.benchmark.studies.cao.suite` does the same for Cao.

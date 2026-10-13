@@ -10,13 +10,13 @@ from .metrics import RunMetrics
 
 
 class Suite(ABC):
-    # One protocol's benchmark: how to run and measure its simulator, and the
-    # directory with its studies.yaml. Its report is templates/<name>/report.html.
+    # One protocol's benchmark: how to run and measure its simulator, its
+    # studies, and where its results go. Its report is templates/<name>/report.html.
     name: str
     config: type[Config]
     presets: dict[str, Config]
     noises: dict[str, Config]
-    directory: Path
+    studies: Path
     output_root: Path
 
     @abstractmethod

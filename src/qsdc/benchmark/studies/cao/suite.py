@@ -19,8 +19,8 @@ class CaoSuite(Suite):
     config = SimulatorConfig
     presets = PRESETS
     noises = NOISES
-    directory = Path(__file__).parent
-    output_root = Path("results-cao")
+    studies = Path(__file__).with_name("studies.yaml")
+    output_root = Path(__file__).parents[2] / "results" / "cao"
 
     def simulate(self, config: SimulatorConfig, payload: str) -> Transmission:
         return CaoSimulator(config).transmit(payload)
