@@ -10,9 +10,8 @@ from scipy.stats import t
 from qsdc.common.config.base import Config, Fraction, PositiveInt
 from qsdc.common.random import ClassicalRandomSource, derive_seed, weighted_random_bits
 
-from ..config import SimulatorConfig
-from ..simulator.protocol import Simulator
 from .metrics import RunMetrics
+from .suite import Suite
 
 
 class Workload(Config):
@@ -28,7 +27,7 @@ class Workload(Config):
 
 @dataclass(frozen=True)
 class Case:
-    simulator: SimulatorConfig
+    simulator: Config
     workload: Workload
     series: str = "default"
     label: str | None = None
@@ -40,6 +39,7 @@ LAYOUTS = ("comparison", "sweep", "heatmap")
 
 @dataclass(frozen=True)
 class Benchmark:
+    suite: Suite
     name: str
     cases: tuple[Case, ...]
     axes: tuple[str, ...] = ()
@@ -98,6 +98,7 @@ def reseed(config: Config, repetition: int) -> Config:
 
 
 def run_benchmark(benchmark: Benchmark, repetitions: int = 1) -> BenchmarkResult:
+    suite = benchmark.suite
     started = perf_counter()
     payloads: dict[Workload, str] = {}
 
@@ -115,9 +116,9 @@ def run_benchmark(benchmark: Benchmark, repetitions: int = 1) -> BenchmarkResult
                 payloads[workload] = workload.payload()
 
             case_started = perf_counter()
-            transmission = Simulator(simulator).transmit(payloads[workload])
+            transmission = suite.simulate(simulator, payloads[workload])
             samples.append(
-                RunMetrics.measure(transmission, perf_counter() - case_started)
+                suite.measure(simulator, transmission, perf_counter() - case_started)
             )
 
         runs.append(RunResult(case, RunMetrics.pool(samples), tuple(samples)))

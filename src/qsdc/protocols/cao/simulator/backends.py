@@ -79,9 +79,7 @@ class AnalyticBackend(Backend):
 
 
 class StrawberryFieldsBackend(Backend):
-    # Strawberry Fields Gaussian circuits with noise, one per check or signal.
-    # With hbar = 2, their quadratures are in shot-noise units, as in the
-    # paper. The subclasses decide how a circuit is read out.
+    # With hbar = 2, quadratures are in shot-noise units, as in the paper.
 
     def __init__(self, squeeze_r: float, noise: NoiseConfig | None = None):
         super().__init__(squeeze_r)
@@ -195,8 +193,6 @@ class StrawberryFieldsBackend(Backend):
 
 
 class SFAnalyticBackend(StrawberryFieldsBackend):
-    # Reads out the exact mean of each measurement
-
     def _measure_heterodyne(
         self, program: Program, readouts: Sequence[HeterodyneReadout]
     ) -> list[complex]:
@@ -223,8 +219,6 @@ class SFAnalyticBackend(StrawberryFieldsBackend):
 
 
 class SFSampledBackend(StrawberryFieldsBackend):
-    # Reads out a sample of each measurement
-
     def begin_run(self, seed: int) -> None:
         np.random.seed(seed)
 

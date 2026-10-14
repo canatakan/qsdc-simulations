@@ -11,7 +11,7 @@ from matplotlib.figure import Figure
 from matplotlib.patches import Patch
 from matplotlib.ticker import PercentFormatter
 
-from .benchmark import BenchmarkResult
+from ..benchmark import BenchmarkResult
 
 PLOTTED = {
     "bit_error_rate": "Bit error rate",

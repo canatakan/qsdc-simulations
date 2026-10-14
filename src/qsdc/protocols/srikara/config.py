@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal
 
 from qsdc.common.config.base import (
@@ -10,7 +11,8 @@ from qsdc.common.config.base import (
     PositiveInt,
     Uniform,
 )
-from qsdc.common.config.noise import Channel, Detector, Environment, Memory
+from qsdc.common.config.noise import BASELINES, Channel, Detector, Environment, Memory
+from qsdc.common.config.presets import load_presets
 
 from .constants import MESSAGE_VARIANCE_SNU
 
@@ -31,6 +33,12 @@ class NoiseConfig(Config):
             alice_detector=environment.detector,
             bob_detector=environment.detector,
         )
+
+
+NOISES = {
+    name: NoiseConfig.from_environment(environment)
+    for name, environment in BASELINES.items()
+}
 
 
 class SimulatorConfig(Config):
@@ -54,3 +62,6 @@ class SimulatorConfig(Config):
 
     error_correction: Literal["none", "parity", "secded"] = "none"
     max_attempts: PositiveInt = 1
+
+
+PRESETS = load_presets(Path(__file__).with_name("presets.yaml"), SimulatorConfig)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from math import acosh
+from pathlib import Path
 from typing import Literal, Optional
 
 from pydantic import model_validator
@@ -14,6 +15,7 @@ from qsdc.common.config.base import (
     PositiveInt,
 )
 from qsdc.common.config.noise import BASELINES, Channel, Detector, Environment, Memory
+from qsdc.common.config.presets import load_presets
 
 
 class NoiseConfig(Config):
@@ -112,3 +114,6 @@ class SimulatorConfig(Config):
             )
 
         return self
+
+
+PRESETS = load_presets(Path(__file__).with_name("presets.yaml"), SimulatorConfig)
