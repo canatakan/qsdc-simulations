@@ -142,10 +142,14 @@ class Simulator(BaseSimulator):
     ) -> Run:
         # 7a. Parameter estimation: Alice reveals G2, and Bob fits his gain.
         estimate = self.receiver.estimate(displacements, measured)
+        run = replace(run, estimate=estimate)
+        if not estimate.gain:
+            return run
+
         signals = self.receiver.decode(
             positions, boxes, displacements, measured, estimate
         )
-        run = replace(run, signals=signals, estimate=estimate)
+        run = replace(run, signals=signals)
 
         if self.config.reconciliation is None:
             # 7b. Without reconciliation, the paper's mapping restores the block.
