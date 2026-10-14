@@ -10,11 +10,10 @@ from time import time_ns
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-from ..config import SimulatorConfig
-from ..simulator.encoding import INTERVAL_CODES
-from .benchmark import Benchmark, BenchmarkResult, Case, RunResult, Workload
-from .catalog import GROUPS, NOISES, STUDY_GROUPS, study_order
-from .metrics import RunMetrics
+from ..benchmark import Benchmark, BenchmarkResult, Case, RunResult, Workload
+from ..metrics import RunMetrics
+from ..studies.catalog import Catalog
+from ..suite import Suite
 from .plots import write_plots
 
 TEMPLATES = Path(__file__).parent / "templates"
@@ -29,7 +28,6 @@ TABLE_RATES = (
 )
 
 OTHER = {"title": "Other"}
-
 _templates = Environment(
     loader=FileSystemLoader(TEMPLATES),
     autoescape=True,
@@ -39,23 +37,15 @@ _templates = Environment(
 )
 
 
-def parameters(case: Case) -> dict[str, str]:
+def parameters(suite: Suite, case: Case) -> dict[str, str]:
     simulator, workload = case.simulator, case.workload
     noise = next(
-        (name for name, preset in NOISES.items() if preset == simulator.noise), None
+        (name for name, preset in suite.noises.items() if preset == simulator.noise),
+        None,
     )
 
     return {
-        "Backend": simulator.backend,
-        "Random source": simulator.random_source,
-        "Alpha variance (SNU)": f"{simulator.alpha_variance_snu:g}",
-        "Squeezing r": str(simulator.squeeze_r),
-        "Theta / pi": str(simulator.theta_pi),
-        "Tolerance (sigma)": f"{simulator.tolerance_sigmas:g}",
-        "Intervals": simulator.intervals,
-        "Axis policy": simulator.axis_policy,
-        "Error correction": simulator.error_correction,
-        "Max attempts": str(simulator.max_attempts),
+        **suite.parameters(simulator),
         "Noise": noise or simulator.noise.model_dump_json(exclude_defaults=True),
         "Simulation seed": str(simulator.seed),
         "Payload bits": str(workload.payload_bits),
@@ -66,7 +56,7 @@ def parameters(case: Case) -> dict[str, str]:
 
 def run_labels(benchmark: Benchmark) -> list[str]:
     # A run is labelled by the parameters that vary across the benchmark.
-    values = [parameters(case) for case in benchmark.cases]
+    values = [parameters(benchmark.suite, case) for case in benchmark.cases]
     varying = [key for key in values[0] if len({value[key] for value in values}) > 1]
     if len({case.series for case in benchmark.cases}) > 1:
         varying = [key for key in varying if key != "Noise"]
@@ -85,18 +75,18 @@ def write_report(result: BenchmarkResult, root: Path) -> Path:
     return directory
 
 
-def rerender(results: Path) -> None:
-    result = load_result(results)
+def rerender(results: Path, suite: Suite) -> None:
+    result = load_result(results, suite)
     shutil.rmtree(results.parent / "plots", ignore_errors=True)
     _write(result, results.parent)
 
 
-def load_result(results: Path) -> BenchmarkResult:
+def load_result(results: Path, suite: Suite) -> BenchmarkResult:
     document = json.loads(results.read_text())
     runs = tuple(
         RunResult(
             Case(
-                SimulatorConfig.model_validate(run["simulator"]),
+                suite.config.model_validate(run["simulator"]),
                 Workload.model_validate(run["workload"]),
                 run["series"],
                 run["label"],
@@ -110,7 +100,7 @@ def load_result(results: Path) -> BenchmarkResult:
 
     info = document["benchmark"]
     benchmark = Benchmark(
-        info["name"], tuple(run.case for run in runs), tuple(info["axes"])
+        suite, info["name"], tuple(run.case for run in runs), tuple(info["axes"])
     )
 
     return BenchmarkResult(benchmark, runs, document["summary"]["simulation_seconds"])
@@ -118,6 +108,7 @@ def load_result(results: Path) -> BenchmarkResult:
 
 def _write(result: BenchmarkResult, directory: Path) -> None:
     benchmark = result.benchmark
+    suite = benchmark.suite
     labels = run_labels(benchmark)
 
     (directory / "plots").mkdir(parents=True)
@@ -164,7 +155,7 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
         writer.writeheader()
         writer.writerows(rows)
 
-    values = [parameters(case) for case in benchmark.cases]
+    values = [parameters(suite, case) for case in benchmark.cases]
     shared = {
         key: value
         for key, value in values[0].items()
@@ -192,12 +183,12 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
     ]
 
     matrices = [
-        {"id": position, "condition": label, **_symbol_matrix(run)}
+        {"id": position, "condition": label, **_symbol_matrix(suite, run)}
         for position, (run, label) in enumerate(zip(result.runs, labels), start=1)
     ]
 
     shutil.copy(TEMPLATES / "style.css", directory / "style.css")
-    html = _templates.get_template("report.html").render(
+    html = _templates.get_template(f"{suite.name}/report.html").render(
         title=benchmark.title,
         layout=benchmark.layout,
         summary=summary,
@@ -213,11 +204,11 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
     (directory / "report.html").write_text(html)
 
 
-def write_index(root: Path) -> Path:
+def write_index(root: Path, suite: Suite) -> Path:
+    catalog = Catalog(suite)
     latest: dict[str, tuple[Path, dict]] = {}
     executions: Counter[str] = Counter()
 
-    # The latest run of each study, and how many runs it has.
     for path in sorted(root.rglob("results.json")):
         document = json.loads(path.read_text())
         name = document["benchmark"]["name"]
@@ -225,12 +216,12 @@ def write_index(root: Path) -> Path:
         latest[name] = (path.parent / "report.html", document)
 
     groups: dict[str, dict] = {}
-    for name in sorted(latest, key=lambda name: (study_order(name), name)):
+    for name in sorted(latest, key=lambda name: (catalog.study_order(name), name)):
         report, document = latest[name]
         summary = document["summary"]
-        group = STUDY_GROUPS.get(name, "other")
+        group = catalog.study_groups.get(name, "other")
         if group not in groups:
-            groups[group] = {**GROUPS.get(group, OTHER), "rows": []}
+            groups[group] = {**catalog.groups.get(group, OTHER), "rows": []}
 
         groups[group]["rows"].append(
             {
@@ -257,21 +248,20 @@ def write_index(root: Path) -> Path:
     return index
 
 
-def _symbol_matrix(run: RunResult) -> dict[str, object]:
+def _symbol_matrix(suite: Suite, run: RunResult) -> dict[str, object]:
     metrics = run.metrics
-    labels = INTERVAL_CODES[run.case.simulator.intervals].labels
+    labels = suite.symbols(run.case.simulator)
     counts = [
         [metrics.symbol_count(int(s, 2), int(d, 2)) for d in labels] for s in labels
     ]
 
-    # Each row shares out the decodings of one sent symbol.
     rows = []
     for label, row in zip(labels, counts):
         total = sum(row) or 1
         cells = [{"count": count, "share": count / total} for count in row]
         rows.append({"label": label, "cells": cells})
 
-    correct = sum(counts[i][i] for i in range(8)) / sum(map(sum, counts))
+    correct = sum(counts[i][i] for i in range(len(labels))) / sum(map(sum, counts))
 
     return {
         "labels": labels,
@@ -284,10 +274,12 @@ def _symbol_matrix(run: RunResult) -> dict[str, object]:
 def _csv_row(run: dict, axes: tuple[str, ...]) -> dict[str, object]:
     metrics = dict(run["metrics"])
     counts = metrics.pop("symbol_counts")
+    n = math.isqrt(len(counts))
+    width = (n - 1).bit_length()
     symbols = {}
-    for s in range(8):
-        for d in range(8):
-            symbols[f"{s:03b}->{d:03b}"] = counts[RunMetrics.symbol_index(s, d)]
+    for s in range(n):
+        for d in range(n):
+            symbols[f"{s:0{width}b}->{d:0{width}b}"] = counts[n * s + d]
 
     fields = {k: v for k, v in run.items() if k not in ("at", "metrics", "repetitions")}
     coordinates = dict(zip(axes, run["at"]))

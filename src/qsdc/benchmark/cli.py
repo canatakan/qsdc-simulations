@@ -1,21 +1,23 @@
-"""Run the built-in Srikara benchmark studies and write their reports."""
-
 from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
-from qsdc.protocols.srikara.benchmark.benchmark import Workload, run_benchmark
-from qsdc.protocols.srikara.benchmark.catalog import studies
-from qsdc.protocols.srikara.benchmark.report import rerender, write_index, write_report
-
-WORKLOAD = Workload()
-STUDIES = studies(WORKLOAD)
+from .benchmark import Workload, run_benchmark
+from .report.report import rerender, write_index, write_report
+from .studies.catalog import Catalog
+from .suite import Suite
 
 
-def main(argv: Sequence[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
+def main(suite: Suite, argv: Sequence[str] | None = None) -> None:
+    catalog = Catalog(suite)
+    default = Workload()
+
+    parser = argparse.ArgumentParser(
+        description=f"Run the built-in {suite.title} benchmark studies and write "
+        "their reports."
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("list", help="list the built-in studies")
 
@@ -23,7 +25,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     run.add_argument(
         "--study",
         action="append",
-        choices=[study.name for study in STUDIES],
+        choices=catalog.names,
         help="repeatable; default: all",
     )
     run.add_argument(
@@ -31,6 +33,12 @@ def main(argv: Sequence[str] | None = None) -> None:
         type=int,
         default=1,
         help="independent seeds per case, pooled into each result (default: 1)",
+    )
+    run.add_argument(
+        "--payload-bits",
+        type=int,
+        default=default.payload_bits,
+        help=f"random payload bits per case (default: {default.payload_bits})",
     )
     run.add_argument(
         "--skip-existing",
@@ -44,17 +52,23 @@ def main(argv: Sequence[str] | None = None) -> None:
         help="rebuild every report's plots, CSV and HTML from its results.json",
     )
     for command in (run, index, rerender_parser):
-        command.add_argument("--output-root", type=Path, default=Path("results"))
+        command.add_argument(
+            "--output-root",
+            type=Path,
+            default=suite.output_root,
+            help=f"default: {suite.output_root}",
+        )
 
     args = parser.parse_args(argv)
 
     if args.command == "list":
-        for study in STUDIES:
+        for study in catalog.studies(default):
             print(f"{study.name:28} {study.layout:11} {len(study.cases)} runs")
         return
 
     if args.command == "run":
-        for study in studies(WORKLOAD):
+        workload = Workload(payload_bits=args.payload_bits)
+        for study in catalog.studies(workload):
             if args.study and study.name not in args.study:
                 continue
             done = any((args.output_root / study.name).glob("run_*/results.json"))
@@ -70,11 +84,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     if args.command == "rerender":
         for results in sorted(args.output_root.rglob("results.json")):
-            rerender(results)
+            rerender(results, suite)
             print(f"Rerendered {results.parent / 'report.html'}")
 
-    print(f"Index: {write_index(args.output_root)}")
-
-
-if __name__ == "__main__":
-    main()
+    print(f"Index: {write_index(args.output_root, suite)}")

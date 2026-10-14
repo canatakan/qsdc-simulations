@@ -128,7 +128,6 @@ class Signal:
 
 @dataclass(frozen=True)
 class Positions:
-    # Where the pairs of a block go: the two checks and the boxes.
     count: int
     channel: list[int]
     authentication: list[int]
@@ -154,7 +153,7 @@ Attempt = transmission.Attempt[Block, BlockRun]
 Transmission = transmission.Transmission[Block, BlockRun]
 
 
-class Simulator:
+class CaoSimulator:
     def __init__(self, config: SimulatorConfig, backend: Backend | None = None):
         self.config = config
         self.backend = backend or make_backend(config)

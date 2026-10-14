@@ -3,10 +3,9 @@ from math import cosh, exp, pi, sinh, sqrt
 import pytest
 
 from qsdc.common.random import make_random_source
-from qsdc.protocols.srikara.benchmark.catalog import NOISES
-from qsdc.protocols.srikara.config import Channel, NoiseConfig, SimulatorConfig
+from qsdc.protocols.srikara.config import NOISES, Channel, NoiseConfig, SimulatorConfig
 from qsdc.protocols.srikara.simulator.backends import AnalyticBackend, PreparedState
-from qsdc.protocols.srikara.simulator.protocol import AXES, Simulator
+from qsdc.protocols.srikara.simulator.protocol import AXES, SrikaraSimulator
 
 PAYLOAD = "101001110010011010001101110"
 
@@ -15,7 +14,7 @@ PAYLOAD = "101001110010011010001101110"
 @pytest.mark.parametrize("error_correction", ["none", "parity", "secded"])
 def test_ideal_backends_deliver_the_payload(backend, error_correction):
     config = SimulatorConfig(backend=backend, error_correction=error_correction)
-    transmission = Simulator(config).transmit(PAYLOAD)
+    transmission = SrikaraSimulator(config).transmit(PAYLOAD)
 
     assert transmission.recovered_bits == PAYLOAD
     for attempt in transmission.attempts:
@@ -32,17 +31,20 @@ def test_transmission_is_reproducible_from_the_seed():
     config = SimulatorConfig(
         backend="sf-sampled", noise=NOISES["lab"], tolerance_sigmas=3.0
     )
-    first = Simulator(config).transmit(PAYLOAD)
+    first = SrikaraSimulator(config).transmit(PAYLOAD)
 
-    assert Simulator(config).transmit(PAYLOAD) == first
-    assert Simulator(config.model_copy(update={"seed": 12})).transmit(PAYLOAD) != first
+    assert SrikaraSimulator(config).transmit(PAYLOAD) == first
+    assert (
+        SrikaraSimulator(config.model_copy(update={"seed": 12})).transmit(PAYLOAD)
+        != first
+    )
 
 
 def test_best_qp_axis_policy_reads_the_quadrature_with_the_larger_response():
     backend = AnalyticBackend()
-    transmission = Simulator(SimulatorConfig(axis_policy="best_qp"), backend).transmit(
-        PAYLOAD
-    )
+    transmission = SrikaraSimulator(
+        SimulatorConfig(axis_policy="best_qp"), backend
+    ).transmit(PAYLOAD)
 
     for attempt in transmission.attempts:
         for message in attempt.run.messages:
@@ -53,7 +55,7 @@ def test_best_qp_axis_policy_reads_the_quadrature_with_the_larger_response():
 
 
 def test_decoy_checks_reject_a_disturbed_channel(eavesdropper):
-    transmission = Simulator(SimulatorConfig(), eavesdropper()).transmit(PAYLOAD)
+    transmission = SrikaraSimulator(SimulatorConfig(), eavesdropper()).transmit(PAYLOAD)
 
     for attempt in transmission.attempts:
         assert all(check.passed for check in attempt.run.controls)
@@ -62,8 +64,10 @@ def test_decoy_checks_reject_a_disturbed_channel(eavesdropper):
 
 
 def test_secded_corrects_one_wrong_symbol_per_block(corrupt_first_message):
-    uncoded = Simulator(SimulatorConfig(), corrupt_first_message()).transmit(PAYLOAD)
-    coded = Simulator(
+    uncoded = SrikaraSimulator(SimulatorConfig(), corrupt_first_message()).transmit(
+        PAYLOAD
+    )
+    coded = SrikaraSimulator(
         SimulatorConfig(error_correction="secded"), corrupt_first_message()
     ).transmit(PAYLOAD)
 
@@ -72,8 +76,10 @@ def test_secded_corrects_one_wrong_symbol_per_block(corrupt_first_message):
 
 
 def test_rejected_blocks_are_retried_until_recovered(reject_every_other_run):
-    single = Simulator(SimulatorConfig(), reject_every_other_run()).transmit(PAYLOAD)
-    retried = Simulator(
+    single = SrikaraSimulator(SimulatorConfig(), reject_every_other_run()).transmit(
+        PAYLOAD
+    )
+    retried = SrikaraSimulator(
         SimulatorConfig(max_attempts=2), reject_every_other_run()
     ).transmit(PAYLOAD)
 
@@ -87,7 +93,7 @@ def test_rejected_blocks_are_retried_until_recovered(reject_every_other_run):
 def test_a_failed_control_check_aborts_before_alice_sends_anything_back(
     reject_every_other_run,
 ):
-    transmission = Simulator(
+    transmission = SrikaraSimulator(
         SimulatorConfig(max_attempts=2), reject_every_other_run()
     ).transmit(PAYLOAD)
 
@@ -101,7 +107,7 @@ def test_a_channel_without_signal_still_decodes():
     config = SimulatorConfig(
         backend="sf", noise=NoiseConfig(backward=Channel(transmittance=0.0))
     )
-    transmission = Simulator(config).transmit("101")
+    transmission = SrikaraSimulator(config).transmit("101")
 
     [message] = transmission.attempts[0].run.messages
     assert (message.response, message.decoded_value) == (0.0, 0.0)
@@ -110,7 +116,7 @@ def test_a_channel_without_signal_still_decodes():
 def test_aligned_axis_reads_the_full_message_displacement():
     backend = AnalyticBackend()
     config = SimulatorConfig(axis_policy="aligned")
-    transmission = Simulator(config, backend).transmit(PAYLOAD)
+    transmission = SrikaraSimulator(config, backend).transmit(PAYLOAD)
 
     assert transmission.recovered_bits == PAYLOAD
     for attempt in transmission.attempts:
@@ -126,7 +132,7 @@ def test_aligned_axis_reads_the_full_message_displacement():
 def test_bob_draws_alpha_with_the_configured_variance():
     config = SimulatorConfig()
     rng = make_random_source(config.random_source, 3)
-    states = Simulator(config).prepare_states(4000, rng)
+    states = SrikaraSimulator(config).prepare_states(4000, rng)
     alphas = [state.alpha for state in states]
     variance = sum(a.real**2 + a.imag**2 for a in alphas) / (2 * len(alphas))
 

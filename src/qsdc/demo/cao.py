@@ -20,7 +20,6 @@ from math import e, log10, sqrt
 from pydantic import ValidationError
 
 from qsdc.common.coding.bits import bits_to_bytes, bytes_to_bits, hamming_distance
-from qsdc.common.utils import header, interval, step, table
 from qsdc.protocols.cao.config import (
     NOISES,
     SYNDROME_FRACTIONS,
@@ -31,10 +30,12 @@ from qsdc.protocols.cao.constants import EPR_BOUND
 from qsdc.protocols.cao.simulator.mapping import interval_code, restore_block
 from qsdc.protocols.cao.simulator.protocol import (
     Attempt,
-    Simulator,
+    CaoSimulator,
     Stage,
     Transmission,
 )
+
+from .console import header, interval, step, table
 
 
 def main() -> None:
@@ -73,7 +74,6 @@ def main() -> None:
     if not args.message:
         parser.error("the message must not be empty")
 
-    # The defaults, with the options given on the command line.
     fields = (
         "backend",
         "random_source",
@@ -100,7 +100,7 @@ def main() -> None:
         parser.error(str(error.errors()[0]["msg"]))
 
     payload = bytes_to_bits(args.message.encode())
-    transmission = Simulator(config).transmit(payload)
+    transmission = CaoSimulator(config).transmit(payload)
     blocks = group_by_block(transmission)
 
     show_settings(config, args.noise)
