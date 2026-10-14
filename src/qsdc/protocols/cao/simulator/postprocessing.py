@@ -24,7 +24,8 @@ class Estimate:
         # Least squares for measured_p = gain * g2 + noise.
         g2 = np.array(g2)
         measured_p = np.array(measured_p)
-        gain = np.dot(g2, measured_p) / np.dot(g2, g2)
+        power = np.dot(g2, g2)
+        gain = np.dot(g2, measured_p) / power if power else 0.0
 
         residual = measured_p - gain * g2
         noise_variance = max(float(np.mean(residual**2)), 1e-12)
