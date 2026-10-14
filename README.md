@@ -474,6 +474,6 @@ box with its detection bit.
 | Delivered bits per state | Correct released bits / all prepared states, retries included |
 | Raw bit error rate | Wrong symbol bits before correction / symbol bits measured, code bits included |
 | Raw-symbol MI per state | Mutual information between sent and decoded symbols × symbols measured / prepared states |
-| Rejection rate | Sends in attempts aborted by a security test / all sends |
 | Check failure rate | Failed checks / checks made |
+| Aborted attempts | Attempts ended because a security test failed |
 | Uncorrectable | Sends whose attempt passed the checks but whose code found an error it could not correct |

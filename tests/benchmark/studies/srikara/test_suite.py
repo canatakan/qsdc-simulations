@@ -18,11 +18,8 @@ def test_ideal_run_delivers_every_bit():
     metrics = measure(Simulator(SimulatorConfig()), PAYLOAD)
 
     assert metrics.delivered_fraction == 1.0
-    assert (metrics.bit_error_rate, metrics.erasure_rate, metrics.rejection_rate) == (
-        0.0,
-        0.0,
-        0.0,
-    )
+    assert (metrics.bit_error_rate, metrics.erasure_rate) == (0.0, 0.0)
+    assert metrics.aborted_attempts == 0
     assert metrics.delivered_bits_per_state == 12 / 16
 
 
@@ -48,12 +45,8 @@ def test_aborted_attempts_count_erasures_and_retry_states(reject_every_other_run
     )
 
     assert retried.delivered_fraction == 1.0
-    assert (
-        retried.states,
-        retried.rejection_rate,
-        retried.delivered_bits_per_state,
-    ) == (32, 0.5, 12 / 32)
-    assert (retried.blocks, retried.retries, retried.rejected) == (4, 4, 4)
+    assert (retried.states, retried.delivered_bits_per_state) == (32, 12 / 32)
+    assert (retried.blocks, retried.retries, retried.aborted_attempts) == (4, 4, 1)
 
     # Aborted sends end after their 2 control checks; accepted ones also check a decoy.
     assert (retried.checks, retried.failed_checks) == (20, 8)

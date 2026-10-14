@@ -14,7 +14,6 @@ RATES = (
     "delivered_fraction",
     "delivered_bits_per_state",
     "information_per_state",
-    "rejection_rate",
     "check_failure_rate",
 )
 
@@ -29,7 +28,7 @@ class RunMetrics:
     states: int
     blocks: int
     retries: int
-    rejected: int
+    aborted_attempts: int
     checks: int
     failed_checks: int
     uncorrectable: int
@@ -89,10 +88,6 @@ class RunMetrics:
         return self.information_per_symbol * sum(self.symbol_counts) / self.states
 
     @property
-    def rejection_rate(self) -> float:
-        return self.rejected / (self.blocks + self.retries)
-
-    @property
     def check_failure_rate(self) -> float:
         return self.failed_checks / self.checks
 
@@ -136,7 +131,7 @@ def count_blocks(transmission: Transmission) -> dict[str, int]:
         "erased_bits": sum(len(r.block.bits) for r in finals if r.decoded_bits is None),
         "blocks": len(finals),
         "retries": len(transmission.runs) - len(finals),
-        "rejected": sum(len(a.runs) for a in attempts if not a.accepted),
+        "aborted_attempts": sum(not a.accepted for a in attempts),
         "uncorrectable": sum(
             run.decoded_bits is None
             for attempt in attempts

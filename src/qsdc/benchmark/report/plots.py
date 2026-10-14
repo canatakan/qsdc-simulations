@@ -17,7 +17,7 @@ PLOTTED = {
     "bit_error_rate": "Bit error rate",
     "delivered_bits_per_state": "Delivered bits / state",
     "information_per_state": "Raw-symbol MI / state",
-    "rejection_rate": "Sends rejected by the checks",
+    "check_failure_rate": "Failed checks",
 }
 HEATMAP_METRICS = ("bit_error_rate", "delivered_bits_per_state")
 
