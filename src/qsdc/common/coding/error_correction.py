@@ -5,6 +5,10 @@ from itertools import product
 from .bits import hamming_distance
 
 
+def use_odd_parity(offset: int) -> bool:
+    return offset % 4 == 0
+
+
 def parity_encode(data: str, odd: bool = True) -> str:
     return data + str(data.count("1") % 2 ^ odd)
 
