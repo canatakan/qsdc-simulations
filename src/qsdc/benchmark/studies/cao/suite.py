@@ -4,9 +4,10 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from qsdc.common.coding.bits import hamming_distance
+from qsdc.common.transmission import Transmission
 from qsdc.protocols.cao.config import NOISES, PRESETS, SimulatorConfig
 from qsdc.protocols.cao.simulator.mapping import interval_code
-from qsdc.protocols.cao.simulator.protocol import CaoSimulator, Transmission
+from qsdc.protocols.cao.simulator.protocol import Simulator
 
 from ... import cli
 from ...metrics import RunMetrics, count_blocks, count_symbols
@@ -22,20 +23,18 @@ class CaoSuite(Suite):
     output_root = Path(__file__).parents[2] / "results" / "cao"
 
     def simulate(self, config: SimulatorConfig, payload: str) -> Transmission:
-        return CaoSimulator(config).transmit(payload)
+        return Simulator(config).transmit(payload)
 
     def measure(
         self, config: SimulatorConfig, transmission: Transmission, seconds: float
     ) -> RunMetrics:
         attempts = transmission.attempts
-        signals = [signal for attempt in attempts for signal in attempt.run.signals]
-        stages = [
-            stage
+        signals = [signal for run in transmission.runs for signal in run.signals]
+        checks = [
+            check
             for attempt in attempts
-            for stage in (attempt.run.channel, attempt.run.authentication)
-            if stage is not None
+            for check in attempt.channel + attempt.authentication
         ]
-        checks = [check for stage in stages for check in stage.checks]
         symbols = [(signal.box.bits, signal.decoded_bits) for signal in signals]
 
         return RunMetrics(
@@ -44,7 +43,7 @@ class CaoSuite(Suite):
             raw_error_bits=sum(
                 hamming_distance(sent, decoded) for sent, decoded in symbols
             ),
-            states=sum(attempt.run.pairs for attempt in attempts),
+            states=sum(attempt.pairs for attempt in attempts),
             checks=len(checks),
             failed_checks=sum(not check.passed for check in checks),
             seconds=seconds,
@@ -69,7 +68,7 @@ class CaoSuite(Suite):
             "Boxes per block": str(config.boxes),
             "Payload bits per box": str(config.box_bits),
             "Detection bits per box": str(config.detection_bits),
-            "Check pairs per stage": str(config.check_pairs),
+            "Check pairs per block and test": str(config.check_pairs),
             "Check tolerance (sigma)": f"{config.check_tolerance_sigmas:g}",
             "Syndrome fraction": syndrome,
             "Message bits per block": str(config.block_bits),

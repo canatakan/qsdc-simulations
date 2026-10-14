@@ -7,12 +7,12 @@ from qsdc.benchmark.studies.cao.suite import CAO
 from qsdc.benchmark.studies.catalog import Catalog
 from qsdc.protocols.cao.config import NOISES, PRESETS, SimulatorConfig
 from qsdc.protocols.cao.simulator.backends import AnalyticBackend
-from qsdc.protocols.cao.simulator.protocol import CaoSimulator
+from qsdc.protocols.cao.simulator.protocol import Simulator
 
 
 def test_noiseless_run_delivers_every_bit_and_counts_the_pairs():
     config = SimulatorConfig()
-    transmission = CaoSimulator(config, AnalyticBackend(0.0)).transmit("1011")
+    transmission = Simulator(config, AnalyticBackend(0.0)).transmit("1011")
 
     metrics = CAO.measure(config, transmission, 0.0)
 
