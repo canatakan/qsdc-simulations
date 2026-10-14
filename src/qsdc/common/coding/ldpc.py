@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from math import log
 
 import numpy as np
 
@@ -10,6 +11,20 @@ MAX_CONFIDENCE = 30.0
 
 
 class LdpcCode:
+    @staticmethod
+    def log_ratio(zero: float, one: float) -> float:
+        # The decoder's confidence in a bit from its probabilities of 0 and 1.
+        if zero <= 0 and one <= 0:
+            return 0.0
+
+        if one <= 0:
+            return MAX_CONFIDENCE
+
+        if zero <= 0:
+            return -MAX_CONFIDENCE
+
+        return log(zero / one)
+
     def __init__(self, length: int, rows: Sequence[Sequence[int]]):
         self.length = length
         self.rows = tuple(tuple(sorted(set(row))) for row in rows)
