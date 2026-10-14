@@ -1,57 +1,111 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from math import sqrt
 
+from .config.base import BaseSimulatorConfig
 from .random import derive_seed
 
 
 @dataclass(frozen=True)
-class Block:
+class BaseBlock:
     offset: int
     bits: str
 
 
-BlockT = TypeVar("BlockT", bound=Block)
-RunT = TypeVar("RunT")
-
-
 @dataclass(frozen=True)
-class Attempt(Generic[BlockT, RunT]):
-    block: BlockT
-    number: int
-    run: RunT
+class BaseRun:
+    block: BaseBlock
     decoded_bits: str | None
 
 
 @dataclass(frozen=True)
-class Transmission(Generic[BlockT, RunT]):
-    attempts: tuple[Attempt[BlockT, RunT], ...]
+class SecurityTest:
+    checks: int
+    failed: int
+    expected_failure_rate: float
+    threshold: float
 
-    @property
-    def final_attempts(self) -> list[Attempt[BlockT, RunT]]:
-        return list(
-            {attempt.block.offset: attempt for attempt in self.attempts}.values()
+    @classmethod
+    def judge(
+        cls, checks: Sequence, expected_failure_rate: float, tolerance_sigmas: float
+    ) -> SecurityTest:
+        rate = expected_failure_rate
+        margin = sqrt(rate * (1 - rate) / len(checks))
+
+        return cls(
+            len(checks),
+            sum(not check.passed for check in checks),
+            rate,
+            rate + tolerance_sigmas * margin,
         )
 
     @property
+    def failure_rate(self) -> float:
+        return self.failed / self.checks
+
+    @property
+    def passed(self) -> bool:
+        return self.failure_rate <= self.threshold
+
+
+@dataclass(frozen=True)
+class BaseAttempt:
+    number: int
+    security_tests: tuple[SecurityTest, ...]
+    runs: tuple[BaseRun, ...]
+
+    @property
+    def accepted(self) -> bool:
+        return all(test.passed for test in self.security_tests)
+
+
+@dataclass(frozen=True)
+class Transmission:
+    attempts: tuple[BaseAttempt, ...]
+
+    @property
+    def runs(self) -> list[BaseRun]:
+        return [run for attempt in self.attempts for run in attempt.runs]
+
+    @property
+    def final_runs(self) -> list[BaseRun]:
+        return list({run.block.offset: run for run in self.runs}.values())
+
+    @property
     def recovered_bits(self) -> str | None:
-        decoded = [attempt.decoded_bits for attempt in self.final_attempts]
+        decoded = [run.decoded_bits for run in self.final_runs]
         return None if None in decoded else "".join(decoded)
 
 
-def send_blocks(
-    blocks: Iterable[BlockT],
-    seed: int,
-    max_attempts: int,
-    send: Callable[[BlockT, int], tuple[RunT, str | None]],
-) -> Transmission[BlockT, RunT]:
-    attempts = []
-    for block_index, block in enumerate(blocks):
-        for number in range(max_attempts):
-            run, decoded = send(block, derive_seed(seed, block_index, number))
-            attempts.append(Attempt(block, number, run, decoded))
-            if decoded is not None:
+class BaseSimulator(ABC):
+    config: BaseSimulatorConfig
+
+    @abstractmethod
+    def encode(self, payload: str) -> list[BaseBlock]: ...
+
+    @abstractmethod
+    def run_attempt(
+        self, blocks: list[BaseBlock], number: int, seed: int
+    ) -> BaseAttempt: ...
+
+    def transmit(self, payload: str) -> Transmission:
+        if not payload or set(payload) - {"0", "1"}:
+            raise ValueError("payload must be a non-empty string of 0s and 1s")
+
+        config = self.config
+        attempts = []
+        pending = self.encode(payload)
+        for number in range(config.max_attempts):
+            attempt = self.run_attempt(
+                pending, number, derive_seed(config.seed, number)
+            )
+            attempts.append(attempt)
+
+            pending = [run.block for run in attempt.runs if run.decoded_bits is None]
+            if not pending:
                 break
-    return Transmission(tuple(attempts))
+
+        return Transmission(tuple(attempts))
