@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from math import log, sqrt
-from statistics import NormalDist
 
 import numpy as np
 
 from qsdc.common.coding.intervals import GaussianIntervalCode
-from qsdc.common.coding.ldpc import MAX_CONFIDENCE, LdpcCode
+from qsdc.common.coding.ldpc import LdpcCode
+from qsdc.common.coding.universal_hash import UniversalHash
+from qsdc.common.random import derive_seed
 
 from ..config import SimulatorConfig
 from .mapping import Box
@@ -30,6 +30,37 @@ class Estimate:
         noise_variance = max(float(np.mean(residual**2)), 1e-12)
 
         return cls(float(gain), noise_variance)
+
+
+class Postprocessor:
+    def __init__(self, config: SimulatorConfig, code: GaussianIntervalCode):
+        self.config = config
+        self.code = code
+        self.ldpc = None
+        self.amplifier = None
+        if config.reconciliation is not None:
+            self.ldpc = reconciliation_code(config)
+            self.amplifier = UniversalHash(
+                config.payload_bits,
+                config.block_bits,
+                seed=derive_seed(config.seed, "universal hash"),
+            )
+
+    def correct(
+        self, boxes: Sequence[Box], values: Sequence[float], estimate: Estimate
+    ) -> tuple[str, str | None]:
+        # Alice's syndrome corrects Bob's payload.
+        bit_confidences = confidences(boxes, values, self.code, estimate)
+        iterations = self.config.reconciliation.max_iterations
+
+        return reconcile(self.ldpc, boxes, bit_confidences, iterations)
+
+    def amplify(self, reconciled: str | None) -> str | None:
+        # The hash of the payload is the message.
+        if reconciled is None:
+            return None
+
+        return self.amplifier.hash(reconciled)
 
 
 def reconciliation_code(config: SimulatorConfig) -> LdpcCode:
@@ -62,7 +93,7 @@ def confidences(
     result = []
     for box, value in zip(boxes, values):
         # Only the labels that carry the announced detection bits are possible.
-        probabilities = label_probabilities(value, code, noise_variance)
+        probabilities = code.probabilities(value, noise_variance)
         possible = {
             label: probability
             for label, probability in probabilities.items()
@@ -72,39 +103,9 @@ def confidences(
         for position in box.payload_positions:
             zero = sum(p for label, p in possible.items() if label[position] == "0")
             one = sum(p for label, p in possible.items() if label[position] == "1")
-            result.append(log_ratio(zero, one))
+            result.append(LdpcCode.log_ratio(zero, one))
 
     return result
-
-
-def label_probabilities(
-    value: float, code: GaussianIntervalCode, noise_variance: float
-) -> dict[str, float]:
-    # G1' is Gaussian with variance V_A, and Bob reads it with Gaussian noise.
-    # Given his value, G1' is Gaussian around the value pulled towards zero.
-    prior_variance = code.sigma**2
-    shrink = prior_variance / (prior_variance + noise_variance)
-    posterior = NormalDist(value * shrink, sqrt(shrink * noise_variance))
-
-    probabilities = {}
-    for label in code.labels:
-        lower, upper = code.interval(label)
-        probabilities[label] = posterior.cdf(upper) - posterior.cdf(lower)
-
-    return probabilities
-
-
-def log_ratio(zero: float, one: float) -> float:
-    if zero <= 0 and one <= 0:
-        return 0.0
-
-    if one <= 0:
-        return MAX_CONFIDENCE
-
-    if zero <= 0:
-        return -MAX_CONFIDENCE
-
-    return log(zero / one)
 
 
 def reconcile(

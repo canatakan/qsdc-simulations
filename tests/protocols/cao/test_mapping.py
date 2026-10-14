@@ -5,6 +5,7 @@ import pytest
 
 from qsdc.common.random import ClassicalRandomSource, RandomSource, weighted_random_bits
 from qsdc.protocols.cao.config import SimulatorConfig
+from qsdc.protocols.cao.simulator.blocks import Block
 from qsdc.protocols.cao.simulator.mapping import (
     Box,
     interval_code,
@@ -13,7 +14,6 @@ from qsdc.protocols.cao.simulator.mapping import (
     uniformize_block,
     uniformize_message,
 )
-from qsdc.protocols.cao.simulator.protocol import encode_blocks
 
 
 class ScriptedRandom(RandomSource):
@@ -100,7 +100,7 @@ def test_mapping_keeps_the_gaussian_of_a_biased_payload():
     rng = ClassicalRandomSource(8)
     payload = weighted_random_bits(4000, 0.9, rng)
     values = []
-    for block in encode_blocks(payload, config.block_bits):
+    for block in Block.encode(payload, config.block_bits):
         bits = uniformize_block(block.uniformized, rng)
         for i in range(0, len(bits), config.box_bits):
             box = Box.map(bits[i : i + config.box_bits], config.detection_bits, rng)
@@ -111,7 +111,7 @@ def test_mapping_keeps_the_gaussian_of_a_biased_payload():
 
 
 def test_blocks_split_the_payload_and_its_uniformization():
-    blocks = encode_blocks("10011", 2)
+    blocks = Block.encode("10011", 2)
 
     assert [block.bits for block in blocks] == ["10", "01", "1"]
     assert "".join(block.uniformized for block in blocks) == uniformize_message(
