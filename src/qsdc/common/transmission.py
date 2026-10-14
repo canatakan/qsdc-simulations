@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from math import sqrt
+from typing import Generic, TypeVar
 
 from .config.base import BaseSimulatorConfig
 from .random import derive_seed
@@ -15,10 +16,16 @@ class BaseBlock:
     bits: str
 
 
+BlockT = TypeVar("BlockT", bound=BaseBlock)
+
+
 @dataclass(frozen=True)
-class BaseRun:
-    block: BaseBlock
+class BaseRun(Generic[BlockT]):
+    block: BlockT
     decoded_bits: str | None
+
+
+RunT = TypeVar("RunT", bound=BaseRun)
 
 
 @dataclass(frozen=True)
@@ -52,19 +59,22 @@ class SecurityTest:
 
 
 @dataclass(frozen=True)
-class BaseAttempt:
+class BaseAttempt(Generic[RunT]):
     number: int
     security_tests: tuple[SecurityTest, ...]
-    runs: tuple[BaseRun, ...]
+    runs: tuple[RunT, ...]
 
     @property
     def accepted(self) -> bool:
         return all(test.passed for test in self.security_tests)
 
 
+AttemptT = TypeVar("AttemptT", bound=BaseAttempt)
+
+
 @dataclass(frozen=True)
-class Transmission:
-    attempts: tuple[BaseAttempt, ...]
+class Transmission(Generic[AttemptT]):
+    attempts: tuple[AttemptT, ...]
 
     @property
     def runs(self) -> list[BaseRun]:
@@ -80,18 +90,16 @@ class Transmission:
         return None if None in decoded else "".join(decoded)
 
 
-class BaseSimulator(ABC):
+class BaseSimulator(ABC, Generic[BlockT, AttemptT]):
     config: BaseSimulatorConfig
 
     @abstractmethod
-    def encode(self, payload: str) -> list[BaseBlock]: ...
+    def encode(self, payload: str) -> list[BlockT]: ...
 
     @abstractmethod
-    def run_attempt(
-        self, blocks: list[BaseBlock], number: int, seed: int
-    ) -> BaseAttempt: ...
+    def run_attempt(self, blocks: list[BlockT], number: int, seed: int) -> AttemptT: ...
 
-    def transmit(self, payload: str) -> Transmission:
+    def transmit(self, payload: str) -> Transmission[AttemptT]:
         if not payload or set(payload) - {"0", "1"}:
             raise ValueError("payload must be a non-empty string of 0s and 1s")
 

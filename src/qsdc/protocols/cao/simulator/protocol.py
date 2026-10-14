@@ -25,7 +25,7 @@ class Positions:
 
 
 @dataclass(frozen=True)
-class Run(BaseRun):
+class Run(BaseRun[Block]):
     signals: tuple[Signal, ...] = ()
     estimate: Estimate | None = None
     syndrome: str | None = None
@@ -33,7 +33,7 @@ class Run(BaseRun):
 
 
 @dataclass(frozen=True)
-class Attempt(BaseAttempt):
+class Attempt(BaseAttempt[Run]):
     positions: Positions
     channel: tuple[Check, ...]
     authentication: tuple[Check, ...] = ()
@@ -43,7 +43,7 @@ class Attempt(BaseAttempt):
         return self.positions.count
 
 
-class Simulator(BaseSimulator):
+class Simulator(BaseSimulator[Block, Attempt]):
     config: SimulatorConfig
     backend: Backend
     code: IntervalCode
