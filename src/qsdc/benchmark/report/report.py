@@ -174,7 +174,7 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
                 str(run.metrics.blocks),
                 str(run.metrics.retries),
                 _rate(run, "check_failure_rate"),
-                str(run.metrics.rejected),
+                str(run.metrics.aborted_attempts),
                 str(run.metrics.uncorrectable),
                 _seconds(run.metrics.seconds),
             ],
