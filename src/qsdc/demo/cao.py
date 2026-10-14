@@ -1,9 +1,10 @@
 """Send a text message through the simulated Cao et al. CV-QSDC protocol.
 
-Prints the settings, one line per send, every protocol step of one block and the
-recovered message. --noise picks a noise baseline; the default, clean, leaves
-only the vacuum noise of the squeezed states and of the measurements. A block
-has hundreds of boxes, so the tables show the first --rows of them.
+Prints the settings, one line per block and attempt, every protocol step of one
+block and the recovered message. --noise picks a noise baseline; the default,
+clean, leaves only the vacuum noise of the squeezed states and of the
+measurements. A block has hundreds of boxes, so the tables show the first
+--rows of them.
 
 Examples:
     cao-demo "hello"
@@ -20,6 +21,7 @@ from math import e, log10, sqrt
 from pydantic import ValidationError
 
 from qsdc.common.coding.bits import bits_to_bytes, bytes_to_bits, hamming_distance
+from qsdc.common.transmission import SecurityTest, Transmission
 from qsdc.protocols.cao.config import (
     NOISES,
     SYNDROME_FRACTIONS,
@@ -27,13 +29,9 @@ from qsdc.protocols.cao.config import (
     SimulatorConfig,
 )
 from qsdc.protocols.cao.constants import EPR_BOUND
+from qsdc.protocols.cao.simulator.checks import Check
 from qsdc.protocols.cao.simulator.mapping import interval_code, restore_block
-from qsdc.protocols.cao.simulator.protocol import (
-    Attempt,
-    CaoSimulator,
-    Stage,
-    Transmission,
-)
+from qsdc.protocols.cao.simulator.protocol import Attempt, Run, Simulator
 
 from .console import header, interval, step, table
 
@@ -51,8 +49,10 @@ def main() -> None:
     parser.add_argument("--random-source", choices=("classical", "sf-bs-qrng"))
     parser.add_argument("--seed", type=int)
     parser.add_argument("--squeeze-r", type=float)
-    parser.add_argument("--check-pairs", type=int, help="pairs per check stage")
-    parser.add_argument("--max-attempts", type=int, help="sends per block")
+    parser.add_argument(
+        "--check-pairs", type=int, help="pairs per block and security test"
+    )
+    parser.add_argument("--max-attempts", type=int, help="attempts")
     parser.add_argument(
         "--no-reconciliation",
         action="store_true",
@@ -100,40 +100,42 @@ def main() -> None:
         parser.error(str(error.errors()[0]["msg"]))
 
     payload = bytes_to_bits(args.message.encode())
-    transmission = CaoSimulator(config).transmit(payload)
+    transmission = Simulator(config).transmit(payload)
     blocks = group_by_block(transmission)
 
     show_settings(config, args.noise)
     print(
         f"\n{args.message!r} -> {len(payload)} bits -> {len(blocks)} blocks, "
-        f"{transmission.attempts[0].run.pairs} EPR pairs per send"
+        f"{transmission.attempts[0].pairs} EPR pairs in the first attempt"
     )
     show_sends(blocks)
 
     number = args.block if args.block is not None else most_eventful(blocks)
-    for attempt in blocks[number]:
-        show_attempt(attempt, number, config, args.rows)
+    for attempt, run in blocks[number]:
+        show_run(attempt, run, number, config, args.rows)
 
     show_result(args.message, payload, transmission)
 
 
-def group_by_block(transmission: Transmission) -> list[list[Attempt]]:
-    blocks: dict[int, list[Attempt]] = {}
+def group_by_block(transmission: Transmission) -> list[list[tuple[Attempt, Run]]]:
+    blocks: dict[int, list[tuple[Attempt, Run]]] = {}
     for attempt in transmission.attempts:
-        blocks.setdefault(attempt.block.offset, []).append(attempt)
+        for run in attempt.runs:
+            blocks.setdefault(run.block.offset, []).append((attempt, run))
 
     return list(blocks.values())
 
 
-def most_eventful(blocks: list[list[Attempt]]) -> int:
-    def score(sends: list[Attempt]) -> tuple[int, int]:
-        return len(sends), wrong_boxes(sends[-1])
+def most_eventful(blocks: list[list[tuple[Attempt, Run]]]) -> int:
+    def score(sends: list[tuple[Attempt, Run]]) -> tuple[int, int]:
+        _, run = sends[-1]
+        return len(sends), wrong_boxes(run)
 
     return max(range(len(blocks)), key=lambda number: score(blocks[number]))
 
 
-def wrong_boxes(attempt: Attempt) -> int:
-    return sum(not s.correct for s in attempt.run.signals)
+def wrong_boxes(run: Run) -> int:
+    return sum(not s.correct for s in run.signals)
 
 
 def show_settings(config: SimulatorConfig, noise: str) -> None:
@@ -156,7 +158,7 @@ def show_settings(config: SimulatorConfig, noise: str) -> None:
             ("Payload bits per box", config.box_bits),
             ("Detection bits per box", config.detection_bits),
             ("Gaussian intervals", f"{2**width} ({width} bits)"),
-            ("Check pairs per stage", config.check_pairs),
+            ("Check pairs per block and test", config.check_pairs),
             ("Check tolerance", f"{config.check_tolerance_sigmas:g} sigma"),
             (
                 "Reconciliation",
@@ -174,7 +176,7 @@ def show_settings(config: SimulatorConfig, noise: str) -> None:
                 f"- {config.syndrome_bits} syndrome - {settings.secrecy_margin} margin "
                 f"= {config.block_bits} message bits",
             ),
-            ("Sends per block", f"at most {config.max_attempts}"),
+            ("Attempts", f"at most {config.max_attempts}"),
         ],
     )
 
@@ -186,73 +188,72 @@ def show_settings(config: SimulatorConfig, noise: str) -> None:
     )
 
 
-def show_sends(blocks: list[list[Attempt]]) -> None:
+def show_sends(blocks: list[list[tuple[Attempt, Run]]]) -> None:
     header("Sends")
 
     rows = []
     for number, sends in enumerate(blocks):
-        block = sends[0].block
-        for attempt in sends:
-            run = attempt.run
+        for attempt, run in sends:
             first = attempt.number == 0
             rows.append(
                 (
                     number if first else "",
-                    shortened(block.bits, 16) if first else "",
+                    shortened(run.block.bits, 16) if first else "",
                     attempt.number + 1,
-                    failures(run.channel),
-                    failures(run.authentication) if run.authentication else "",
-                    f"{wrong_boxes(attempt)}/{len(run.signals)}" if run.signals else "",
-                    outcome(attempt),
+                    failures(attempt.channel),
+                    failures(attempt.authentication) if attempt.authentication else "",
+                    f"{wrong_boxes(run)}/{len(run.signals)}" if run.signals else "",
+                    outcome(attempt, run),
                 )
             )
 
     table(
-        ("Block", "Bits", "Send", "Channel", "Auth", "Wrong boxes", "Result"),
+        ("Block", "Bits", "Attempt", "Channel", "Auth", "Wrong boxes", "Result"),
         rows,
     )
 
 
-def failures(stage: Stage) -> str:
-    return f"{stage.failed}/{len(stage.checks)}"
+def failures(checks: tuple[Check, ...]) -> str:
+    return f"{sum(not check.passed for check in checks)}/{len(checks)}"
 
 
-def outcome(attempt: Attempt) -> str:
-    run = attempt.run
-    if not run.accepted:
-        return "terminated"
+def outcome(attempt: Attempt, run: Run) -> str:
+    if not attempt.accepted:
+        return "attempt terminated by the checks"
 
-    if attempt.decoded_bits is None:
+    if run.decoded_bits is None:
         if run.syndrome is not None:
             return "reconciliation failed, withheld"
         return "error detected, withheld"
 
-    errors = hamming_distance(attempt.decoded_bits, attempt.block.bits)
+    errors = hamming_distance(run.decoded_bits, run.block.bits)
     return "released" if not errors else f"released, {errors} wrong bit(s)"
 
 
-def show_attempt(
-    attempt: Attempt, number: int, config: SimulatorConfig, rows: int
+def show_run(
+    attempt: Attempt, run: Run, number: int, config: SimulatorConfig, rows: int
 ) -> None:
-    run, block = attempt.run, attempt.block
+    block = run.block
     code = interval_code(config)
-    header(f"Block {number}, send {attempt.number + 1}")
+    header(f"Block {number}, attempt {attempt.number + 1}")
 
     step("1. Alice prepares EPR pairs (Eqs. 1-4) and sends S2 of each to Bob")
     print(
-        f"{run.pairs} pairs: {2 * config.check_pairs} for the checks, "
-        f"{config.boxes} for the boxes"
+        f"{attempt.pairs} pairs in the attempt: {len(attempt.channel)} for each "
+        f"check, {len(attempt.positions.signal)} for the boxes of its blocks"
     )
 
     step("2. Channel detection: both heterodyne the positions Alice picks (Eq. 5)")
-    show_stage(run.channel, rows)
+    show_checks(attempt.channel, rows)
+    show_test("Channel detection", attempt.security_tests[0])
 
-    if run.authentication is not None:
+    if len(attempt.security_tests) > 1:
         step("3. Authentication: the same test on positions Bob picks")
-        show_stage(run.authentication, rows)
+        show_checks(attempt.authentication, rows)
+        show_test("Authentication", attempt.security_tests[1])
 
-    if not run.accepted:
-        print("-> communication terminated")
+    if not attempt.accepted:
+        print("-> attempt terminated")
         return
 
     signals = run.signals
@@ -363,22 +364,22 @@ def show_attempt(
                 f"{hamming_distance(reconciled, payloads)}"
             )
 
-    if attempt.decoded_bits is not None and reconciled is not None:
+    if run.decoded_bits is not None and reconciled is not None:
         print(
             f"(iii) Privacy amplification: hash of {shortened(reconciled, 24)} -> "
-            f"{shortened(attempt.decoded_bits, 24)}"
+            f"{shortened(run.decoded_bits, 24)}"
         )
-    elif attempt.decoded_bits is not None:
+    elif run.decoded_bits is not None:
         print(
             f"(iii) Inverse mapping: {shortened(raw, 24)} -> "
             f"{shortened(restore_block(raw), 24)} -> "
-            f"{shortened(attempt.decoded_bits, 24)}"
+            f"{shortened(run.decoded_bits, 24)}"
         )
 
-    print(f"-> {outcome(attempt)}")
+    print(f"-> {outcome(attempt, run)}")
 
 
-def show_stage(stage: Stage, rows: int) -> None:
+def show_checks(checks: tuple[Check, ...], rows: int) -> None:
     table(
         ("j", "Alice x, p", "Bob x, p", "X_m^2 + P_m^2", "Result"),
         [
@@ -389,34 +390,37 @@ def show_stage(stage: Stage, rows: int) -> None:
                 f"{c.statistic:.4f}",
                 "pass" if c.passed else "FAIL",
             )
-            for c in stage.checks[:rows]
+            for c in checks[:rows]
         ],
     )
-    more(stage.checks, rows)
+    more(checks, rows)
+    print(f"{failures(checks)} above {EPR_BOUND:g}")
 
-    verdict = "passed" if stage.accepted else "failed"
+
+def show_test(name: str, test: SecurityTest) -> None:
     print(
-        f"{failures(stage)} above {EPR_BOUND:g}, rate {stage.failure_rate:.3f} "
-        f"vs threshold {stage.threshold:.3f} (honest {stage.expected_failure_rate:.3f}) "
-        f"-> {verdict}"
+        f"{name} over all blocks of the attempt: {test.failed} of {test.checks} "
+        f"failed, rate {test.failure_rate:.3f} vs threshold {test.threshold:.3f} "
+        f"(honest {test.expected_failure_rate:.3f}) -> "
+        + ("passed" if test.passed else "failed")
     )
 
 
 def show_result(text: str, payload: str, transmission: Transmission) -> None:
     header("Result")
-    attempts = transmission.attempts
-    finals = transmission.final_attempts
-    signals = [s for attempt in attempts for s in attempt.run.signals]
+    runs = transmission.runs
+    finals = transmission.final_runs
+    signals = [s for run in runs for s in run.signals]
 
-    retries = len(attempts) - len(finals)
-    terminated = sum(not a.run.accepted for a in attempts)
-    print(f"Sends: {len(attempts)} for {len(finals)} blocks ({retries} retries)")
-    print(f"Terminated by the checks: {terminated}")
-    print(f"EPR pairs prepared: {sum(a.run.pairs for a in attempts)}")
+    attempts = transmission.attempts
+    terminated = sum(not attempt.accepted for attempt in attempts)
+    print(f"Attempts: {len(attempts)}, block runs: {len(runs)}, blocks: {len(finals)}")
+    print(f"Attempts terminated by the checks: {terminated}")
+    print(f"EPR pairs prepared: {sum(attempt.pairs for attempt in attempts)}")
 
     wrong = sum(not s.correct for s in signals)
     print(f"Boxes decoded into a wrong interval: {wrong} / {len(signals)}")
-    revealed = sum(len(a.run.syndrome) for a in attempts if a.run.syndrome)
+    revealed = sum(len(run.syndrome) for run in runs if run.syndrome)
     if revealed:
         print(f"Syndrome bits revealed: {revealed}")
 

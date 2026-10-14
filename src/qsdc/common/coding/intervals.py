@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from bisect import bisect_right
 from dataclasses import dataclass
-from math import inf
+from math import inf, sqrt
 from statistics import NormalDist
 
 from ..random import RandomSource
@@ -68,3 +68,17 @@ class GaussianIntervalCode(IntervalCode):
         lower, upper = self.interval(bits)
 
         return gaussian.inv_cdf(rng.uniform(gaussian.cdf(lower), gaussian.cdf(upper)))
+
+    def probabilities(self, value: float, noise_variance: float) -> dict[str, float]:
+        # The value is Gaussian with variance sigma^2, read with Gaussian noise.
+        # Given the reading, it is Gaussian around the reading pulled towards 0.
+        prior_variance = self.sigma**2
+        shrink = prior_variance / (prior_variance + noise_variance)
+        posterior = NormalDist(value * shrink, sqrt(shrink * noise_variance))
+
+        probabilities = {}
+        for label in self.labels:
+            lower, upper = self.interval(label)
+            probabilities[label] = posterior.cdf(upper) - posterior.cdf(lower)
+
+        return probabilities

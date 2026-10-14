@@ -14,7 +14,6 @@ RATES = (
     "delivered_fraction",
     "delivered_bits_per_state",
     "information_per_state",
-    "rejection_rate",
     "check_failure_rate",
 )
 
@@ -29,7 +28,7 @@ class RunMetrics:
     states: int
     blocks: int
     retries: int
-    rejected: int
+    aborted_attempts: int
     checks: int
     failed_checks: int
     uncorrectable: int
@@ -89,10 +88,6 @@ class RunMetrics:
         return self.information_per_symbol * sum(self.symbol_counts) / self.states
 
     @property
-    def rejection_rate(self) -> float:
-        return self.rejected / (self.blocks + self.retries)
-
-    @property
     def check_failure_rate(self) -> float:
         return self.failed_checks / self.checks
 
@@ -124,20 +119,24 @@ class RunMetrics:
 
 
 def count_blocks(transmission: Transmission) -> dict[str, int]:
-    finals = transmission.final_attempts
-    released = [attempt for attempt in finals if attempt.decoded_bits is not None]
+    attempts = transmission.attempts
+    finals = transmission.final_runs
+    released = [run for run in finals if run.decoded_bits is not None]
 
     return {
-        "payload_bits": sum(len(attempt.block.bits) for attempt in finals),
+        "payload_bits": sum(len(run.block.bits) for run in finals),
         "error_bits": sum(
-            hamming_distance(a.block.bits, a.decoded_bits) for a in released
+            hamming_distance(run.block.bits, run.decoded_bits) for run in released
         ),
-        "erased_bits": sum(len(a.block.bits) for a in finals if a.decoded_bits is None),
+        "erased_bits": sum(len(r.block.bits) for r in finals if r.decoded_bits is None),
         "blocks": len(finals),
-        "retries": len(transmission.attempts) - len(finals),
-        "rejected": sum(not a.run.accepted for a in transmission.attempts),
+        "retries": len(transmission.runs) - len(finals),
+        "aborted_attempts": sum(not a.accepted for a in attempts),
         "uncorrectable": sum(
-            a.run.accepted and a.decoded_bits is None for a in transmission.attempts
+            run.decoded_bits is None
+            for attempt in attempts
+            if attempt.accepted
+            for run in attempt.runs
         ),
     }
 

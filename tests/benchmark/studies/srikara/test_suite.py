@@ -5,57 +5,48 @@ from qsdc.benchmark.metrics import RunMetrics
 from qsdc.benchmark.studies.catalog import Catalog
 from qsdc.benchmark.studies.srikara.suite import SRIKARA
 from qsdc.protocols.srikara.config import NOISES, SimulatorConfig
-from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
+from qsdc.protocols.srikara.simulator.protocol import Simulator
 
 PAYLOAD = "101001110010"
 
 
-def measure(simulator: SrikaraSimulator, payload: str) -> RunMetrics:
+def measure(simulator: Simulator, payload: str) -> RunMetrics:
     return SRIKARA.measure(simulator.config, simulator.transmit(payload), 0.0)
 
 
 def test_ideal_run_delivers_every_bit():
-    metrics = measure(SrikaraSimulator(SimulatorConfig()), PAYLOAD)
+    metrics = measure(Simulator(SimulatorConfig()), PAYLOAD)
 
     assert metrics.delivered_fraction == 1.0
-    assert (metrics.bit_error_rate, metrics.erasure_rate, metrics.rejection_rate) == (
-        0.0,
-        0.0,
-        0.0,
-    )
+    assert (metrics.bit_error_rate, metrics.erasure_rate) == (0.0, 0.0)
+    assert metrics.aborted_attempts == 0
     assert metrics.delivered_bits_per_state == 12 / 16
 
 
 def test_noiseless_channel_carries_three_bits_per_message_state():
     every_symbol = "000001010011100101110111"
-    metrics = measure(SrikaraSimulator(SimulatorConfig()), every_symbol)
+    metrics = measure(Simulator(SimulatorConfig()), every_symbol)
 
     assert metrics.information_per_state == pytest.approx(3 / 4)
 
 
-def test_partial_delivery_counts_erasures_and_retry_states(reject_every_other_run):
-    single = measure(
-        SrikaraSimulator(SimulatorConfig(), reject_every_other_run()), PAYLOAD
-    )
+def test_aborted_attempts_count_erasures_and_retry_states(reject_every_other_run):
+    single = measure(Simulator(SimulatorConfig(), reject_every_other_run()), PAYLOAD)
     retried = measure(
-        SrikaraSimulator(SimulatorConfig(max_attempts=2), reject_every_other_run()),
+        Simulator(SimulatorConfig(max_attempts=2), reject_every_other_run()),
         PAYLOAD,
     )
 
-    assert single.delivered_fraction == 0.5
+    assert single.delivered_fraction == 0.0
     assert (single.delivered_bits, single.erased_bits, single.bit_error_rate) == (
-        6,
-        6,
-        0.0,
+        0,
+        12,
+        None,
     )
 
     assert retried.delivered_fraction == 1.0
-    assert (
-        retried.states,
-        retried.rejection_rate,
-        retried.delivered_bits_per_state,
-    ) == (32, 0.5, 12 / 32)
-    assert (retried.blocks, retried.retries, retried.rejected) == (4, 4, 4)
+    assert (retried.states, retried.delivered_bits_per_state) == (32, 12 / 32)
+    assert (retried.blocks, retried.retries, retried.aborted_attempts) == (4, 4, 1)
 
     # Aborted sends end after their 2 control checks; accepted ones also check a decoy.
     assert (retried.checks, retried.failed_checks) == (20, 8)
@@ -65,16 +56,14 @@ def test_partial_delivery_counts_erasures_and_retry_states(reject_every_other_ru
 def test_raw_bit_error_rate_is_undefined_when_every_send_is_aborted(
     reject_every_other_run,
 ):
-    metrics = measure(
-        SrikaraSimulator(SimulatorConfig(), reject_every_other_run()), "101"
-    )
+    metrics = measure(Simulator(SimulatorConfig(), reject_every_other_run()), "101")
 
     assert metrics.raw_bits == 0
     assert metrics.as_dict()["raw_bit_error_rate"] is None
 
 
 def test_bit_error_rate_is_undefined_when_nothing_is_released(eavesdropper):
-    metrics = measure(SrikaraSimulator(SimulatorConfig(), eavesdropper()), PAYLOAD)
+    metrics = measure(Simulator(SimulatorConfig(), eavesdropper()), PAYLOAD)
 
     assert metrics.erasure_rate == 1.0
     assert metrics.bit_error_rate is None

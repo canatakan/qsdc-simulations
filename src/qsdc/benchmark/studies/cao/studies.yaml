@@ -20,7 +20,7 @@ studies:
     cases:
       - {simulator: paper, label: Paper mapping}
       - {simulator: reconciled, label: Reconciliation and privacy amplification}
-      - {simulator: retry, label: "+ up to 3 sends per block"}
+      - {simulator: retry, label: "+ up to 3 attempts"}
 
   syndrome_fraction:
     group: postprocessing

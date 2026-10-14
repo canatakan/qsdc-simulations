@@ -7,6 +7,7 @@ from typing import Literal, Optional
 from pydantic import model_validator
 
 from qsdc.common.config.base import (
+    BaseSimulatorConfig,
     Config,
     Fraction,
     NonNegative,
@@ -53,10 +54,8 @@ class Reconciliation(Config):
     secrecy_margin: NonNegativeInt = 32
 
 
-class SimulatorConfig(Config):
+class SimulatorConfig(BaseSimulatorConfig):
     backend: Literal["analytic", "sf", "sf-sampled"] = "sf-sampled"
-    random_source: Literal["classical", "sf-bs-qrng"] = "classical"
-    seed: int = 11
 
     noise: NoiseConfig = NoiseConfig()
 
@@ -71,7 +70,6 @@ class SimulatorConfig(Config):
     check_tolerance_sigmas: Positive = 3.0
 
     reconciliation: Optional[Reconciliation] = Reconciliation()  # noqa: UP045
-    max_attempts: PositiveInt = 1
 
     @property
     def payload_bits(self) -> int:

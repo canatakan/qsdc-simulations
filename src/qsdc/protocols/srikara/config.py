@@ -4,11 +4,11 @@ from pathlib import Path
 from typing import Literal
 
 from qsdc.common.config.base import (
+    BaseSimulatorConfig,
     Config,
     Distribution,
     NonNegative,
     Positive,
-    PositiveInt,
     Uniform,
 )
 from qsdc.common.config.noise import BASELINES, Channel, Detector, Environment, Memory
@@ -41,10 +41,8 @@ NOISES = {
 }
 
 
-class SimulatorConfig(Config):
+class SimulatorConfig(BaseSimulatorConfig):
     backend: Literal["analytic", "sf", "sf-sampled"] = "analytic"
-    random_source: Literal["classical", "sf-bs-qrng"] = "classical"
-    seed: int = 11
 
     noise: NoiseConfig = NoiseConfig()
 
@@ -61,7 +59,6 @@ class SimulatorConfig(Config):
     axis_policy: Literal["random", "best_qp", "aligned"] = "random"
 
     error_correction: Literal["none", "parity", "secded"] = "none"
-    max_attempts: PositiveInt = 1
 
 
 PRESETS = load_presets(Path(__file__).with_name("presets.yaml"), SimulatorConfig)

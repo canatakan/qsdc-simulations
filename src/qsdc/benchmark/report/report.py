@@ -174,7 +174,7 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
                 str(run.metrics.blocks),
                 str(run.metrics.retries),
                 _rate(run, "check_failure_rate"),
-                str(run.metrics.rejected),
+                str(run.metrics.aborted_attempts),
                 str(run.metrics.uncorrectable),
                 _seconds(run.metrics.seconds),
             ],
@@ -261,12 +261,13 @@ def _symbol_matrix(suite: Suite, run: RunResult) -> dict[str, object]:
         cells = [{"count": count, "share": count / total} for count in row]
         rows.append({"label": label, "cells": cells})
 
-    correct = sum(counts[i][i] for i in range(len(labels))) / sum(map(sum, counts))
+    total = sum(map(sum, counts))
+    correct = sum(counts[i][i] for i in range(len(labels))) / total if total else None
 
     return {
         "labels": labels,
         "rows": rows,
-        "correct": f"{correct:.1%}",
+        "correct": f"{correct:.1%}" if correct is not None else "—",
         "information": f"{metrics.information_per_symbol:.3f}",
     }
 

@@ -1,7 +1,8 @@
 """Send a text message through the simulated Srikara CV-QSDC protocol.
 
-Prints the settings, one line per send, every protocol step of one block and the
-recovered message. --trace adds the noise path of that block's modes.
+Prints the settings, one line per block and attempt, every protocol step of one
+block and the recovered message. --trace adds the noise path of that block's
+modes.
 
 Simulator presets (presets.yaml):
     baseline   the paper's protocol
@@ -9,7 +10,7 @@ Simulator presets (presets.yaml):
     gray       + Gray-labelled intervals
     optimized  + theta in 3pi/2 ± pi/4
     parity     + one parity bit per symbol
-    retry      + up to 3 sends per block (optimized + EC, the default)
+    retry      + up to 3 attempts (optimized + EC, the default)
 
 Examples:
     srikara-demo "hello"
@@ -26,25 +27,28 @@ from math import pi, sqrt
 from strawberryfields import Engine, Program, ops
 
 from qsdc.common.coding.bits import bits_to_bytes, bytes_to_bits, hamming_distance
-from qsdc.common.coding.error_correction import secded_decode, secded_encode
+from qsdc.common.coding.error_correction import (
+    secded_decode,
+    secded_encode,
+    use_odd_parity,
+)
 from qsdc.common.config.noise import Detector
 from qsdc.common.quadrature import Quadrature
+from qsdc.common.transmission import SecurityTest, Transmission
 from qsdc.protocols.srikara.config import NOISES, PRESETS, SimulatorConfig
-from qsdc.protocols.srikara.constants import MESSAGE_DIRECTION, VACUUM_VARIANCE
+from qsdc.protocols.srikara.constants import (
+    INTERVAL_CODES,
+    MESSAGE_DIRECTION,
+    VACUUM_VARIANCE,
+)
 from qsdc.protocols.srikara.simulator.backends import (
     SF_SCALE,
     AnalyticBackend,
     PreparedState,
 )
-from qsdc.protocols.srikara.simulator.encoding import INTERVAL_CODES
-from qsdc.protocols.srikara.simulator.protocol import (
-    Attempt,
-    Check,
-    Message,
-    SrikaraSimulator,
-    Transmission,
-)
-from qsdc.protocols.srikara.simulator.transport import odd_parity
+from qsdc.protocols.srikara.simulator.checks import Check
+from qsdc.protocols.srikara.simulator.messages import Message
+from qsdc.protocols.srikara.simulator.protocol import Attempt, Run, Simulator
 
 from .console import header, interval, step, table
 
@@ -80,35 +84,37 @@ def main() -> None:
     config = PRESETS[args.simulator].model_copy(update=update)
 
     payload = bytes_to_bits(args.message.encode())
-    transmission = SrikaraSimulator(config).transmit(payload)
+    transmission = Simulator(config).transmit(payload)
     blocks = group_by_block(transmission)
 
     show_settings(config, args.simulator, args.noise)
     print(
         f"\n{args.message!r} -> {len(payload)} bits -> {len(blocks)} blocks, "
-        f"{len(transmission.attempts[0].run.states)} states per send"
+        f"{len(transmission.attempts[0].states)} states in the first attempt"
     )
     show_sends(blocks)
 
     number = args.block if args.block is not None else most_eventful(blocks)
     trace = args.trace and config.backend != "analytic"
-    for attempt in blocks[number]:
-        show_attempt(attempt, number, config, trace)
+    for attempt, run in blocks[number]:
+        show_run(attempt, run, number, config, trace)
 
     show_result(args.message, payload, transmission)
 
 
-def group_by_block(transmission: Transmission) -> list[list[Attempt]]:
-    blocks: dict[int, list[Attempt]] = {}
+def group_by_block(transmission: Transmission) -> list[list[tuple[Attempt, Run]]]:
+    blocks: dict[int, list[tuple[Attempt, Run]]] = {}
     for attempt in transmission.attempts:
-        blocks.setdefault(attempt.block.offset, []).append(attempt)
+        for run in attempt.runs:
+            blocks.setdefault(run.block.offset, []).append((attempt, run))
 
     return list(blocks.values())
 
 
-def most_eventful(blocks: list[list[Attempt]]) -> int:
-    def score(sends: list[Attempt]) -> tuple[int, int]:
-        return len(sends), sum(not m.correct for m in sends[-1].run.messages)
+def most_eventful(blocks: list[list[tuple[Attempt, Run]]]) -> int:
+    def score(sends: list[tuple[Attempt, Run]]) -> tuple[int, int]:
+        _, run = sends[-1]
+        return len(sends), sum(not m.correct for m in run.messages)
 
     return max(range(len(blocks)), key=lambda number: score(blocks[number]))
 
@@ -127,7 +133,7 @@ def show_settings(config: SimulatorConfig, simulator: str, noise: str) -> None:
             ("Measured quadrature", config.axis_policy),
             ("Check tolerance", f"{config.tolerance_sigmas:g} sigma"),
             ("Error correction", config.error_correction),
-            ("Sends per block", f"at most {config.max_attempts}"),
+            ("Attempts", f"at most {config.max_attempts}"),
         ],
     )
 
@@ -140,51 +146,51 @@ def show_settings(config: SimulatorConfig, simulator: str, noise: str) -> None:
     )
 
 
-def show_sends(blocks: list[list[Attempt]]) -> None:
+def show_sends(blocks: list[list[tuple[Attempt, Run]]]) -> None:
     header("Sends")
 
     rows = []
     for number, sends in enumerate(blocks):
-        block = sends[0].block
-        for attempt in sends:
-            run = attempt.run
-            checks = run.controls + run.decoys
+        for attempt, run in sends:
+            checks = attempt.controls + attempt.decoys
             first = attempt.number == 0
             rows.append(
                 (
                     number if first else "",
-                    block.bits if first else "",
+                    run.block.bits if first else "",
                     attempt.number + 1,
                     " ".join(m.sent_bits for m in run.messages) or "-",
                     " ".join(m.decoded_bits for m in run.messages) or "-",
                     f"{sum(not c.passed for c in checks)}/{len(checks)}",
-                    outcome(attempt),
+                    outcome(attempt, run),
                 )
             )
 
-    table(("Block", "Bits", "Send", "Sent", "Decoded", "Failed checks", "Result"), rows)
+    table(
+        ("Block", "Bits", "Attempt", "Sent", "Decoded", "Failed checks", "Result"), rows
+    )
 
 
-def outcome(attempt: Attempt) -> str:
-    if attempt.run.aborted:
-        return "aborted by the control check"
+def outcome(attempt: Attempt, run: Run) -> str:
+    if not attempt.security_tests[0].passed:
+        return "attempt aborted by the control test"
 
-    if not attempt.run.accepted:
-        return "rejected by the decoy check"
+    if not attempt.accepted:
+        return "attempt rejected by the decoy test"
 
-    if attempt.decoded_bits is None:
+    if run.decoded_bits is None:
         return "error detected, withheld"
 
-    errors = hamming_distance(attempt.decoded_bits, attempt.block.bits)
+    errors = hamming_distance(run.decoded_bits, run.block.bits)
     return "released" if not errors else f"released, {errors} wrong bit(s)"
 
 
-def show_attempt(
-    attempt: Attempt, number: int, config: SimulatorConfig, trace: bool
+def show_run(
+    attempt: Attempt, run: Run, number: int, config: SimulatorConfig, trace: bool
 ) -> None:
-    run, route = attempt.run, attempt.run.route
+    route = attempt.route
     code = INTERVAL_CODES[config.intervals]
-    header(f"Block {number}, send {attempt.number + 1}")
+    header(f"Block {number}, attempt {attempt.number + 1}")
 
     roles = {
         **{i: "control" for i in route.control},
@@ -203,20 +209,19 @@ def show_attempt(
                 f"{s.squeeze_r:.4f}",
                 f"{s.theta / pi:.4f}",
             )
-            for s in run.states
+            for s in attempt.states
         ],
     )
 
     step("2. Alice checks the control modes after Bob reveals their s and alpha")
-    show_checks(run.controls, config)
+    show_checks(attempt.controls, config)
     if trace:
-        for check in run.controls:
-            trace_check(run.states[check.index], check, config, "control")
+        for check in attempt.controls:
+            trace_check(attempt.states[check.index], check, config, "control")
 
-    if run.aborted:
-        failed = sum(not c.passed for c in run.controls)
-        print(f"{failed} of {len(run.controls)} control checks failed")
-        print(f"-> {outcome(attempt)}, Alice sends nothing back")
+    show_test("Control", attempt.security_tests[0])
+    if not attempt.security_tests[0].passed:
+        print(f"-> {outcome(attempt, run)}, Alice sends nothing back")
         return
 
     step("3. Alice displaces the message modes by m (1 + i), decoys stay unchanged")
@@ -234,16 +239,12 @@ def show_attempt(
     )
 
     step("4. Bob checks the decoy modes after Alice reveals them")
-    show_checks(run.decoys, config)
+    show_checks(attempt.decoys, config)
     if trace:
-        for check in run.decoys:
-            trace_check(run.states[check.index], check, config, "decoy")
+        for check in attempt.decoys:
+            trace_check(attempt.states[check.index], check, config, "decoy")
 
-    checks = run.controls + run.decoys
-    print(
-        f"{sum(not c.passed for c in checks)} of {len(checks)} checks failed -> "
-        + ("accepted" if run.accepted else "rejected")
-    )
+    show_test("Decoy", attempt.security_tests[1])
 
     step(
         "5. Bob unsqueezes the message modes and decodes m = (x - baseline) / response"
@@ -256,8 +257,8 @@ def show_attempt(
                 cplx(
                     AnalyticBackend.unsqueezed_displacement(
                         m.value * MESSAGE_DIRECTION,
-                        run.states[m.index].squeeze_r,
-                        run.states[m.index].theta,
+                        attempt.states[m.index].squeeze_r,
+                        attempt.states[m.index].theta,
                     )
                 ),
                 m.axis.name,
@@ -273,12 +274,21 @@ def show_attempt(
     )
     if trace:
         for message in run.messages:
-            trace_message(run.states[message.index], message, config)
+            trace_message(attempt.states[message.index], message, config)
 
-    if run.accepted:
-        show_code(attempt, config)
+    if attempt.accepted:
+        show_code(run, config)
 
-    print(f"-> {outcome(attempt)}")
+    print(f"-> {outcome(attempt, run)}")
+
+
+def show_test(name: str, test: SecurityTest) -> None:
+    print(
+        f"{name} test over all blocks of the attempt: {test.failed} of "
+        f"{test.checks} checks failed, rate {test.failure_rate:.3f} vs threshold "
+        f"{test.threshold:.3f} (honest {test.expected_failure_rate:.3f}) -> "
+        + ("passed" if test.passed else "failed")
+    )
 
 
 def show_checks(checks: tuple[Check, ...], config: SimulatorConfig) -> None:
@@ -299,11 +309,11 @@ def show_checks(checks: tuple[Check, ...], config: SimulatorConfig) -> None:
     )
 
 
-def show_code(attempt: Attempt, config: SimulatorConfig) -> None:
-    received = [m.decoded_bits for m in attempt.run.messages]
+def show_code(run: Run, config: SimulatorConfig) -> None:
+    received = [m.decoded_bits for m in run.messages]
 
     if config.error_correction == "parity":
-        word, odd = received[0], odd_parity(attempt.block.offset)
+        word, odd = received[0], use_odd_parity(run.block.offset)
         ones = word.count("1")
         verdict = "passes" if ones % 2 == odd else "error detected"
         print(f"{'Odd' if odd else 'Even'} parity of {word}: {ones} ones, {verdict}")
@@ -438,13 +448,13 @@ def trace_stages(
 
 def show_result(text: str, payload: str, transmission: Transmission) -> None:
     header("Result")
-    attempts = transmission.attempts
-    finals = transmission.final_attempts
-    messages = [m for attempt in attempts for m in attempt.run.messages]
+    runs = transmission.runs
+    finals = transmission.final_runs
+    messages = [m for run in runs for m in run.messages]
 
-    retries = len(attempts) - len(finals)
-    print(f"Sends: {len(attempts)} for {len(finals)} blocks ({retries} retries)")
-    print(f"States prepared: {sum(len(a.run.states) for a in attempts)}")
+    attempts = len(transmission.attempts)
+    print(f"Attempts: {attempts}, block runs: {len(runs)}, blocks: {len(finals)}")
+    print(f"States prepared: {sum(len(a.states) for a in transmission.attempts)}")
 
     raw = sum(hamming_distance(m.sent_bits, m.decoded_bits) for m in messages)
     print(f"Symbol bit errors: {raw} / {3 * len(messages)}")

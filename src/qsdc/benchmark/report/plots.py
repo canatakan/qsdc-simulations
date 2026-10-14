@@ -17,7 +17,7 @@ PLOTTED = {
     "bit_error_rate": "Bit error rate",
     "delivered_bits_per_state": "Delivered bits / state",
     "information_per_state": "Raw-symbol MI / state",
-    "rejection_rate": "Sends rejected by the checks",
+    "check_failure_rate": "Failed checks",
 }
 HEATMAP_METRICS = ("bit_error_rate", "delivered_bits_per_state")
 
@@ -58,7 +58,7 @@ def _comparison(result: BenchmarkResult, labels: list[str]) -> Figure:
         errors = np.nan_to_num([run.interval(metric) for run in runs])
         axis.barh(
             positions,
-            np.nan_to_num(values),
+            values,
             xerr=errors,
             color=colors,
             error_kw={"capsize": 3, "elinewidth": 1},
@@ -70,11 +70,11 @@ def _comparison(result: BenchmarkResult, labels: list[str]) -> Figure:
         wide = errors.max(initial=0.0) > 0.05 * right
 
         for position, value, error in zip(positions, values, errors):
-            value = np.nan_to_num(value)
-            inside = wide and value - error > 0.3 * right
+            x = np.nan_to_num(value)
+            inside = wide and x - error > 0.3 * right
             axis.annotate(
                 _format(metric, value),
-                (value - error, position) if inside else (value + error, position),
+                (x - error, position) if inside else (x + error, position),
                 xytext=(-6, 0) if inside else (4, 0),
                 textcoords="offset points",
                 ha="right" if inside else "left",

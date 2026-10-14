@@ -9,7 +9,7 @@ class Eavesdropper(AnalyticBackend):
 
 
 class CorruptFirstMessage(AnalyticBackend):
-    def begin_run(self, seed):
+    def prepare_run(self, seed):
         self.corrupted = False
 
     def measure_returned(self, state, axis, beta=0j):
@@ -27,7 +27,7 @@ class CorruptFirstMessage(AnalyticBackend):
 class RejectEveryOtherRun(AnalyticBackend):
     runs = 0
 
-    def begin_run(self, seed):
+    def prepare_run(self, seed):
         self.runs += 1
 
     def measure_control(self, state, axis):
