@@ -12,17 +12,17 @@ class ModeRoute:
     message: tuple[int, ...]
     decoy: tuple[int, ...]
 
+    @classmethod
+    def create(cls, n_states: int, rng: RandomSource) -> ModeRoute:
+        shuffled = rng.shuffled(range(n_states))
+        control, delayed = shuffled[: n_states // 2], shuffled[n_states // 2 :]
 
-def route_modes(n_states: int, rng: RandomSource) -> ModeRoute:
-    shuffled = rng.shuffled(range(n_states))
-    control, delayed = shuffled[: n_states // 2], shuffled[n_states // 2 :]
+        # Half of the delayed states carry messages, the other half are decoys.
+        released = rng.shuffled(delayed)
 
-    # Half of the delayed states carry messages, the other half are decoys.
-    released = rng.shuffled(delayed)
-
-    return ModeRoute(
-        control=tuple(sorted(control)),
-        delayed=tuple(sorted(delayed)),
-        message=tuple(sorted(released[: n_states // 4])),
-        decoy=tuple(sorted(released[n_states // 4 :])),
-    )
+        return cls(
+            control=tuple(sorted(control)),
+            delayed=tuple(sorted(delayed)),
+            message=tuple(sorted(released[: n_states // 4])),
+            decoy=tuple(sorted(released[n_states // 4 :])),
+        )
