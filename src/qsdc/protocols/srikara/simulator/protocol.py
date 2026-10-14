@@ -17,12 +17,12 @@ from .routing import ModeRoute
 
 
 @dataclass(frozen=True)
-class Run(BaseRun):
+class Run(BaseRun[Block]):
     messages: tuple[Message, ...] = ()
 
 
 @dataclass(frozen=True)
-class Attempt(BaseAttempt):
+class Attempt(BaseAttempt[Run]):
     states: tuple[PreparedState, ...]
     route: ModeRoute
     controls: tuple[Check, ...]
@@ -33,7 +33,7 @@ class Attempt(BaseAttempt):
         return [bits for run in self.runs for bits in run.block.symbols]
 
 
-class Simulator(BaseSimulator):
+class Simulator(BaseSimulator[Block, Attempt]):
     config: SimulatorConfig
     backend: Backend
     code: IntervalCode
@@ -53,7 +53,7 @@ class Simulator(BaseSimulator):
     def run_attempt(self, blocks: list[Block], number: int, seed: int) -> Attempt:
         rng = make_random_source(self.config.random_source, seed)
         self.backend.prepare_run(seed)
-        
+
         runs = tuple(Run(block, None) for block in blocks)
         symbols = [bits for block in blocks for bits in block.symbols]
 
