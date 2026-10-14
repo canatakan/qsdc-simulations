@@ -17,6 +17,12 @@ class Config(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
 
+class BaseSimulatorConfig(Config):
+    random_source: Literal["classical", "sf-bs-qrng"] = "classical"
+    seed: int = 11
+    max_attempts: PositiveInt = 1
+
+
 class Fixed(Config):
     kind: Literal["fixed"] = "fixed"
     value: float
