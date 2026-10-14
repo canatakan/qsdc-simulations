@@ -52,24 +52,30 @@ Alice sends a message to Bob over two optical passes. Each 3-bit symbol uses
 
 1. Bob prepares the states with random α, r and θ and sends them to Alice.
 2. Alice checks half of them (the controls) against the values Bob reveals.
-   If any control check fails, the run aborts here.
+   If too many of them fail, the attempt aborts here.
 3. Alice displaces a quarter (the messages) by m(1 + i), where the interval of
    m encodes 3 bits. She leaves the last quarter (the decoys) unchanged and
    sends both back.
 4. Bob unsqueezes and measures the returned states, checks the decoys, and
    decodes m from the messages.
 
-A run is accepted when every control and decoy check falls within
-`tolerance_sigmas` of its expected value.
+The message is sent in attempts. An attempt prepares the states of every block
+not yet released at once, and Alice picks the controls, messages and decoys
+among all of them. A check passes when it falls within k = `tolerance_sigmas`
+of its expected value, which an honest check misses with probability
+q = erfc(k/√2). The controls of an attempt form one security test, and its
+decoys another. A test passes when at most q + k · √(q(1 − q)/n) of its n
+checks fail. A failed test aborts the whole attempt, as in the paper, where
+Alice "discards the protocol, and they start all over again".
 
 ### Usage
 
 ```python
 from qsdc.protocols.srikara.config import SimulatorConfig
-from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator
+from qsdc.protocols.srikara.simulator.protocol import Simulator
 
 config = SimulatorConfig(error_correction="secded", max_attempts=3)
-transmission = SrikaraSimulator(config).transmit("101001110010")
+transmission = Simulator(config).transmit("101001110010")
 assert transmission.recovered_bits == "101001110010"
 ```
 
@@ -136,9 +142,9 @@ Only the layout differs from `gray`.
   always detected.
 - **SECDED:** the block is three extended Hamming (8, 4) codewords,
   interleaved so each symbol carries one bit of each codeword.
-- **Retries:** a block is sent again, up to `max_attempts` sends in total, when
-  its run is rejected or its code finds an error it cannot correct. Each send
-  draws fresh states.
+- **Attempts:** at most `max_attempts` attempts. An aborted attempt sends all
+  its blocks again, and a block whose code finds an error it cannot correct
+  goes again in the next attempt. Each attempt draws fresh states.
 - **Padding:** the last block is padded with zeros. The padding is removed
   after decoding.
 
@@ -173,9 +179,9 @@ paper.
 
 ```python
 from qsdc.protocols.cao.config import SimulatorConfig
-from qsdc.protocols.cao.simulator.protocol import CaoSimulator
+from qsdc.protocols.cao.simulator.protocol import Simulator
 
-transmission = CaoSimulator(SimulatorConfig(max_attempts=3)).transmit("1010")
+transmission = Simulator(SimulatorConfig(max_attempts=3)).transmit("1010")
 ```
 
 `SimulatorConfig` (`config.py`) holds every option. A block has 512 boxes, so
@@ -199,11 +205,15 @@ thermal mode.
 
 ### Checks
 
-The paper gives no threshold for the checks. A stage passes when fewer
-positions fail than q + `check_tolerance_sigmas` · √(q(1 − q)/`check_pairs`),
-where q = e^(−1/σ²) is the failure rate of an honest pair. The backend's
-`check_sigma` gives σ: from the paper's formulas for `analytic`, and from
-the covariance of the noisy circuit for `sf` and `sf-sampled`. An honest
+The paper gives no threshold for the checks. The message is sent in attempts.
+An attempt prepares the pairs of every block not yet released at once, and each
+security test takes `check_pairs` positions per block at random among all of
+them, n in all. A test passes when at most
+q + `check_tolerance_sigmas` · √(q(1 − q)/n) of them fail, where q = e^(−1/σ²)
+is the failure rate of an honest pair. A failed test terminates the whole
+attempt. The backend's `check_sigma` gives σ: from the paper's formulas for
+`analytic`, and from the covariance of the noisy circuit for `sf` and
+`sf-sampled`. An honest
 position fails 15% of the time on `clean` and 40% on `record_27km`.
 
 ### Postprocessing
@@ -242,8 +252,10 @@ reconciled 12 of 12 blocks on each baseline, and `cao-demo` uses it:
 | `metro_5km` | 0.40 | 70 |
 | `metro_10km`, `record_27km` | none | even 0.45 reconciles almost no block, and above about 0.47 no message bits are left |
 
-A block that fails its checks or its reconciliation is sent again, up to
-`max_attempts` sends, with the same payload so a retry publishes nothing new.
+An attempt sends every block not yet released, up to `max_attempts` attempts. A
+terminated attempt sends all its blocks again, and a block that fails its
+reconciliation goes again in the next attempt, with the same payload so a retry
+publishes nothing new.
 With `reconciliation=None`, the paper's mapping is used instead: the message
 is uniformized twice, Bob decodes every box on its own, and a block is released
 only when every box passes its detection and parity bits.
@@ -253,7 +265,7 @@ only when every box passes its detection and parity bits.
 | Setting | Value | Reason |
 | --- | --- | --- |
 | `squeeze_r` | arcosh(9)/2 ≈ 1.444 (12.5 dB) | The two-mode squeezed state then has the variance V = V_A + 1 of the paper's security model |
-| `check_pairs` | 64 per stage | Enough positions for a stable failure rate |
+| `check_pairs` | 64 per block and security test | Enough positions for a stable failure rate |
 | `check_tolerance_sigmas` | 3 | As in Srikara |
 | `syndrome_fraction` | 0.3 | Enough up to `lab`; `SYNDROME_FRACTIONS` gives each baseline its own |
 
@@ -264,9 +276,10 @@ reconciliation removes these errors.
 
 ## Demo
 
-The demos are in `src/qsdc/demo/`. `srikara-demo` sends a text message. It prints one line per send, then every
-protocol step of one block. It uses the `retry` simulator under `lab` noise
-unless told otherwise.
+The demos are in `src/qsdc/demo/`. `srikara-demo` sends a text message. It
+prints one line per block and attempt, then every protocol step of one block,
+with the verdict of each security test over the attempt. It uses the `retry` simulator
+under `lab` noise unless told otherwise.
 
 ```bash
 srikara-demo "hello"
@@ -354,7 +367,7 @@ extends the row above it:
 | `gray` | Gray labels |
 | `optimized` | θ uniform within 3π/2 ± π/4 |
 | `parity` | Parity error detection |
-| `retry` | Up to 3 sends per block |
+| `retry` | Up to 3 attempts |
 
 **Cao.**
 
@@ -362,7 +375,7 @@ extends the row above it:
 | --- | --- |
 | `paper` | The paper's mapping without error correction: a block is released only when every box passes its detection and parity bits |
 | `reconciled` | The defaults: reconciliation and privacy amplification |
-| `retry` | `reconciled` with up to 3 sends per block |
+| `retry` | `reconciled` with up to 3 attempts |
 
 ### Noise baselines
 
@@ -448,9 +461,10 @@ Each run writes `<output-root>/<study>/run_<time>/`, and
 
 `benchmark/metrics.py` records counts and derives every rate from them; each
 suite's `measure` takes the counts from its protocol's transmission.
-Repetitions are pooled by adding their counts. A send is one run of a block;
-a released block is one that passed its checks and its code. For Cao, a state
-is an EPR pair and a symbol is a box with its detection bit.
+Repetitions are pooled by adding their counts. A send is one block in one
+attempt; a released block is one whose attempt passed its security tests and
+whose code then decoded it. For Cao, a state is an EPR pair and a symbol is a
+box with its detection bit.
 
 | Metric | Definition |
 | --- | --- |
@@ -460,6 +474,6 @@ is an EPR pair and a symbol is a box with its detection bit.
 | Delivered bits per state | Correct released bits / all prepared states, retries included |
 | Raw bit error rate | Wrong symbol bits before correction / symbol bits measured, code bits included |
 | Raw-symbol MI per state | Mutual information between sent and decoded symbols × symbols measured / prepared states |
-| Rejection rate | Sends rejected by a check / all sends |
+| Rejection rate | Sends in attempts aborted by a security test / all sends |
 | Check failure rate | Failed checks / checks made |
-| Uncorrectable | Sends that passed the checks but whose code found an error it could not correct |
+| Uncorrectable | Sends whose attempt passed the checks but whose code found an error it could not correct |
