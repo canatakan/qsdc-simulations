@@ -10,14 +10,14 @@ from qsdc.protocols.cao.simulator.backends import (
     SFAnalyticBackend,
     SFSampledBackend,
 )
-from qsdc.protocols.cao.simulator.protocol import CaoSimulator
+from qsdc.protocols.cao.simulator.protocol import Simulator
 
 SQUEEZE_R = 1.0
 SAMPLES = 2000
 
 
 def draws(backend, method, *args):
-    backend.begin_run(3)
+    backend.prepare_run(3)
     return [getattr(backend, method)(*args) for _ in range(SAMPLES)]
 
 
@@ -63,9 +63,9 @@ def test_the_gain_estimate_follows_the_loss():
     config = SimulatorConfig(noise=noise)
     payload = weighted_random_bits(200, 0.5, ClassicalRandomSource(4))
 
-    transmission = CaoSimulator(config).transmit(payload)
+    transmission = Simulator(config).transmit(payload)
 
-    gains = [a.run.estimate.gain for a in transmission.attempts if a.run.estimate]
+    gains = [run.estimate.gain for run in transmission.runs if run.estimate]
     expected = SFAnalyticBackend(config.squeeze_r, noise).measure_signal(1).real
     assert fmean(gains) == pytest.approx(expected, rel=0.03)
 
@@ -90,6 +90,6 @@ def test_calibrated_checks_accept_honest_blocks_at_27km():
     payload = weighted_random_bits(1024, 0.5, ClassicalRandomSource(8))
     config = SimulatorConfig(noise=NOISES["record_27km"])
 
-    transmission = CaoSimulator(config).transmit(payload)
+    transmission = Simulator(config).transmit(payload)
 
-    assert all(attempt.run.accepted for attempt in transmission.attempts)
+    assert all(attempt.accepted for attempt in transmission.attempts)

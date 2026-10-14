@@ -8,13 +8,13 @@ from qsdc.common.random import ClassicalRandomSource, weighted_random_bits
 from qsdc.protocols.cao.config import NOISES, Reconciliation, SimulatorConfig
 from qsdc.protocols.cao.constants import EPR_BOUND
 from qsdc.protocols.cao.simulator.backends import AnalyticBackend, SFSampledBackend
-from qsdc.protocols.cao.simulator.protocol import CaoSimulator
+from qsdc.protocols.cao.simulator.protocol import Simulator
 
 SAMPLES = 2000
 
 
 class InvertFirstSignal(AnalyticBackend):
-    def begin_run(self, seed):
+    def prepare_run(self, seed):
         self.runs = getattr(self, "runs", 0) + 1
         self.inverted = self.runs > 1
 
@@ -27,7 +27,7 @@ class InvertFirstSignal(AnalyticBackend):
 
 
 def samples(backend, method, *args):
-    backend.begin_run(1)
+    backend.prepare_run(1)
     return [getattr(backend, method)(*args) for _ in range(SAMPLES)]
 
 
@@ -64,14 +64,13 @@ def test_analytic_backend_measures_without_noise():
 
 def test_noiseless_round_trip():
     payload = bytes_to_bits(b"Gaussian mapping")
-    simulator = CaoSimulator(SimulatorConfig(backend="analytic"))
+    simulator = Simulator(SimulatorConfig(backend="analytic"))
 
     transmission = simulator.transmit(payload)
 
     assert transmission.recovered_bits == payload
     assert all(
-        attempt.run.estimate.gain == pytest.approx(1 / sqrt(2))
-        for attempt in transmission.attempts
+        run.estimate.gain == pytest.approx(1 / sqrt(2)) for run in transmission.runs
     )
 
 
@@ -81,11 +80,11 @@ def test_without_reconciliation_a_detected_error_is_retried():
         boxes=4, check_pairs=4, reconciliation=None, max_attempts=2
     )
 
-    transmission = CaoSimulator(config, InvertFirstSignal(0.0)).transmit(payload)
+    transmission = Simulator(config, InvertFirstSignal(0.0)).transmit(payload)
 
-    first, second = transmission.attempts
-    assert first.run.accepted and first.decoded_bits is None
-    assert not first.run.signals[0].parity_valid
+    first, second = transmission.runs
+    assert transmission.attempts[0].accepted and first.decoded_bits is None
+    assert not all(signal.valid for signal in first.signals)
     assert second.decoded_bits == payload
 
 
@@ -93,11 +92,11 @@ def test_reconciliation_corrects_a_wrong_box():
     config = SimulatorConfig()
     payload = weighted_random_bits(config.block_bits, 0.5, ClassicalRandomSource(6))
 
-    transmission = CaoSimulator(config, InvertFirstSignal(0.0)).transmit(payload)
+    transmission = Simulator(config, InvertFirstSignal(0.0)).transmit(payload)
 
-    (attempt,) = transmission.attempts
-    assert attempt.run.signals[0].decoded_bits != attempt.run.signals[0].box.bits
-    assert attempt.decoded_bits == payload
+    (run,) = transmission.runs
+    assert run.signals[0].decoded_bits != run.signals[0].box.bits
+    assert run.decoded_bits == payload
 
 
 @pytest.mark.parametrize("name", ["clean", "lab"])
@@ -105,12 +104,10 @@ def test_reconciliation_delivers_the_message(name):
     payload = weighted_random_bits(1024, 0.5, ClassicalRandomSource(7))
     config = SimulatorConfig(noise=NOISES[name], max_attempts=3)
 
-    transmission = CaoSimulator(config).transmit(payload)
+    transmission = Simulator(config).transmit(payload)
 
     wrong = sum(
-        s.decoded_bits != s.box.bits
-        for a in transmission.attempts
-        for s in a.run.signals
+        s.decoded_bits != s.box.bits for run in transmission.runs for s in run.signals
     )
     assert wrong > 0
     assert transmission.recovered_bits == payload
@@ -120,7 +117,7 @@ def test_without_reconciliation_the_raw_errors_withhold_blocks():
     payload = weighted_random_bits(1024, 0.5, ClassicalRandomSource(7))
     config = SimulatorConfig(noise=NOISES["lab"], reconciliation=None)
 
-    transmission = CaoSimulator(config).transmit(payload)
+    transmission = Simulator(config).transmit(payload)
 
     assert transmission.recovered_bits is None
 
@@ -128,27 +125,29 @@ def test_without_reconciliation_the_raw_errors_withhold_blocks():
 def test_honest_channel_passes_the_checks():
     payload = weighted_random_bits(1024, 0.5, ClassicalRandomSource(1))
 
-    transmission = CaoSimulator(SimulatorConfig()).transmit(payload)
+    transmission = Simulator(SimulatorConfig()).transmit(payload)
 
-    assert all(attempt.run.accepted for attempt in transmission.attempts)
+    assert all(attempt.accepted for attempt in transmission.attempts)
 
 
-def test_each_block_uses_its_pairs_once():
+def test_each_attempt_uses_its_pairs_once():
     config = SimulatorConfig()
-    run = CaoSimulator(config, AnalyticBackend(0.0)).transmit("10").attempts[0].run
-    indices = [check.index for check in run.channel.checks + run.authentication.checks]
-    indices += [signal.index for signal in run.signals]
+    transmission = Simulator(config, AnalyticBackend(0.0)).transmit("10" * 100)
+    [attempt] = transmission.attempts
+    indices = [check.index for check in attempt.channel + attempt.authentication]
+    indices += [signal.index for run in attempt.runs for signal in run.signals]
 
-    assert run.pairs == 2 * config.check_pairs + config.boxes
-    assert sorted(indices) == list(range(run.pairs))
+    assert len(attempt.runs) == 2
+    assert attempt.pairs == 2 * (2 * config.check_pairs + config.boxes)
+    assert sorted(indices) == list(range(attempt.pairs))
 
 
 def test_transmission_is_reproducible():
     payload = weighted_random_bits(60, 0.5, ClassicalRandomSource(2))
     config = SimulatorConfig(max_attempts=3)
 
-    first = CaoSimulator(config).transmit(payload)
-    second = CaoSimulator(config).transmit(payload)
+    first = Simulator(config).transmit(payload)
+    second = Simulator(config).transmit(payload)
 
     assert first == second
 

@@ -25,7 +25,7 @@ class Backend(ABC):
     def __init__(self, squeeze_r: float):
         self.squeeze_r = squeeze_r
 
-    def begin_run(self, seed: int) -> None: ...
+    def prepare_run(self, seed: int) -> None: ...
 
     @abstractmethod
     def measure_check(self) -> tuple[complex, complex]:
@@ -219,7 +219,7 @@ class SFAnalyticBackend(StrawberryFieldsBackend):
 
 
 class SFSampledBackend(StrawberryFieldsBackend):
-    def begin_run(self, seed: int) -> None:
+    def prepare_run(self, seed: int) -> None:
         np.random.seed(seed)
 
     def _measure_heterodyne(
