@@ -4,9 +4,10 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from qsdc.common.coding.bits import hamming_distance
+from qsdc.common.transmission import Transmission
 from qsdc.protocols.srikara.config import NOISES, PRESETS, SimulatorConfig
-from qsdc.protocols.srikara.simulator.encoding import INTERVAL_CODES
-from qsdc.protocols.srikara.simulator.protocol import SrikaraSimulator, Transmission
+from qsdc.protocols.srikara.constants import INTERVAL_CODES
+from qsdc.protocols.srikara.simulator.protocol import Simulator
 
 from ... import cli
 from ...metrics import RunMetrics, count_blocks, count_symbols
@@ -22,18 +23,14 @@ class SrikaraSuite(Suite):
     output_root = Path(__file__).parents[2] / "results" / "srikara"
 
     def simulate(self, config: SimulatorConfig, payload: str) -> Transmission:
-        return SrikaraSimulator(config).transmit(payload)
+        return Simulator(config).transmit(payload)
 
     def measure(
         self, config: SimulatorConfig, transmission: Transmission, seconds: float
     ) -> RunMetrics:
         attempts = transmission.attempts
-        messages = [m for attempt in attempts for m in attempt.run.messages]
-        checks = [
-            check
-            for attempt in attempts
-            for check in attempt.run.controls + attempt.run.decoys
-        ]
+        messages = [m for run in transmission.runs for m in run.messages]
+        checks = [c for attempt in attempts for c in attempt.controls + attempt.decoys]
         symbols = [(m.sent_bits, m.decoded_bits) for m in messages]
 
         return RunMetrics(
@@ -42,7 +39,7 @@ class SrikaraSuite(Suite):
             raw_error_bits=sum(
                 hamming_distance(sent, decoded) for sent, decoded in symbols
             ),
-            states=sum(len(attempt.run.states) for attempt in attempts),
+            states=sum(len(attempt.states) for attempt in attempts),
             checks=len(checks),
             failed_checks=sum(not check.passed for check in checks),
             seconds=seconds,

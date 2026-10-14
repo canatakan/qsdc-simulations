@@ -124,20 +124,24 @@ class RunMetrics:
 
 
 def count_blocks(transmission: Transmission) -> dict[str, int]:
-    finals = transmission.final_attempts
-    released = [attempt for attempt in finals if attempt.decoded_bits is not None]
+    attempts = transmission.attempts
+    finals = transmission.final_runs
+    released = [run for run in finals if run.decoded_bits is not None]
 
     return {
-        "payload_bits": sum(len(attempt.block.bits) for attempt in finals),
+        "payload_bits": sum(len(run.block.bits) for run in finals),
         "error_bits": sum(
-            hamming_distance(a.block.bits, a.decoded_bits) for a in released
+            hamming_distance(run.block.bits, run.decoded_bits) for run in released
         ),
-        "erased_bits": sum(len(a.block.bits) for a in finals if a.decoded_bits is None),
+        "erased_bits": sum(len(r.block.bits) for r in finals if r.decoded_bits is None),
         "blocks": len(finals),
-        "retries": len(transmission.attempts) - len(finals),
-        "rejected": sum(not a.run.accepted for a in transmission.attempts),
+        "retries": len(transmission.runs) - len(finals),
+        "rejected": sum(len(a.runs) for a in attempts if not a.accepted),
         "uncorrectable": sum(
-            a.run.accepted and a.decoded_bits is None for a in transmission.attempts
+            run.decoded_bits is None
+            for attempt in attempts
+            if attempt.accepted
+            for run in attempt.runs
         ),
     }
 
