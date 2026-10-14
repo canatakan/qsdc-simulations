@@ -32,7 +32,7 @@ class Expectation:
 
 
 class Backend(ABC):
-    def begin_run(self, seed: int) -> None: ...
+    def prepare_run(self, seed: int) -> None: ...
 
     @abstractmethod
     def measure_control(self, state: PreparedState, axis: Quadrature) -> float: ...
@@ -190,7 +190,7 @@ class SFAnalyticBackend(StrawberryFieldsBackend):
 class SFSampledBackend(StrawberryFieldsBackend):
     # Reads out a homodyne sample of each circuit
 
-    def begin_run(self, seed: int) -> None:
+    def prepare_run(self, seed: int) -> None:
         np.random.seed(seed)
 
     def _measure(self, program: Program, axis: Quadrature, detector: Detector) -> float:
