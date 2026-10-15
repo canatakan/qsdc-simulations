@@ -383,6 +383,12 @@ benchmark srikara rerender                              # rebuild reports withou
 - `--skip-existing` skips studies that already have a report.
 - `rerender` rebuilds the plots, CSV and HTML from each `results.json`.
 
+To replay one saved case and repetition with its original settings and
+seeds, use `benchmark srikara reproduce path/to/results.json --case 28 --repetition 4`.
+Both numbers start at 1. This compares the metrics with the saved repetition,
+excluding elapsed time. It writes no reports and exits with status 1 if the metrics
+differ. Reproduction uses the currently installed simulator code.
+
 ### Presets
 
 Each protocol names its simulator configurations in its `presets.yaml`. A

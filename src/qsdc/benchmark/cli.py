@@ -3,9 +3,10 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from pathlib import Path
+from time import perf_counter
 
-from .benchmark import Workload, run_benchmark
-from .report.report import rerender, write_index, write_report
+from .benchmark import Workload, reseed, run_benchmark
+from .report.report import load_result, rerender, write_index, write_report
 from .studies.cao.suite import CAO
 from .studies.catalog import Catalog
 from .studies.srikara.suite import SRIKARA
@@ -30,6 +31,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         list_studies(catalog, Workload())
     elif args.command == "run":
         run_studies(suite, catalog, args)
+    elif args.command == "reproduce":
+        reproduce_run(suite, args, parser)
     elif args.command == "rerender":
         rerender_reports(suite, args.output_root)
     elif args.command == "index":
@@ -42,6 +45,17 @@ def add_commands(parser: argparse.ArgumentParser, suite: Suite) -> None:
 
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("list", help="list the built-in studies")
+
+    reproduce = commands.add_parser(
+        "reproduce", help="replay one saved run and repetition without writing reports"
+    )
+    reproduce.add_argument("results", type=Path, help="path to results.json")
+    reproduce.add_argument(
+        "--case", type=int, required=True, help="Case number shown in the report"
+    )
+    reproduce.add_argument(
+        "--repetition", type=int, default=1, help="1-based; default: 1"
+    )
 
     run = commands.add_parser("run", help="run studies into <output-root>/<study>/")
     run.add_argument(
@@ -102,6 +116,45 @@ def run_studies(suite: Suite, catalog: Catalog, args: argparse.Namespace) -> Non
         print(f"  {report / 'report.html'}")
 
     rebuild_index(suite, args.output_root)
+
+
+def reproduce_run(
+    suite: Suite, args: argparse.Namespace, parser: argparse.ArgumentParser
+) -> None:
+    saved = load_result(args.results, suite)
+    if not 1 <= args.case <= len(saved.runs):
+        parser.error(f"--case must be between 1 and {len(saved.runs)}")
+
+    run = saved.runs[args.case - 1]
+    if not 1 <= args.repetition <= len(run.repetitions):
+        parser.error(f"--repetition must be between 1 and {len(run.repetitions)}")
+
+    config, workload = run.case.simulator, run.case.workload
+    if args.repetition > 1:
+        config = reseed(config, args.repetition - 1)
+        workload = reseed(workload, args.repetition - 1)
+
+    print(
+        f"Case {args.case}, repetition {args.repetition}: {run.case.series}, {run.case.label or saved.benchmark.name}"
+    )
+    print(f"Simulation seed: {config.seed}, payload seed: {workload.seed}")
+    payload = workload.payload()
+    started = perf_counter()
+    transmission = suite.simulate(config, payload)
+    metrics = suite.measure(config, transmission, perf_counter() - started)
+
+    expected = run.repetitions[args.repetition - 1].as_dict()
+    differences = {
+        key: {"saved": expected[key], "reproduced": value}
+        for key, value in metrics.as_dict().items()
+        if key != "seconds" and value != expected[key]
+    }
+    if differences:
+        for key, values in differences.items():
+            print(f"{key}: saved={values['saved']}, reproduced={values['reproduced']}")
+        parser.exit(1, "Metrics differ from the saved repetition.\n")
+
+    print("Metrics match the saved repetition (excluding elapsed time).")
 
 
 def rerender_reports(suite: Suite, output_root: Path) -> None:
