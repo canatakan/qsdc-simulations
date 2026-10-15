@@ -59,3 +59,51 @@ def test_extra_rows_take_part_in_decoding():
 
     assert code.decode([5.0, -0.5], "0") == "00"
     assert code.decode([5.0, -0.5], "1") == "01"
+
+
+@pytest.mark.parametrize("data_bits,parity_bits", [(12, 9), (96, 96), (192, 96)])
+def test_transmitted_codewords_are_systematic_and_satisfy_every_check(
+    data_bits,
+    parity_bits,
+):
+    code = LdpcCode.systematic(data_bits, parity_bits, seed=3)
+    rng = np.random.default_rng(4)
+    for _ in range(10):
+        bits = random_bits(data_bits, rng)
+        word = code.encode(bits)
+
+        assert len(word) == data_bits + parity_bits
+        assert word[:data_bits] == bits
+        assert code.syndrome(word) == "0" * parity_bits
+
+    assert code.rows == LdpcCode.systematic(data_bits, parity_bits, seed=3).rows
+    assert code.rows != LdpcCode.systematic(data_bits, parity_bits, seed=4).rows
+
+
+def test_transmitted_code_corrects_each_single_bit_error_in_a_default_block():
+    code = LdpcCode.systematic(96, 96)
+    word = code.encode(random_bits(96, np.random.default_rng(3)))
+    for i in range(code.length):
+        prior = confidences(word, 0.01)
+        prior[i] *= -1
+
+        assert code.decode(prior, "0" * code.checks) == word
+
+
+@pytest.mark.parametrize("shape", [(0, 6, 3), (6, 0, 3), (6, 3, 4), (6, 3, 0)])
+def test_transmitted_code_rejects_invalid_shapes(shape):
+    with pytest.raises(ValueError):
+        LdpcCode.systematic(*shape)
+
+
+@pytest.mark.parametrize("bits", ["101", "0" * 95 + "x"])
+def test_transmitted_code_rejects_invalid_data(bits):
+    with pytest.raises(ValueError):
+        LdpcCode.systematic(96, 96).encode(bits)
+
+
+def test_reconciliation_code_rejects_codeword_encoding():
+    code = LdpcCode.regular(96, 48, 3, seed=0)
+
+    with pytest.raises(ValueError, match="encoding requires a systematic code"):
+        code.encode("0" * 48)
