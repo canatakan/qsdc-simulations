@@ -31,7 +31,6 @@ class Check:
         measured: float,
         tolerance_sigmas: float,
     ) -> Check:
-        # A check passes within tolerance_sigmas of its expected value.
         passed = abs(measured - expected.mean) <= tolerance_sigmas * expected.sigma
         return cls(state.index, axis, expected.mean, expected.sigma, measured, passed)
 
