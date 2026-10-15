@@ -72,7 +72,11 @@ class Catalog:
         self, spec: dict, shared: dict, simulator: str, noise: str, workload: Workload
     ) -> Case:
         suite = self.suite
-        document = suite.presets[spec.get("simulator", simulator)].model_dump()
+        preset = spec.get("simulator", simulator)
+        if isinstance(preset, dict):
+            preset = preset.get(noise, preset["default"])
+
+        document = suite.presets[preset].model_dump()
         document["noise"] = suite.noises[noise].model_dump()
         document["workload"] = workload.model_dump()
 
@@ -81,10 +85,14 @@ class Catalog:
 
         payload = Workload.model_validate(document.pop("workload"))
 
+        label = spec.get("label")
+        if isinstance(label, dict):
+            label = label.get(noise, label["default"])
+
         return Case(
             suite.config.model_validate(document),
             payload,
             series=noise,
-            label=spec.get("label"),
+            label=label,
             at=tuple(spec.get("at", ())),
         )

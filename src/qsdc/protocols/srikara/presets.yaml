@@ -31,3 +31,7 @@ retry:
 ldpc:
   extends: optimized
   error_correction: ldpc
+
+ldpc_large:
+  extends: ldpc
+  ldpc: {data_bits: 384, parity_bits: 768}

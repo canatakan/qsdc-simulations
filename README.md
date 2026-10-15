@@ -407,6 +407,7 @@ extends the row above it:
 | `parity` | Parity error detection |
 | `retry` | Up to 3 attempts |
 | `ldpc` | `optimized` with transmitted LDPC codewords |
+| `ldpc_large` | `ldpc` with 384 data + 768 parity bits; 100 decoding iterations |
 
 **Cao.**
 
@@ -439,7 +440,7 @@ by dotted path, such as `noise.forward.transmittance`. Each noise baseline is
 one series in the report. Each case sends a random 10,000-bit payload unless
 `--payload-bits` says otherwise.
 
-**Srikara** has 19 studies. A case runs `optimized` unless the study says
+**Srikara** has 20 studies. A case runs `optimized` unless the study says
 otherwise.
 
 | Group | Studies | Noise |
@@ -447,6 +448,7 @@ otherwise.
 | Reference | `ideal_backend_check`, `paper_baseline`, `noise_profiles` | `clean`; `noise_profiles` uses all five |
 | Signal | `squeezing_r`, `squeezing_distributions`, `theta_fixed`, `theta_band`, `r_theta_heatmap` | `lab` |
 | Optimizations | `optimization_comparison`, `axis_comparison`, `interval_comparison`, `error_correction_comparison` | all five |
+| Optimizations | `ldpc_high_noise` | `record_27km` |
 | Protocol | `tolerance_safety`, `one_probability` | `lab` |
 | Hardware | `channel_transmittance`, `thermal_occupation`, `detector_efficiency`, `electronic_noise`, `memory_efficiency` | `lab` |
 
@@ -455,6 +457,28 @@ retry variants for parity, SECDED and LDPC.
 
 `optimization_comparison` also includes LDPC and LDPC with retries as alternatives
 to parity, both starting from `optimized`.
+
+Both comparisons use `ldpc_large` (384 data + 768 parity bits) at 10 km and
+27 km, and `ldpc` (96 data + 96 parity bits) for clean, lab and 5 km noise.
+Cases can select a preset or label by noise using a `simulator` or `label`
+mapping with a `default` entry and noise names as overrides.
+
+`ldpc_high_noise` compares eight LDPC configurations on the 27 km baseline:
+96 or 384 data bits, an equal or double number of parity bits (rates 1/2 and
+1/3), and 100 or 300 decoder iterations. Retries are disabled; graph seed 0,
+column weight 3 and all optical settings are held fixed. Compare coding
+rejection, correct payload delivered, BER and delivered bits per state.
+
+```bash
+srikara-benchmark run --study ldpc_high_noise --payload-bits 9984 --repetitions 10
+```
+
+9,984 bits divides evenly into both data block sizes, avoiding padding. Each
+repetition uses the same payload and simulation seeds across configurations;
+iteration pairs also use identical transmitted states and measurements. More
+parity changes the number of states transmitted, so compare delivery together
+with bits per state. The study measures reliability and transmission cost;
+it does not estimate Eve's information or establish secrecy for these codes.
 
 **Cao** has 4 studies. A case runs `reconciled` unless the study says
 otherwise.
