@@ -39,7 +39,8 @@ a { color: var(--accent); }
 
 .cards article { padding: 14px 16px; }
 .cards h3 { margin: 0; color: var(--muted); font-size: 13px; font-weight: 600; }
-.cards p { margin: 4px 0 0; font-size: 24px; font-weight: 700; }
+.cards p { margin: 4px 0 0; font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cards small { color: var(--muted); font-size: 13px; }
 
 img {
   display: block;
@@ -54,6 +55,34 @@ thead th { color: var(--muted); font-size: 13px; white-space: nowrap; }
 tbody tr:last-child > * { border-bottom: 0; }
 th.number, td.number { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .links { margin-top: 16px; }
+
+.switch { position: absolute; opacity: 0; }
+.switch + label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.switch + label::before {
+  content: "";
+  width: 30px;
+  height: 18px;
+  border-radius: 9px;
+  background: radial-gradient(circle, white 6px, transparent 7px) no-repeat 0 0 / 18px 18px, var(--line);
+  transition: background-position 0.15s, background-color 0.15s;
+}
+.switch:checked + label::before { background-position: 12px 0; background-color: var(--accent); }
+.switch:focus-visible + label::before { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch:not(:checked) ~ .table .interval { display: none; }
+
+.index { table-layout: fixed; }
+.index col.layout { width: 120px; }
+.index col.count { width: 120px; }
+.index col.time { width: 130px; }
 details { margin: 8px 0; }
 summary { cursor: pointer; padding: 6px 0; }
 .matrix {

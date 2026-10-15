@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from textwrap import fill
 
@@ -11,15 +12,17 @@ from matplotlib.figure import Figure
 from matplotlib.patches import Patch
 from matplotlib.ticker import PercentFormatter
 
-from ..benchmark import BenchmarkResult
+from ..benchmark import BenchmarkResult, RunResult
 
 PLOTTED = {
     "bit_error_rate": "Bit error rate",
+    "delivered_fraction": "Correct payload delivered",
+    "coding_rejection_rate": "Coding-rejected sends",
     "delivered_bits_per_state": "Delivered bits / state",
     "information_per_state": "Raw-symbol MI / state",
     "check_failure_rate": "Failed checks",
 }
-HEATMAP_METRICS = ("bit_error_rate", "delivered_bits_per_state")
+HEATMAP_PANELS = 4
 
 
 def write_plots(
@@ -48,12 +51,16 @@ def _comparison(result: BenchmarkResult, labels: list[str]) -> Figure:
     series = list(dict.fromkeys(run.case.series for run in runs))
     colors = [colormaps["tab10"](series.index(run.case.series) % 10) for run in runs]
 
-    height = max(6.0, 0.6 * sum(label.count("\n") + 1 for label in labels))
+    plotted = _plotted(result, runs)
+    rows = (len(plotted) + 1) // 2
+    height = max(
+        3.0 * rows, 0.3 * rows * sum(label.count("\n") + 1 for label in labels)
+    )
     figure = Figure(figsize=(15, height), layout="constrained")
-    axes = figure.subplots(2, 2, sharey=True)
+    axes = figure.subplots(rows, 2, sharey=True)
     positions = np.arange(len(runs))
 
-    for axis, (metric, title) in zip(axes.flat, PLOTTED.items()):
+    for axis, (metric, title) in zip(axes.flat, plotted.items()):
         values = [run.value(metric) for run in runs]
         errors = np.nan_to_num([run.interval(metric) for run in runs])
         axis.barh(
@@ -87,6 +94,9 @@ def _comparison(result: BenchmarkResult, labels: list[str]) -> Figure:
         _style(axis, title, metric, axis.xaxis)
 
     axes[0, 0].invert_yaxis()
+    for axis in axes.flat[len(plotted) :]:
+        axis.set_visible(False)
+
     if len(series) > 1:
         figure.legend(
             handles=[
@@ -106,10 +116,12 @@ def _sweep(result: BenchmarkResult) -> Figure:
     runs = result.runs
     series = list(dict.fromkeys(run.case.series for run in runs))
 
-    figure = Figure(figsize=(12, 8), layout="constrained")
-    axes = figure.subplots(2, 2)
+    plotted = _plotted(result, runs)
+    rows = (len(plotted) + 1) // 2
+    figure = Figure(figsize=(12, 4 * rows), layout="constrained")
+    axes = figure.subplots(rows, 2)
 
-    for axis, (metric, title) in zip(axes.flat, PLOTTED.items()):
+    for axis, (metric, title) in zip(axes.flat, plotted.items()):
         for name in series:
             points = sorted(
                 (*run.case.at, run.value(metric), run.interval(metric))
@@ -131,6 +143,9 @@ def _sweep(result: BenchmarkResult) -> Figure:
         if len(series) > 1:
             axis.legend(frameon=False)
 
+    for axis in axes.flat[len(plotted) :]:
+        axis.set_visible(False)
+
     figure.suptitle(result.benchmark.title, fontsize=16, fontweight="bold")
     return figure
 
@@ -138,19 +153,21 @@ def _sweep(result: BenchmarkResult) -> Figure:
 def _heatmaps(result: BenchmarkResult) -> list[Figure]:
     runs = result.runs
     limits = {
-        metric: _limits([run.value(metric) for run in runs])
-        for metric in HEATMAP_METRICS
+        metric: _limits([run.value(metric) for run in runs]) for metric in PLOTTED
     }
 
     figures = []
     for series in dict.fromkeys(run.case.series for run in runs):
-        cells = {run.case.at: run for run in runs if run.case.series == series}
+        selected = [run for run in runs if run.case.series == series]
+        cells = {run.case.at: run for run in selected}
         xs, ys = sorted({x for x, _ in cells}), sorted({y for _, y in cells})
 
-        figure = Figure(figsize=(12, 4.8), layout="constrained")
-        axes = figure.subplots(1, 2)
+        metrics = list(_plotted(result, selected))[:HEATMAP_PANELS]
+        rows = (len(metrics) + 1) // 2
+        figure = Figure(figsize=(12, 4.8 * rows), layout="constrained")
+        axes = figure.subplots(rows, 2, squeeze=False)
 
-        for axis, metric in zip(axes, HEATMAP_METRICS):
+        for axis, metric in zip(axes.flat, metrics):
             matrix = np.array(
                 [
                     [
@@ -160,7 +177,7 @@ def _heatmaps(result: BenchmarkResult) -> list[Figure]:
                     for y in ys
                 ]
             )
-            colormap = "viridis" if metric.endswith("per_state") else "viridis_r"
+            colormap = "viridis_r" if metric.endswith("_rate") else "viridis"
             image = axis.imshow(
                 np.ma.masked_invalid(matrix),
                 origin="lower",
@@ -203,6 +220,18 @@ def _heatmaps(result: BenchmarkResult) -> list[Figure]:
     return figures
 
 
+def _plotted(result: BenchmarkResult, runs: Sequence[RunResult]) -> dict[str, str]:
+    suite = result.benchmark.suite
+    coded = suite.name != "srikara" or any(
+        run.case.simulator.error_correction != "none" for run in runs
+    )
+    return {
+        metric: title
+        for metric, title in PLOTTED.items()
+        if coded or metric != "coding_rejection_rate"
+    }
+
+
 def _style(axis: Axes, title: str, metric: str, value_axis: Axis) -> None:
     axis.set_title(title, fontweight="bold")
     axis.grid(alpha=0.3)
@@ -220,4 +249,8 @@ def _format(metric: str, value: float) -> str:
 
 def _limits(values: list[float]) -> tuple[float, float]:
     finite = [value for value in values if np.isfinite(value)]
-    return (min(finite), max(finite)) if finite else (0.0, 1.0)
+    if not finite:
+        return 0.0, 1.0
+
+    lower, upper = min(finite), max(finite)
+    return (0.0, max(1.0, upper)) if lower == upper else (lower, upper)

@@ -448,7 +448,7 @@ otherwise.
 | Reference | `ideal_backend_check`, `paper_baseline`, `noise_profiles` | `clean`; `noise_profiles` uses all five |
 | Signal | `squeezing_r`, `squeezing_distributions`, `theta_fixed`, `theta_band`, `r_theta_heatmap` | `lab` |
 | Optimizations | `optimization_comparison`, `axis_comparison`, `interval_comparison`, `error_correction_comparison` | all five |
-| Optimizations | `ldpc_high_noise` | `record_27km` |
+| Optimizations | `ldpc_configuration` | `record_27km` |
 | Protocol | `tolerance_safety`, `one_probability` | `lab` |
 | Hardware | `channel_transmittance`, `thermal_occupation`, `detector_efficiency`, `electronic_noise`, `memory_efficiency` | `lab` |
 
@@ -463,14 +463,14 @@ Both comparisons use `ldpc_large` (384 data + 768 parity bits) at 10 km and
 Cases can select a preset or label by noise using a `simulator` or `label`
 mapping with a `default` entry and noise names as overrides.
 
-`ldpc_high_noise` compares eight LDPC configurations on the 27 km baseline:
+`ldpc_configuration` compares eight LDPC configurations on the 27 km baseline:
 96 or 384 data bits, an equal or double number of parity bits (rates 1/2 and
 1/3), and 100 or 300 decoder iterations. Retries are disabled; graph seed 0,
 column weight 3 and all optical settings are held fixed. Compare coding
 rejection, correct payload delivered, BER and delivered bits per state.
 
 ```bash
-srikara-benchmark run --study ldpc_high_noise --payload-bits 9984 --repetitions 10
+benchmark srikara run --study ldpc_configuration --payload-bits 9984 --repetitions 10
 ```
 
 9,984 bits divides evenly into both data block sizes, avoiding padding. Each
@@ -541,5 +541,20 @@ box with its detection bit.
 | Raw bit error rate | Wrong symbol bits before correction / symbol bits measured, code bits included |
 | Raw-symbol MI per state | Mutual information between sent and decoded symbols × symbols measured / prepared states |
 | Check failure rate | Failed checks / checks made |
+| Coding rejection rate | Uncorrectable sends / all block sends, retries included; excludes security aborts from the numerator |
 | Aborted attempts | Attempts ended because a security test failed |
 | Uncorrectable | Sends whose attempt passed the checks but whose code found an error it could not correct |
+
+Comparison and sweep plots show BER, correct payload delivered, coding-rejected
+sends, delivered bits per state, raw-symbol MI per state and failed checks.
+Heatmaps show the first four. Studies without error correction have no
+coding-rejected sends: their plots and tables leave the rate out, and heatmaps
+show raw-symbol MI per state instead. These rates can be regenerated from saved
+counts with `benchmark srikara rerender` or `benchmark cao rerender`.
+
+Failed checks count individual measurements. Coding-rejected sends count blocks
+withheld after accepted security tests, including parity mismatches and decoding
+failures. A retry may recover those blocks, so this rate differs from final
+erasures and correct payload delivery. It is also different from the former
+per-send security rejection rate, which rejected a whole send when any of its
+checks failed.

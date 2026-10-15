@@ -26,6 +26,7 @@ TABLE_RATES = (
     "delivered_bits_per_state",
     "information_per_state",
 )
+OVERVIEW_RATES = ("bit_error_rate", "delivered_fraction", "delivered_bits_per_state")
 
 OTHER = {"title": "Other"}
 _templates = Environment(
@@ -163,6 +164,9 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
     }
 
     series = len({case.series for case in benchmark.cases}) > 1
+    coded = suite.name != "srikara" or any(
+        case.simulator.error_correction != "none" for case in benchmark.cases
+    )
 
     table = [
         {
@@ -171,12 +175,19 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
             "series": run.case.series,
             "cells": [
                 *(_rate(run, rate) for rate in TABLE_RATES),
-                str(run.metrics.blocks),
-                str(run.metrics.retries),
+                _cell(run.metrics.blocks),
+                _cell(run.metrics.retries),
                 _rate(run, "check_failure_rate"),
-                str(run.metrics.aborted_attempts),
-                str(run.metrics.uncorrectable),
-                _seconds(run.metrics.seconds),
+                _cell(run.metrics.aborted_attempts),
+                *(
+                    [
+                        _rate(run, "coding_rejection_rate"),
+                        _cell(run.metrics.uncorrectable),
+                    ]
+                    if coded
+                    else []
+                ),
+                _cell(_seconds(run.metrics.seconds)),
             ],
         }
         for position, (run, label) in enumerate(zip(result.runs, labels), start=1)
@@ -192,8 +203,12 @@ def _write(result: BenchmarkResult, directory: Path) -> None:
         title=benchmark.title,
         layout=benchmark.layout,
         summary=summary,
-        single=result.runs[0].metrics if len(result.runs) == 1 else None,
+        overview={rate: _span(result.runs, rate) for rate in OVERVIEW_RATES},
         seconds=_seconds(summary["simulation_seconds"]),
+        per_repetition=_seconds(
+            summary["simulation_seconds"] / (summary["runs"] * summary["repetitions"])
+        ),
+        coded=coded,
         plots=plots,
         shared=shared,
         show_series=series,
@@ -225,7 +240,7 @@ def write_index(root: Path, suite: Suite) -> Path:
 
         groups[group]["rows"].append(
             {
-                "name": name.replace("_", " ").capitalize(),
+                "name": name.replace("_", " ").capitalize().replace("Ldpc", "LDPC"),
                 "layout": document["benchmark"]["layout"],
                 "href": report.relative_to(root).as_posix(),
                 "executions": executions[name],
@@ -241,7 +256,7 @@ def write_index(root: Path, suite: Suite) -> Path:
     index = root / "index.html"
     index.write_text(
         _templates.get_template("index.html").render(
-            title=root.name.replace("_", " ").capitalize(), groups=groups
+            title=f"{suite.title} benchmark results", groups=groups
         )
     )
 
@@ -299,18 +314,49 @@ def _flatten(record: dict, prefix: str = "") -> dict[str, object]:
     return flat
 
 
-def _rate(run: RunResult, rate: str) -> str:
+def _cell(value: object, interval: str | None = None) -> dict[str, object]:
+    return {"value": value, "interval": interval}
+
+
+def _rate(run: RunResult, rate: str) -> dict[str, object]:
     value = getattr(run.metrics, rate)
     if value is None:
-        return "—"
+        return _cell("—")
 
     text = "{:.4f}" if rate.endswith("per_state") else "{:.2%}"
     interval = run.interval(rate)
     if math.isnan(interval):
-        return text.format(value)
+        return _cell(text.format(value))
 
-    return f"{text.format(value)} ± {text.format(interval)}"
+    return _cell(text.format(value), text.format(interval))
+
+
+def _span(runs: tuple[RunResult, ...], rate: str) -> str:
+    # The lowest and the highest value over the cases, or the single value.
+    values = sorted(
+        value
+        for value in (getattr(run.metrics, rate) for run in runs)
+        if value is not None
+    )
+    if not values:
+        return "—"
+
+    low, high = values[0], values[-1]
+    if rate.endswith("per_state"):
+        return f"{low:.4f}" if low == high else f"{low:.3f} – {high:.3f}"
+
+    return f"{low:.2%}" if low == high else f"{100 * low:.2f} – {high:.2%}"
 
 
 def _seconds(seconds: float) -> str:
-    return f"{seconds * 1000:.1f} ms" if seconds < 1 else f"{seconds:.2f} s"
+    if seconds < 1:
+        return f"{seconds * 1000:.1f} ms"
+    if seconds < 60:
+        return f"{seconds:.2f} s"
+
+    minutes, seconds = divmod(round(seconds), 60)
+    if minutes < 60:
+        return f"{minutes} min {seconds:02d} s"
+
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours} h {minutes:02d} min"

@@ -155,7 +155,7 @@ studies:
           record_27km: ldpc_large
         set: {max_attempts: 3}
 
-  ldpc_high_noise:
+  ldpc_configuration:
     group: optimizations
     simulator: ldpc
     noise: [record_27km]
