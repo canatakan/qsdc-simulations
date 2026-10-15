@@ -89,6 +89,8 @@ studies:
       - {label: + Theta band 3pi/2 ± pi/4, simulator: optimized}
       - {label: + Parity error detection, simulator: parity}
       - {label: + Retries, simulator: retry}
+      - {label: LDPC, simulator: ldpc}
+      - {label: LDPC + retries, simulator: ldpc, set: {max_attempts: 3}}
 
   axis_comparison:
     group: optimizations

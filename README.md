@@ -446,6 +446,9 @@ otherwise.
 `error_correction_comparison` covers no coding, parity, SECDED and LDPC, with
 retry variants for parity, SECDED and LDPC.
 
+`optimization_comparison` also includes LDPC and LDPC with retries as alternatives
+to parity, both starting from `optimized`.
+
 **Cao** has 4 studies. A case runs `reconciled` unless the study says
 otherwise.
 
