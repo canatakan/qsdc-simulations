@@ -11,6 +11,7 @@ Simulator presets (presets.yaml):
     optimized  + theta in 3pi/2 ± pi/4
     parity     + one parity bit per symbol
     retry      + up to 3 attempts (optimized + EC, the default)
+    ldpc       optimized + transmitted LDPC codewords
 
 Examples:
     srikara-demo "hello"
@@ -311,6 +312,15 @@ def show_checks(checks: tuple[Check, ...], config: SimulatorConfig) -> None:
 
 def show_code(run: Run, config: SimulatorConfig) -> None:
     received = [m.decoded_bits for m in run.messages]
+
+    if config.error_correction == "ldpc":
+        settings = config.ldpc
+        verdict = "decoded" if run.decoded_bits is not None else "decoding failed"
+
+        print(
+            f"LDPC: {settings.data_bits} data + {settings.parity_bits} parity bits, "
+            f"up to {settings.max_iterations} iterations -> {verdict}"
+        )
 
     if config.error_correction == "parity":
         word, odd = received[0], use_odd_parity(run.block.offset)

@@ -2,9 +2,10 @@ from itertools import product
 
 import pytest
 
+from qsdc.common.coding.ldpc import MAX_CONFIDENCE, LdpcCode
 from qsdc.common.random import ClassicalRandomSource
 from qsdc.protocols.srikara.constants import INTERVAL_CODES
-from qsdc.protocols.srikara.simulator.blocks import Block
+from qsdc.protocols.srikara.simulator.blocks import Block, CodingOptions
 
 PAYLOAD = "101001110010011010001101"
 
@@ -35,6 +36,29 @@ def test_blocks_round_trip_any_payload_length(error_correction, length):
     payload = PAYLOAD[:length]
     blocks = Block.encode(payload, error_correction)
     decoded = [block.decode(block.symbols, error_correction) for block in blocks]
+
+    assert "".join(decoded) == payload
+
+
+@pytest.mark.parametrize("length", [1, 11, 12, 13, 24])
+def test_ldpc_blocks_round_trip_any_payload_length(length):
+    payload = PAYLOAD[:length]
+    code = LdpcCode.systematic(96, 96)
+    blocks = Block.encode(payload, "ldpc", CodingOptions(ldpc=code))
+    decoded = [
+        block.decode(
+            block.symbols,
+            "ldpc",
+            CodingOptions(
+                ldpc=code,
+                confidences=[
+                    MAX_CONFIDENCE if bit == "0" else -MAX_CONFIDENCE
+                    for bit in "".join(block.symbols)
+                ],
+            ),
+        )
+        for block in blocks
+    ]
 
     assert "".join(decoded) == payload
 

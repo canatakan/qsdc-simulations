@@ -27,3 +27,11 @@ parity:
 retry:
   extends: parity
   max_attempts: 3
+
+ldpc:
+  extends: optimized
+  error_correction: ldpc
+
+ldpc_large:
+  extends: ldpc
+  ldpc: {data_bits: 384, parity_bits: 768}

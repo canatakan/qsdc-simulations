@@ -4,13 +4,14 @@ from dataclasses import dataclass, replace
 from math import pi, sqrt
 
 from qsdc.common.coding.intervals import IntervalCode
+from qsdc.common.coding.ldpc import LdpcCode
 from qsdc.common.random import RandomSource, make_random_source
 from qsdc.common.transmission import BaseAttempt, BaseRun, BaseSimulator
 
 from ..config import SimulatorConfig
 from ..constants import INTERVAL_CODES, STATES_PER_SYMBOL, VACUUM_VARIANCE
 from .backends import Backend, PreparedState, make_backend
-from .blocks import Block
+from .blocks import Block, CodingOptions
 from .checks import Check, Checks
 from .messages import Message, Receiver
 from .routing import ModeRoute
@@ -47,8 +48,23 @@ class Simulator(BaseSimulator[Block, Attempt]):
         self.checks = Checks(self.backend, config.tolerance_sigmas)
         self.receiver = Receiver(self.backend, self.code, config.axis_policy)
 
+        self.ldpc = None
+        if config.error_correction == "ldpc":
+            settings = config.ldpc
+            self.ldpc = LdpcCode.systematic(
+                settings.data_bits,
+                settings.parity_bits,
+                settings.column_weight,
+                settings.seed,
+            )
+
     def encode(self, payload: str) -> list[Block]:
-        return Block.encode(payload, self.config.error_correction)
+        if self.ldpc is None:
+            return Block.encode(payload, self.config.error_correction)
+
+        return Block.encode(
+            payload, self.config.error_correction, CodingOptions(ldpc=self.ldpc)
+        )
 
     def run_attempt(self, blocks: list[Block], number: int, seed: int) -> Attempt:
         rng = make_random_source(self.config.random_source, seed)
@@ -119,5 +135,24 @@ class Simulator(BaseSimulator[Block, Attempt]):
 
     def correct(self, run: Run) -> Run:
         received = [message.decoded_bits for message in run.messages]
-        bits = run.block.decode(received, self.config.error_correction)
+
+        if self.ldpc is not None:
+            confidences = [
+                confidence
+                for message in run.messages
+                for confidence in message.confidences(self.code)
+            ]
+
+            bits = run.block.decode(
+                received,
+                self.config.error_correction,
+                CodingOptions(
+                    ldpc=self.ldpc,
+                    confidences=confidences,
+                    max_iterations=self.config.ldpc.max_iterations,
+                ),
+            )
+        else:
+            bits = run.block.decode(received, self.config.error_correction)
+
         return replace(run, decoded_bits=bits)

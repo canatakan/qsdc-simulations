@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from qsdc.common.coding.intervals import IntervalCode
+from qsdc.common.coding.ldpc import LdpcCode
 from qsdc.common.quadrature import P, Q, Quadrature
 from qsdc.common.random import RandomSource
 
@@ -22,10 +23,25 @@ class Message:
     response: float
     decoded_value: float
     decoded_bits: str
+    noise_variance: float = 0.0
 
     @property
     def correct(self) -> bool:
         return self.decoded_bits == self.sent_bits
+
+    def confidences(self, code: IntervalCode) -> list[float]:
+        if not self.response:
+            return [0.0] * len(self.decoded_bits)
+
+        probabilities = code.probabilities(self.decoded_value, self.noise_variance)
+
+        return [
+            LdpcCode.log_ratio(
+                sum(p for label, p in probabilities.items() if label[i] == "0"),
+                sum(p for label, p in probabilities.items() if label[i] == "1"),
+            )
+            for i in range(len(self.decoded_bits))
+        ]
 
 
 class Receiver:
@@ -54,7 +70,8 @@ class Receiver:
         axis = self.axis(state, rng)
 
         measured = self.backend.measure_returned(state, axis, value * MESSAGE_DIRECTION)
-        baseline = self.backend.expect_returned(state, axis).mean
+        expectation = self.backend.expect_returned(state, axis)
+        baseline = expectation.mean
         response = self.backend.message_response(state, axis)
 
         # Without any signal reaching Bob, his best guess is m = 0.
@@ -70,6 +87,9 @@ class Receiver:
             response,
             decoded,
             self.code.decode(decoded),
+            self.backend.readout_variance(expectation) / response**2
+            if response**2
+            else float("inf"),
         )
 
     def axis(self, state: PreparedState, rng: RandomSource) -> Quadrature:

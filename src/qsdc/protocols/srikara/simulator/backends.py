@@ -34,6 +34,10 @@ class Expectation:
 class Backend(ABC):
     def prepare_run(self, seed: int) -> None: ...
 
+    @staticmethod
+    def readout_variance(expectation: Expectation) -> float:
+        return expectation.sigma**2
+
     @abstractmethod
     def measure_control(self, state: PreparedState, axis: Quadrature) -> float: ...
 
@@ -182,6 +186,10 @@ class StrawberryFieldsBackend(Backend):
 
 class SFAnalyticBackend(StrawberryFieldsBackend):
     # Reads out the exact mean of each circuit
+
+    @staticmethod
+    def readout_variance(expectation: Expectation) -> float:
+        return 0.0
 
     def _measure(self, program: Program, axis: Quadrature, detector: Detector) -> float:
         return self._expect(program, axis, detector).mean

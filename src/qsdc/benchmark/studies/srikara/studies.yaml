@@ -89,6 +89,23 @@ studies:
       - {label: + Theta band 3pi/2 ± pi/4, simulator: optimized}
       - {label: + Parity error detection, simulator: parity}
       - {label: + Retries, simulator: retry}
+      - label:
+          default: LDPC
+          metro_10km: LDPC (large blocks)
+          record_27km: LDPC (large blocks)
+        simulator:
+          default: ldpc
+          metro_10km: ldpc_large
+          record_27km: ldpc_large
+      - label:
+          default: LDPC + retries
+          metro_10km: LDPC (large blocks) + retries
+          record_27km: LDPC (large blocks) + retries
+        simulator:
+          default: ldpc
+          metro_10km: ldpc_large
+          record_27km: ldpc_large
+        set: {max_attempts: 3}
 
   axis_comparison:
     group: optimizations
@@ -120,6 +137,38 @@ studies:
         set: {error_correction: secded}
       - label: SECDED + retries
         set: {error_correction: secded, max_attempts: 3}
+      - label:
+          default: LDPC
+          metro_10km: LDPC (large blocks)
+          record_27km: LDPC (large blocks)
+        simulator:
+          default: ldpc
+          metro_10km: ldpc_large
+          record_27km: ldpc_large
+      - label:
+          default: LDPC + retries
+          metro_10km: LDPC (large blocks) + retries
+          record_27km: LDPC (large blocks) + retries
+        simulator:
+          default: ldpc
+          metro_10km: ldpc_large
+          record_27km: ldpc_large
+        set: {max_attempts: 3}
+
+  ldpc_high_noise:
+    group: optimizations
+    simulator: ldpc
+    noise: [record_27km]
+    set: {max_attempts: 1, ldpc.column_weight: 3, ldpc.seed: 0}
+    cases:
+      - {label: "96 + 96, 100 iterations", set: {ldpc.data_bits: 96, ldpc.parity_bits: 96, ldpc.max_iterations: 100}}
+      - {label: "96 + 96, 300 iterations", set: {ldpc.data_bits: 96, ldpc.parity_bits: 96, ldpc.max_iterations: 300}}
+      - {label: "96 + 192, 100 iterations", set: {ldpc.data_bits: 96, ldpc.parity_bits: 192, ldpc.max_iterations: 100}}
+      - {label: "96 + 192, 300 iterations", set: {ldpc.data_bits: 96, ldpc.parity_bits: 192, ldpc.max_iterations: 300}}
+      - {label: "384 + 384, 100 iterations", set: {ldpc.data_bits: 384, ldpc.parity_bits: 384, ldpc.max_iterations: 100}}
+      - {label: "384 + 384, 300 iterations", set: {ldpc.data_bits: 384, ldpc.parity_bits: 384, ldpc.max_iterations: 300}}
+      - {label: "384 + 768, 100 iterations", set: {ldpc.data_bits: 384, ldpc.parity_bits: 768, ldpc.max_iterations: 100}}
+      - {label: "384 + 768, 300 iterations", set: {ldpc.data_bits: 384, ldpc.parity_bits: 768, ldpc.max_iterations: 300}}
 
   tolerance_safety:
     group: protocol
