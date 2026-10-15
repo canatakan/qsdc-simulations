@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import multiprocessing
 from collections.abc import Sequence
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from time import perf_counter
 
-from .benchmark import Workload, reseed, run_benchmark
+from .benchmark import Benchmark, Workload, reseed, run_benchmark
 from .report.report import load_result, rerender, write_index, write_report
 from .studies.cao.suite import CAO
 from .studies.catalog import Catalog
@@ -71,6 +73,12 @@ def add_commands(parser: argparse.ArgumentParser, suite: Suite) -> None:
         help="independent seeds per case, pooled into each result (default: 1)",
     )
     run.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        help="parallel studies (default: 4); 1 runs serially",
+    )
+    run.add_argument(
         "--payload-bits",
         type=int,
         default=default.payload_bits,
@@ -103,6 +111,7 @@ def list_studies(catalog: Catalog, workload: Workload) -> None:
 
 def run_studies(suite: Suite, catalog: Catalog, args: argparse.Namespace) -> None:
     workload = Workload(payload_bits=args.payload_bits)
+    studies = []
     for study in catalog.studies(workload):
         if args.study and study.name not in args.study:
             continue
@@ -111,11 +120,38 @@ def run_studies(suite: Suite, catalog: Catalog, args: argparse.Namespace) -> Non
             print(f"{study.name}: already done")
             continue
 
-        print(study.name)
-        report = write_report(run_benchmark(study, args.repetitions), args.output_root)
-        print(f"  {report / 'report.html'}")
+        studies.append(study)
 
-    rebuild_index(suite, args.output_root)
+    try:
+        if args.workers == 1 or len(studies) <= 1:
+            for study in studies:
+                report = run_study(study, args.repetitions, args.output_root)
+                print(f"  {report / 'report.html'}", flush=True)
+        else:
+            run_studies_parallel(
+                studies, args.repetitions, args.output_root, args.workers
+            )
+    finally:
+        rebuild_index(suite, args.output_root)
+
+
+def run_studies_parallel(
+    studies: Sequence[Benchmark], repetitions: int, output_root: Path, workers: int
+) -> None:
+    with ProcessPoolExecutor(
+        max_workers=min(workers, len(studies)),
+        mp_context=multiprocessing.get_context("spawn"),
+    ) as pool:
+        futures = [
+            pool.submit(run_study, study, repetitions, output_root) for study in studies
+        ]
+        for future in as_completed(futures):
+            print(f"  {future.result() / 'report.html'}", flush=True)
+
+
+def run_study(study: Benchmark, repetitions: int, output_root: Path) -> Path:
+    print(study.name, flush=True)
+    return write_report(run_benchmark(study, repetitions), output_root)
 
 
 def reproduce_run(

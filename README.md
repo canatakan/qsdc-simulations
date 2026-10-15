@@ -375,6 +375,8 @@ benchmark srikara rerender                              # rebuild reports withou
 
 - `--repetitions N` reruns every case with N seeds and pools their counts. The
   first seed is the configured one.
+- `--workers N` runs up to N studies in parallel (default: 4). Cases and
+  repetitions within each study stay sequential; use `--workers 1` to run serially.
 - `--payload-bits N` sends a random N-bit payload in every case (default:
   10,000). Runs with another size belong in their own `--output-root`: the
   index links the latest run of each study, whatever its size.
