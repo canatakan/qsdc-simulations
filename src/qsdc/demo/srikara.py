@@ -5,13 +5,15 @@ block and the recovered message. --trace adds the noise path of that block's
 modes.
 
 Simulator presets (presets.yaml):
-    baseline   the paper's protocol
-    aligned    + measurement along Alice's displacement
-    gray       + Gray-labelled intervals
-    optimized  + theta in 3pi/2 ± pi/4
-    parity     + one parity bit per symbol
-    retry      + up to 3 attempts (optimized + EC, the default)
-    ldpc       optimized + transmitted LDPC codewords
+    baseline    the paper's protocol
+    best_qp     baseline + whichever of q and p responds more
+    aligned     baseline + measurement along Alice's displacement
+    gray        aligned + Gray-labelled intervals
+    optimized   gray + theta in 3pi/2 ± pi/4
+    parity      optimized + one parity bit per symbol
+    retry       parity + up to 3 attempts (the default)
+    ldpc        optimized + transmitted LDPC codewords
+    ldpc_large  ldpc with 384 data and 768 parity bits
 
 Examples:
     srikara-demo "hello"
