@@ -14,13 +14,22 @@
 
   <section class="cards">
     <article><h3>Cases × repetitions</h3><p>{{ summary.runs }} × {{ summary.repetitions }}</p></article>
-    <article><h3>Prepared EPR pairs</h3><p>{{ "{:,}".format(summary.states) }}</p></article>
-    {% if single %}
-    <article><h3>Payload delivered</h3><p>{{ "%.2f"|format(100 * single.delivered_fraction) }}%</p></article>
-    <article><h3>Delivered bits / pair</h3><p>{{ "%.4f"|format(single.delivered_bits_per_state) }}</p></article>
-    <article><h3>Raw-box MI / pair</h3><p>{{ "%.4f"|format(single.information_per_state) }}</p></article>
-    {% endif %}
-    <article><h3>Simulation time</h3><p>{{ seconds }}</p></article>
+    <article>
+      <h3>Bit error rate</h3><p>{{ overview.bit_error_rate }}</p>
+      {% if summary.runs > 1 %}<small>lowest – highest case</small>{% endif %}
+    </article>
+    <article>
+      <h3>Payload delivered</h3><p>{{ overview.delivered_fraction }}</p>
+      {% if summary.runs > 1 %}<small>lowest – highest case</small>{% endif %}
+    </article>
+    <article>
+      <h3>Delivered bits / pair</h3><p>{{ overview.delivered_bits_per_state }}</p>
+      {% if summary.runs > 1 %}<small>lowest – highest case</small>{% endif %}
+    </article>
+    <article>
+      <h3>Simulation time</h3><p>{{ seconds }}</p>
+      <small>{{ per_repetition }} per repetition</small>
+    </article>
   </section>
 
   <section>
@@ -31,7 +40,11 @@
 
   <section>
     <h2>Results</h2>
-    {% if summary.repetitions > 1 %}<p>± and error bars: 95% confidence interval of the mean over {{ summary.repetitions }} repetitions (Student's t).</p>{% endif %}
+    {% if summary.repetitions > 1 %}
+    <p>Error bars and ±: 95% confidence interval of the mean over {{ summary.repetitions }} repetitions</p>
+    <input type="checkbox" id="intervals" class="switch">
+    <label for="intervals">Show confidence intervals</label>
+    {% endif %}
     <div class="table">
       <table>
         <thead>
@@ -42,14 +55,17 @@
             <th class="number">Raw-box MI / pair</th><th class="number">Blocks</th>
             <th class="number">Retries</th><th class="number">Failed checks</th>
             <th class="number">Aborted attempts</th>
-            <th class="number">Uncorrectable</th><th class="number">Time</th>
+            {% if coded %}
+            <th class="number">Coding-rejected sends</th><th class="number">Uncorrectable</th>
+            {% endif %}
+            <th class="number">Time</th>
           </tr>
         </thead>
         <tbody>
           {% for row in table %}
           <tr>
             <td class="number">{{ row.id }}</td><td>{{ row.condition }}</td>{% if show_series %}<td>{{ row.series }}</td>{% endif %}
-            {% for cell in row.cells %}<td class="number">{{ cell }}</td>{% endfor %}
+            {% for cell in row.cells %}<td class="number">{{ cell.value }}{% if cell.interval %}<span class="interval"> ± {{ cell.interval }}</span>{% endif %}</td>{% endfor %}
           </tr>
           {% endfor %}
         </tbody>

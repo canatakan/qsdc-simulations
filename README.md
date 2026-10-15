@@ -448,7 +448,7 @@ otherwise.
 | Reference | `ideal_backend_check`, `paper_baseline`, `noise_profiles` | `clean`; `noise_profiles` uses all five |
 | Signal | `squeezing_r`, `squeezing_distributions`, `theta_fixed`, `theta_band`, `r_theta_heatmap` | `lab` |
 | Optimizations | `optimization_comparison`, `axis_comparison`, `interval_comparison`, `error_correction_comparison` | all five |
-| Optimizations | `ldpc_high_noise` | `record_27km` |
+| Optimizations | `ldpc_configuration` | `record_27km` |
 | Protocol | `tolerance_safety`, `one_probability` | `lab` |
 | Hardware | `channel_transmittance`, `thermal_occupation`, `detector_efficiency`, `electronic_noise`, `memory_efficiency` | `lab` |
 
@@ -463,14 +463,14 @@ Both comparisons use `ldpc_large` (384 data + 768 parity bits) at 10 km and
 Cases can select a preset or label by noise using a `simulator` or `label`
 mapping with a `default` entry and noise names as overrides.
 
-`ldpc_high_noise` compares eight LDPC configurations on the 27 km baseline:
+`ldpc_configuration` compares eight LDPC configurations on the 27 km baseline:
 96 or 384 data bits, an equal or double number of parity bits (rates 1/2 and
 1/3), and 100 or 300 decoder iterations. Retries are disabled; graph seed 0,
 column weight 3 and all optical settings are held fixed. Compare coding
 rejection, correct payload delivered, BER and delivered bits per state.
 
 ```bash
-srikara-benchmark run --study ldpc_high_noise --payload-bits 9984 --repetitions 10
+benchmark srikara run --study ldpc_configuration --payload-bits 9984 --repetitions 10
 ```
 
 9,984 bits divides evenly into both data block sizes, avoiding padding. Each

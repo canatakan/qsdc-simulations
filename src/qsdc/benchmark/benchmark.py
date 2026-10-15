@@ -50,7 +50,7 @@ class Benchmark:
 
     @property
     def title(self) -> str:
-        return self.name.replace("_", " ").capitalize()
+        return self.name.replace("_", " ").capitalize().replace("Ldpc", "LDPC")
 
 
 @dataclass(frozen=True)
