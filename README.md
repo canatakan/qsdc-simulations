@@ -16,9 +16,7 @@ make install
 
 `make install` adds three commands to `.venv/bin`: `benchmark`, `srikara-demo`
 and `cao-demo`. `benchmark` takes `srikara` or `cao` as its first argument.
-To run the tests, use `make test` for everything, `make srikara/test` and
-`make cao/test` for one protocol and its studies, or `make benchmark/test` for
-the benchmark package.
+To run the tests, use `make test`.
 
 ## Layout
 
