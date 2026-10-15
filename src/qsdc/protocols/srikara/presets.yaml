@@ -27,3 +27,7 @@ parity:
 retry:
   extends: parity
   max_attempts: 3
+
+ldpc:
+  extends: optimized
+  error_correction: ldpc

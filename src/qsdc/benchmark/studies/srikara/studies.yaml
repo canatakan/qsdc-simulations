@@ -120,6 +120,10 @@ studies:
         set: {error_correction: secded}
       - label: SECDED + retries
         set: {error_correction: secded, max_attempts: 3}
+      - label: LDPC
+        set: {error_correction: ldpc}
+      - label: LDPC + retries
+        set: {error_correction: ldpc, max_attempts: 3}
 
   tolerance_safety:
     group: protocol

@@ -47,7 +47,7 @@ class SrikaraSuite(Suite):
         )
 
     def parameters(self, config: SimulatorConfig) -> dict[str, str]:
-        return {
+        parameters = {
             "Backend": config.backend,
             "Random source": config.random_source,
             "Alpha variance (SNU)": f"{config.alpha_variance_snu:g}",
@@ -59,6 +59,19 @@ class SrikaraSuite(Suite):
             "Error correction": config.error_correction,
             "Max attempts": str(config.max_attempts),
         }
+
+        if config.error_correction == "ldpc":
+            parameters.update(
+                {
+                    "LDPC data bits": str(config.ldpc.data_bits),
+                    "LDPC parity bits": str(config.ldpc.parity_bits),
+                    "LDPC column weight": str(config.ldpc.column_weight),
+                    "LDPC iterations": str(config.ldpc.max_iterations),
+                    "LDPC seed": str(config.ldpc.seed),
+                }
+            )
+
+        return parameters
 
     def symbols(self, config: SimulatorConfig) -> tuple[str, ...]:
         return INTERVAL_CODES[config.intervals].labels
