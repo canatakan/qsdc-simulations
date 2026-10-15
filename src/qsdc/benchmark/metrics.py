@@ -15,6 +15,7 @@ RATES = (
     "delivered_bits_per_state",
     "information_per_state",
     "check_failure_rate",
+    "coding_rejection_rate",
 )
 
 
@@ -90,6 +91,10 @@ class RunMetrics:
     @property
     def check_failure_rate(self) -> float:
         return self.failed_checks / self.checks
+
+    @property
+    def coding_rejection_rate(self) -> float:
+        return self.uncorrectable / (self.blocks + self.retries)
 
     def symbol_count(self, sent: int, decoded: int) -> int:
         return self.symbol_counts[self.alphabet * sent + decoded]
