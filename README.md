@@ -135,6 +135,7 @@ Only the layout differs from `gray`.
 | `none` | 3 | 1 | 4 | none |
 | `parity` | 2 | 1 | 4 | detects an odd number of wrong bits |
 | `secded` | 12 | 8 | 32 | corrects one wrong symbol per block |
+| `ldpc` | 96 (configurable) | 64 (default) | 256 (default) | soft-decision decoding of transmitted codewords |
 
 - **Parity:** the parity bit is part of the symbol. Blocks alternate between
   odd and even parity, so all 8 intervals are used and m stays zero-mean, as
@@ -142,11 +143,41 @@ Only the layout differs from `gray`.
   always detected.
 - **SECDED:** the block is three extended Hamming (8, 4) codewords,
   interleaved so each symbol carries one bit of each codeword.
+- **LDPC:** a systematic sparse code with a dual-diagonal parity section.
+  The default sends 96 data bits plus 96 parity bits, grouped into 3-bit symbols.
+  Bob computes bit log-likelihood ratios from the received value and the
+  model's readout variance divided by the squared message response. Uniform
+  layouts use their finite sampling supports; Gaussian layouts use their
+  Gaussian prior. Exact-mean backends use noiseless likelihoods. A block with
+  no signal is unrecovered. Decoding targets the all-zero syndrome; no
+  message-dependent syndrome is announced on a classical channel.
 - **Attempts:** at most `max_attempts` attempts. An aborted attempt sends all
   its blocks again, and a block whose code finds an error it cannot correct
   goes again in the next attempt. Each attempt draws fresh states.
 - **Padding:** the last block is padded with zeros. The padding is removed
   after decoding.
+
+Enable LDPC with `SimulatorConfig(error_correction="ldpc")`, or run
+`srikara-demo "hello" --simulator ldpc`. To change its shape:
+
+```python
+from qsdc.protocols.srikara.config import LdpcConfig, SimulatorConfig
+
+config = SimulatorConfig(
+    error_correction="ldpc",
+    ldpc=LdpcConfig(data_bits=192, parity_bits=192, column_weight=3,
+                    max_iterations=100, seed=0),
+)
+```
+
+The total codeword length must be divisible by 3. The code seed fixes the
+parity-check matrix independently of the channel seed and retry number.
+This LDPC construction is a simulation extension, not a code specified by the
+Srikara paper. Its soft demapper assumes equally likely labels, and its noise
+variance comes from the simulator model rather than channel estimation.
+Convergence means parity checks pass; it does not guarantee correct recovery
+or establish secrecy. Benchmark error rates still compare the delivered bits
+against the original payload.
 
 ## Cao protocol
 
@@ -368,6 +399,7 @@ extends the row above it:
 | `optimized` | θ uniform within 3π/2 ± π/4 |
 | `parity` | Parity error detection |
 | `retry` | Up to 3 attempts |
+| `ldpc` | `optimized` with transmitted LDPC codewords |
 
 **Cao.**
 
@@ -411,8 +443,8 @@ otherwise.
 | Protocol | `tolerance_safety`, `one_probability` | `lab` |
 | Hardware | `channel_transmittance`, `thermal_occupation`, `detector_efficiency`, `electronic_noise`, `memory_efficiency` | `lab` |
 
-`error_correction_comparison` covers no coding, parity and SECDED, with retries
-for parity and SECDED only.
+`error_correction_comparison` covers no coding, parity, SECDED and LDPC, with
+retry variants for parity, SECDED and LDPC.
 
 **Cao** has 4 studies. A case runs `reconciled` unless the study says
 otherwise.
