@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from pathlib import Path
 
 from qsdc.common.coding.bits import hamming_distance
@@ -9,7 +8,6 @@ from qsdc.protocols.cao.config import NOISES, PRESETS, SimulatorConfig
 from qsdc.protocols.cao.simulator.mapping import interval_code
 from qsdc.protocols.cao.simulator.protocol import Simulator
 
-from ... import cli
 from ...metrics import RunMetrics, count_blocks, count_symbols
 from ...suite import Suite
 
@@ -80,11 +78,3 @@ class CaoSuite(Suite):
 
 
 CAO = CaoSuite()
-
-
-def main(argv: Sequence[str] | None = None) -> None:
-    cli.main(CAO, argv)
-
-
-if __name__ == "__main__":
-    main()

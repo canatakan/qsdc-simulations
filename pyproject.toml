@@ -19,10 +19,9 @@ dependencies = [
 ]
 
 [project.scripts]
-cao-benchmark = "qsdc.benchmark.studies.cao.suite:main"
-cao-demo = "qsdc.demo.cao:main"
-srikara-benchmark = "qsdc.benchmark.studies.srikara.suite:main"
+benchmark = "qsdc.benchmark.cli:main"
 srikara-demo = "qsdc.demo.srikara:main"
+cao-demo = "qsdc.demo.cao:main"
 
 [project.optional-dependencies]
 dev = [

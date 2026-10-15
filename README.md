@@ -14,10 +14,11 @@ python -m pip install --upgrade pip
 make install
 ```
 
-`make install` adds four commands to `.venv/bin`: `srikara-demo`,
-`srikara-benchmark`, `cao-demo` and `cao-benchmark`. To run the tests, use
-`make test` for everything, `make srikara/test` and `make cao/test` for one
-protocol and its studies, or `make benchmark/test` for the benchmark package.
+`make install` adds three commands to `.venv/bin`: `benchmark`, `srikara-demo`
+and `cao-demo`. `benchmark` takes `srikara` or `cao` as its first argument.
+To run the tests, use `make test` for everything, `make srikara/test` and
+`make cao/test` for one protocol and its studies, or `make benchmark/test` for
+the benchmark package.
 
 ## Layout
 
@@ -361,16 +362,16 @@ studies and writes their reports. It has one suite per protocol in
 ### Running
 
 ```bash
-srikara-benchmark list                                  # list the studies
-srikara-benchmark run                                   # run every study
-srikara-benchmark run --study theta_band --repetitions 3
-srikara-benchmark run --payload-bits 1024 --output-root src/qsdc/benchmark/results/srikara-1024
-srikara-benchmark run --skip-existing                   # resume an interrupted run
-srikara-benchmark index                                 # rebuild the study index
-srikara-benchmark rerender                              # rebuild reports without simulating
+benchmark srikara list                                  # list the studies
+benchmark srikara run                                   # run every study
+benchmark srikara run --study theta_band --repetitions 3
+benchmark srikara run --payload-bits 1024 --output-root src/qsdc/benchmark/results/srikara-1024
+benchmark srikara run --skip-existing                   # resume an interrupted run
+benchmark srikara index                                 # rebuild the study index
+benchmark srikara rerender                              # rebuild reports without simulating
 ```
 
-`cao-benchmark` takes the same commands. Each protocol writes to
+`benchmark cao` takes the same commands. Each protocol writes to
 `src/qsdc/benchmark/results/<protocol>/`, wherever the command runs from;
 `--output-root` writes elsewhere.
 

@@ -6,18 +6,40 @@ from pathlib import Path
 
 from .benchmark import Workload, run_benchmark
 from .report.report import rerender, write_index, write_report
+from .studies.cao.suite import CAO
 from .studies.catalog import Catalog
+from .studies.srikara.suite import SRIKARA
 from .suite import Suite
 
 
-def main(suite: Suite, argv: Sequence[str] | None = None) -> None:
+def main(argv: Sequence[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        prog="benchmark", description="Run QSDC benchmarks."
+    )
+    protocols = parser.add_subparsers(dest="protocol", required=True)
+    suites = {suite.name: suite for suite in (SRIKARA, CAO)}
+    for suite in suites.values():
+        protocol = protocols.add_parser(suite.name, help=f"{suite.title} benchmarks")
+        add_commands(protocol, suite)
+
+    args = parser.parse_args(argv)
+    suite = suites[args.protocol]
+    catalog = Catalog(suite)
+
+    if args.command == "list":
+        list_studies(catalog, Workload())
+    elif args.command == "run":
+        run_studies(suite, catalog, args)
+    elif args.command == "rerender":
+        rerender_reports(suite, args.output_root)
+    elif args.command == "index":
+        rebuild_index(suite, args.output_root)
+
+
+def add_commands(parser: argparse.ArgumentParser, suite: Suite) -> None:
     catalog = Catalog(suite)
     default = Workload()
 
-    parser = argparse.ArgumentParser(
-        description=f"Run the built-in {suite.title} benchmark studies and write "
-        "their reports."
-    )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("list", help="list the built-in studies")
 
@@ -59,32 +81,36 @@ def main(suite: Suite, argv: Sequence[str] | None = None) -> None:
             help=f"default: {suite.output_root}",
         )
 
-    args = parser.parse_args(argv)
 
-    if args.command == "list":
-        for study in catalog.studies(default):
-            print(f"{study.name:28} {study.layout:11} {len(study.cases)} runs")
-        return
+def list_studies(catalog: Catalog, workload: Workload) -> None:
+    for study in catalog.studies(workload):
+        print(f"{study.name:28} {study.layout:11} {len(study.cases)} runs")
 
-    if args.command == "run":
-        workload = Workload(payload_bits=args.payload_bits)
-        for study in catalog.studies(workload):
-            if args.study and study.name not in args.study:
-                continue
-            done = any((args.output_root / study.name).glob("run_*/results.json"))
-            if args.skip_existing and done:
-                print(f"{study.name}: already done")
-                continue
 
-            print(study.name)
-            report = write_report(
-                run_benchmark(study, args.repetitions), args.output_root
-            )
-            print(f"  {report / 'report.html'}")
+def run_studies(suite: Suite, catalog: Catalog, args: argparse.Namespace) -> None:
+    workload = Workload(payload_bits=args.payload_bits)
+    for study in catalog.studies(workload):
+        if args.study and study.name not in args.study:
+            continue
+        done = any((args.output_root / study.name).glob("run_*/results.json"))
+        if args.skip_existing and done:
+            print(f"{study.name}: already done")
+            continue
 
-    if args.command == "rerender":
-        for results in sorted(args.output_root.rglob("results.json")):
-            rerender(results, suite)
-            print(f"Rerendered {results.parent / 'report.html'}")
+        print(study.name)
+        report = write_report(run_benchmark(study, args.repetitions), args.output_root)
+        print(f"  {report / 'report.html'}")
 
-    print(f"Index: {write_index(args.output_root, suite)}")
+    rebuild_index(suite, args.output_root)
+
+
+def rerender_reports(suite: Suite, output_root: Path) -> None:
+    for results in sorted(output_root.rglob("results.json")):
+        rerender(results, suite)
+        print(f"Rerendered {results.parent / 'report.html'}")
+
+    rebuild_index(suite, output_root)
+
+
+def rebuild_index(suite: Suite, output_root: Path) -> None:
+    print(f"Index: {write_index(output_root, suite)}")

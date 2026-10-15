@@ -39,8 +39,8 @@ def test_catalog_builds_valid_studies_for_every_baseline():
 
 def test_cli_runs_a_study_into_a_report_that_reloads(tmp_path):
     cli.main(
-        CAO,
         [
+            "cao",
             "run",
             "--study",
             "paper_comparison",

@@ -57,8 +57,8 @@ def test_heatmap_report_has_one_figure_per_series(tmp_path):
 
 def test_cli_runs_a_study_into_a_browsable_report(tmp_path):
     cli.main(
-        SRIKARA,
         [
+            "srikara",
             "run",
             "--study",
             "squeezing_distributions",
