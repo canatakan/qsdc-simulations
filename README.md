@@ -14,10 +14,9 @@ python -m pip install --upgrade pip
 make install
 ```
 
-`make install` adds four commands to `.venv/bin`: `srikara-demo`,
-`srikara-benchmark`, `cao-demo` and `cao-benchmark`. To run the tests, use
-`make test` for everything, `make srikara/test` and `make cao/test` for one
-protocol and its studies, or `make benchmark/test` for the benchmark package.
+`make install` adds three commands to `.venv/bin`: `benchmark`, `srikara-demo`
+and `cao-demo`. `benchmark` takes `srikara` or `cao` as its first argument.
+To run the tests, use `make test`.
 
 ## Layout
 
@@ -361,26 +360,34 @@ studies and writes their reports. It has one suite per protocol in
 ### Running
 
 ```bash
-srikara-benchmark list                                  # list the studies
-srikara-benchmark run                                   # run every study
-srikara-benchmark run --study theta_band --repetitions 3
-srikara-benchmark run --payload-bits 1024 --output-root src/qsdc/benchmark/results/srikara-1024
-srikara-benchmark run --skip-existing                   # resume an interrupted run
-srikara-benchmark index                                 # rebuild the study index
-srikara-benchmark rerender                              # rebuild reports without simulating
+benchmark srikara list                                  # list the studies
+benchmark srikara run                                   # run every study
+benchmark srikara run --study theta_band --repetitions 3
+benchmark srikara run --payload-bits 1024 --output-root src/qsdc/benchmark/results/srikara-1024
+benchmark srikara run --skip-existing                   # resume an interrupted run
+benchmark srikara index                                 # rebuild the study index
+benchmark srikara rerender                              # rebuild reports without simulating
 ```
 
-`cao-benchmark` takes the same commands. Each protocol writes to
+`benchmark cao` takes the same commands. Each protocol writes to
 `src/qsdc/benchmark/results/<protocol>/`, wherever the command runs from;
 `--output-root` writes elsewhere.
 
 - `--repetitions N` reruns every case with N seeds and pools their counts. The
   first seed is the configured one.
+- `--workers N` runs up to N studies in parallel (default: 4). Cases and
+  repetitions within each study stay sequential; use `--workers 1` to run serially.
 - `--payload-bits N` sends a random N-bit payload in every case (default:
   10,000). Runs with another size belong in their own `--output-root`: the
   index links the latest run of each study, whatever its size.
 - `--skip-existing` skips studies that already have a report.
 - `rerender` rebuilds the plots, CSV and HTML from each `results.json`.
+
+To replay one saved case and repetition with its original settings and
+seeds, use `benchmark srikara reproduce path/to/results.json --case 28 --repetition 4`.
+Both numbers start at 1. This compares the metrics with the saved repetition,
+excluding elapsed time. It writes no reports and exits with status 1 if the metrics
+differ. Reproduction uses the currently installed simulator code.
 
 ### Presets
 

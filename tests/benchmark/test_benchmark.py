@@ -57,8 +57,8 @@ def test_heatmap_report_has_one_figure_per_series(tmp_path):
 
 def test_cli_runs_a_study_into_a_browsable_report(tmp_path):
     cli.main(
-        SRIKARA,
         [
+            "srikara",
             "run",
             "--study",
             "squeezing_distributions",
@@ -97,3 +97,54 @@ def test_reports_can_be_rerendered_without_simulating(tmp_path):
 
     assert (report / "report.html").is_file()
     assert (report / "plots" / "comparison.png").is_file()
+
+
+def test_parallel_studies_match_serial_results(tmp_path):
+    studies = ("ideal_backend_check", "paper_baseline")
+    documents = []
+
+    for workers in (1, 2):
+        root = tmp_path / str(workers)
+        cli.main(
+            [
+                "srikara",
+                "run",
+                "--study",
+                studies[0],
+                "--study",
+                studies[1],
+                "--payload-bits",
+                "6",
+                "--repetitions",
+                "2",
+                "--workers",
+                str(workers),
+                "--output-root",
+                str(root),
+            ]
+        )
+
+        reports = []
+        for name in studies:
+            [path] = (root / name).glob("run_*/results.json")
+            result = load_result(path, SRIKARA)
+            reports.append(
+                tuple(
+                    replace(
+                        run,
+                        metrics=replace(run.metrics, seconds=0),
+                        repetitions=tuple(
+                            replace(m, seconds=0) for m in run.repetitions
+                        ),
+                    )
+                    for run in result.runs
+                )
+            )
+            assert (path.parent / "report.html").is_file()
+            assert (path.parent / "runs.csv").is_file()
+            assert list((path.parent / "plots").glob("*.png"))
+            assert f"{name}/run_" in (root / "index.html").read_text()
+
+        documents.append(reports)
+
+    assert documents[0] == documents[1]

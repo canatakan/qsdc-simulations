@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from pathlib import Path
 
 from qsdc.common.coding.bits import hamming_distance
@@ -9,7 +8,6 @@ from qsdc.protocols.srikara.config import NOISES, PRESETS, SimulatorConfig
 from qsdc.protocols.srikara.constants import INTERVAL_CODES
 from qsdc.protocols.srikara.simulator.protocol import Simulator
 
-from ... import cli
 from ...metrics import RunMetrics, count_blocks, count_symbols
 from ...suite import Suite
 
@@ -78,11 +76,3 @@ class SrikaraSuite(Suite):
 
 
 SRIKARA = SrikaraSuite()
-
-
-def main(argv: Sequence[str] | None = None) -> None:
-    cli.main(SRIKARA, argv)
-
-
-if __name__ == "__main__":
-    main()
