@@ -332,7 +332,6 @@ def _rate(run: RunResult, rate: str) -> dict[str, object]:
 
 
 def _span(runs: tuple[RunResult, ...], rate: str) -> str:
-    # The lowest and the highest value over the cases, or the single value.
     values = sorted(
         value
         for value in (getattr(run.metrics, rate) for run in runs)

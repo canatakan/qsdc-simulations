@@ -60,7 +60,6 @@ class RunResult:
     repetitions: tuple[RunMetrics, ...]
 
     def value(self, metric: str) -> float:
-        # An undefined metric, such as a rate over nothing, is NaN.
         value = getattr(self.metrics, metric)
         return nan if value is None else value
 
@@ -106,7 +105,6 @@ def run_benchmark(benchmark: Benchmark, repetitions: int = 1) -> BenchmarkResult
     for case in benchmark.cases:
         samples = []
         for repetition in range(repetitions):
-            # The first repetition uses the configured seeds, the others fresh ones.
             simulator, workload = case.simulator, case.workload
             if repetition:
                 simulator = reseed(simulator, repetition)

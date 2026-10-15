@@ -87,7 +87,6 @@ def main() -> None:
     if args.no_reconciliation:
         update["reconciliation"] = None
     else:
-        # Each noise baseline has its own syndrome fraction, unless one is given.
         fraction = args.syndrome_fraction
         if fraction is None:
             fraction = SYNDROME_FRACTIONS.get(args.noise)

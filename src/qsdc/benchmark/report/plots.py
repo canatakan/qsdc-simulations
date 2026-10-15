@@ -187,7 +187,6 @@ def _heatmaps(result: BenchmarkResult) -> list[Figure]:
                 vmax=limits[metric][1],
             )
 
-            # Each cell is labelled in white on dark colours, black on light ones.
             for (row, column), value in np.ndenumerate(matrix):
                 red, green, blue, _ = image.cmap(image.norm(value))
                 dark = 0.2126 * red + 0.7152 * green + 0.0722 * blue < 0.5
