@@ -11,34 +11,17 @@ MAX_CONFIDENCE = 30.0
 
 
 class LdpcCode:
-    @staticmethod
-    def log_ratio(zero: float, one: float) -> float:
-        # The decoder's confidence in a bit from its probabilities of 0 and 1.
-        if zero <= 0 and one <= 0:
-            return 0.0
-
-        if one <= 0:
-            return MAX_CONFIDENCE
-
-        if zero <= 0:
-            return -MAX_CONFIDENCE
-
-        return log(zero / one)
-
-    def __init__(self, length: int, rows: Sequence[Sequence[int]]):
+    def __init__(
+        self,
+        length: int,
+        rows: Sequence[Sequence[int]],
+        *,
+        data_bits: int | None = None,
+    ):
         self.length = length
         self.rows = tuple(tuple(sorted(set(row))) for row in rows)
-
-        # One entry per edge between a check (row) and a bit, ordered by check.
-        edge_checks, edge_bits = [], []
-        for check, row in enumerate(self.rows):
-            for bit in row:
-                edge_checks.append(check)
-                edge_bits.append(bit)
-        self._edge_check = np.array(edge_checks, dtype=np.int64)
-        self._edge_bit = np.array(edge_bits, dtype=np.int64)
-        row_lengths = [len(row) for row in self.rows]
-        self._row_start = np.cumsum([0, *row_lengths[:-1]])
+        self.data_bits = data_bits
+        self._prepare_edges()
 
     @classmethod
     def regular(
@@ -58,6 +41,30 @@ class LdpcCode:
                 row.add(int(bit))
         return cls(length, [row for row in rows if row])
 
+    @classmethod
+    def systematic(
+        cls, data_bits: int, parity_bits: int, column_weight: int = 3, seed: int = 0
+    ) -> LdpcCode:
+        if data_bits < 1 or parity_bits < 1:
+            raise ValueError("data_bits and parity_bits must be positive")
+
+        if not 1 <= column_weight <= parity_bits:
+            raise ValueError("column_weight must be between 1 and parity_bits")
+
+        rows = []
+        for check in range(parity_bits):
+            row = [data_bits + check]
+            if check:
+                row.append(data_bits + check - 1)
+            rows.append(row)
+
+        rng = np.random.default_rng(seed)
+        for bit in range(data_bits):
+            for check in rng.choice(parity_bits, column_weight, replace=False):
+                rows[check].append(bit)
+
+        return cls(data_bits + parity_bits, rows, data_bits=data_bits)
+
     def extended(self, rows: Sequence[Sequence[int]]) -> LdpcCode:
         return LdpcCode(self.length, [*self.rows, *rows])
 
@@ -67,6 +74,32 @@ class LdpcCode:
 
     def syndrome(self, bits: str) -> str:
         return array_to_bits(self._syndrome(bits_to_array(bits)))
+
+    def encode(self, bits: str) -> str:
+        if self.data_bits is None:
+            raise ValueError("encoding requires a systematic code")
+
+        if len(bits) != self.data_bits or set(bits) - {"0", "1"}:
+            raise ValueError(f"expected {self.data_bits} binary data bits")
+
+        values = bits_to_array(bits + "0" * self.checks)
+        parity = np.bitwise_xor.accumulate(self._syndrome(values))
+
+        return bits + array_to_bits(parity)
+
+    @staticmethod
+    def log_ratio(zero: float, one: float) -> float:
+        # The decoder's confidence in a bit from its probabilities of 0 and 1.
+        if zero <= 0 and one <= 0:
+            return 0.0
+
+        if one <= 0:
+            return MAX_CONFIDENCE
+
+        if zero <= 0:
+            return -MAX_CONFIDENCE
+
+        return log(zero / one)
 
     def decode(
         self,
@@ -91,6 +124,18 @@ class LdpcCode:
                 return array_to_bits(bits)
             bit_to_check = belief[self._edge_bit] - check_to_bit
         return None
+
+    def _prepare_edges(self) -> None:
+        edge_checks, edge_bits = [], []
+        for check, row in enumerate(self.rows):
+            for bit in row:
+                edge_checks.append(check)
+                edge_bits.append(bit)
+
+        self._edge_check = np.array(edge_checks, dtype=np.int64)
+        self._edge_bit = np.array(edge_bits, dtype=np.int64)
+        row_lengths = [len(row) for row in self.rows]
+        self._row_start = np.cumsum([0, *row_lengths[:-1]])
 
     def _check_messages(
         self, bit_to_check: np.ndarray, target: np.ndarray
